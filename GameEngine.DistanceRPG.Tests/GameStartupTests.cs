@@ -312,9 +312,31 @@ public class GameStartupTests
         var takeBack = typeof(DistanceRpgGame).GetMethod("TakeBackFailedSaves", Declared)!;
         Assert.Equal(["DistanceRpgGame.Save"], Callers(saveFailed));
         Assert.Equal(["DungeonScene.SaveFailed"], Callers(typeof(DungeonHud).GetMethod(nameof(DungeonHud.ShowSaveFailed))!));
+
+        // Between runs the screen between runs says it at once instead, when it is
+        // up (PHASE 6a DECISION 10): the same one Save, through HubScene.
+        var hubFailed = typeof(BetweenRunsScene).GetMethod(nameof(BetweenRunsScene.SaveFailed), Declared)!;
+        Assert.Equal(["DistanceRpgGame.Save"], Callers(hubFailed));
+        Assert.Equal(1, Mentions(save, hubFailed));
+        Assert.Equal(1, Mentions(save, typeof(DistanceRpgGame).GetMethod("HubScene", Declared)!));
         Assert.Equal(["DistanceRpgGame.TakeBackFailedSaves"], Callers(typeof(StartupNotices).GetMethod(nameof(StartupNotices.Withdraw))!));
         Assert.Equal(["DistanceRpgGame.Save"], Callers(takeBack));
         Assert.Equal(1, Mentions(save, takeBack));
+
+        // And takes it back there once a later save goes through (the 6a.2 review:
+        // the hub's row never expired, as a floor's does): the same one Save hands
+        // the hub up every failure since the last save that went through, before
+        // TakeBackFailedSaves forgets them.
+        var hubTakesBack = typeof(BetweenRunsScene).GetMethod(nameof(BetweenRunsScene.SaveWentThrough), Declared)!;
+        Assert.Equal(["DistanceRpgGame.Save"], Callers(hubTakesBack));
+        Assert.Equal(1, Mentions(save, hubTakesBack));
+        var saving = Walk(save);
+        int handedBack = saving.FindIndex(i => i.Called is { } called && Same(called, hubTakesBack));
+        Assert.True(handedBack > 0 && saving[handedBack - 1].Op == OpCodes.Ldfld
+                && SameField(saving[handedBack - 1].Field, typeof(DistanceRpgGame).GetField("_failedSaves", Declared)!),
+            "Save does not hand the hub what failed");
+        Assert.True(handedBack < saving.FindIndex(i => i.Called is { } called && Same(called, takeBack)),
+            "Save forgets what failed before it takes it back on the hub");
         Assert.Equal(["DistanceRpgGame.BeginNewCampaign", "DistanceRpgGame.BootCampaign", "DistanceRpgGame.LoadSlot", "DistanceRpgGame.Save", "DistanceRpgGame.ShowTitle"],
             Callers(lead));
         Assert.Equal(1, Mentions(save, lead));
@@ -780,6 +802,22 @@ public class GameStartupTests
         var game = typeof(DistanceRpgGame);
         var request = game.GetMethod(nameof(DistanceRpgGame.RequestSave))!;
         Assert.Equal(["DistanceRpgGame.BeginRun"], Callers(request));
+
+        // Between runs (PHASE 6a DECISION 10): the hub asks through its own host,
+        // IBetweenRunsHost.RequestSave — the game's same RequestSave — after every
+        // change it makes to the campaign, and those are its put-downs (Phase 6a.2),
+        // its deposits and its take-backs (Phase 6a.5). Only asked for, as the
+        // dungeon's are.
+        var hubAsks = typeof(IBetweenRunsHost).GetMethod(nameof(IBetweenRunsHost.RequestSave))!;
+        Assert.Equal(["BetweenRunsScene.MakeDeposit", "BetweenRunsScene.PutDown", "BetweenRunsScene.TakeBack"], Callers(hubAsks));
+        // And those are the only callers of the doors the hub changes the campaign
+        // through, so no change on the hub goes unsaved.
+        Assert.Equal(["BetweenRunsScene.PutDown"], Callers(typeof(CampaignState).GetMethod("Move", Declared)!));
+        Assert.Equal(["BetweenRunsScene.MakeDeposit"], Callers(typeof(Enchanter).GetMethod(nameof(Enchanter.Deposit))!));
+        Assert.Equal(["BetweenRunsScene.TakeBack"], Callers(typeof(Enchanter).GetMethod(nameof(Enchanter.TakeBack))!));
+        Assert.Contains(typeof(IBetweenRunsHost), game.GetInterfaces());
+        Assert.Equal(request, game.GetInterfaceMap(typeof(IBetweenRunsHost)).TargetMethods
+            .Single(method => method.Name.EndsWith(nameof(IBetweenRunsHost.RequestSave), StringComparison.Ordinal)));
         foreach (var asking in new[] { request, game.GetMethod("BeginRun", Declared)! })
             Assert.DoesNotContain(Instructions(Body(asking)!), i => i.Token != 0 && Resolve(asking, i.Token) is { } target
                 && (target.DeclaringType == typeof(CampaignBoot) || target.DeclaringType == typeof(SaveStore) || target.Name == "Save"));
@@ -872,6 +910,52 @@ public class GameStartupTests
                         .Any(i => i.instruction.Op == OpCodes.Stfld && SameField(i.instruction.Field, request) && clearingWalk[i.at - 1].Op == OpCodes.Ldc_I4_0),
                     $"{clearing} does not store false to {request.Name}");
         }
+    }
+
+    [Fact]
+    public void ASaveBetweenRunsIsLoggedAsTheRunsEndsOrTheHubs()
+    {
+        // The 6a.2 review: one public RequestSave answers the dungeon's autosaves and
+        // the hub's (PHASE 6a DECISION 10), so the game tells the run's end's save
+        // from a change on the hub's by a flag of its own, _runsEndAsked, which the
+        // log line reads (When). The run's end stores true to it; the frame's end
+        // hands it to When, the argument just before the call, and stores false to it
+        // once — past its clear of the request and the call, before the write — so
+        // the next save between runs is the hub's unless another run ends; and a
+        // campaign let go, or one adopted, carries none of the one before. Nothing
+        // else writes it. Read off the IL.
+        var game = typeof(DistanceRpgGame);
+        var runsEnd = game.GetField("_runsEndAsked", Declared)!;
+        var requested = game.GetField("_saveRequested", Declared)!;
+        var when = game.GetMethod("When", Declared)!;
+        var save = game.GetMethod("Save", Declared)!;
+        static List<int> Stores(List<(OpCode Op, MethodBase? Called, FieldInfo? Field)> walked, FieldInfo field, OpCode value)
+            => walked.Select((instruction, at) => (instruction, at))
+                .Where(i => i.instruction.Op == OpCodes.Stfld && SameField(i.instruction.Field, field) && walked[i.at - 1].Op == value)
+                .Select(i => i.at)
+                .ToList();
+
+        var asked = Walk(game.GetMethod("SaveAtTheRunsEnd", Declared)!);
+        Assert.Single(Stores(asked, runsEnd, OpCodes.Ldc_I4_1));
+
+        var write = Walk(game.GetMethod("WriteRequestedSave", Declared)!);
+        int told = write.FindIndex(i => i.Called is { } called && Same(called, when));
+        Assert.True(told > 0 && write[told - 1].Op == OpCodes.Ldfld && SameField(write[told - 1].Field, runsEnd),
+            "WriteRequestedSave does not hand When the run's end's flag");
+        Assert.Single(write, i => i.Op == OpCodes.Ldfld && SameField(i.Field, runsEnd));
+        Assert.Single(write, i => i.Op == OpCodes.Stfld && SameField(i.Field, runsEnd));
+        var cleared = Stores(write, runsEnd, OpCodes.Ldc_I4_0);
+        int requestCleared = Stores(write, requested, OpCodes.Ldc_I4_0).Last();
+        int written = write.FindIndex(i => i.Called is { } called && Same(called, save));
+        Assert.True(cleared.Count == 1 && requestCleared < cleared[0] && told < cleared[0] && cleared[0] < written,
+            "WriteRequestedSave does not clear the run's end's flag once, past the request's clear and When, before it writes");
+
+        foreach (string clearing in new[] { "DropCampaign", "Adopt" })
+            Assert.True(Stores(Walk(game.GetMethod(clearing, Declared)!), runsEnd, OpCodes.Ldc_I4_0).Count == 1, $"{clearing} does not store false to {runsEnd.Name}");
+        Assert.Equal(["Adopt", "DropCampaign", "SaveAtTheRunsEnd", "WriteRequestedSave"],
+            game.GetNestedTypes(Declared).Prepend(game).SelectMany(type => type.GetMethods(Declared))
+                .Where(method => Body(method) is not null && Walk(method).Any(i => i.Op == OpCodes.Stfld && SameField(i.Field, runsEnd)))
+                .Select(method => method.Name).Order(StringComparer.Ordinal));
     }
 
     [Fact]

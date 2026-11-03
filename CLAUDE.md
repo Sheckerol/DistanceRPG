@@ -45,6 +45,15 @@ GameEngine.DistanceRPG/         # Game executable
                                 # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
   DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
+  BetweenRunsScene.cs           # The screen between runs: DUNGEONS (the last run's summary, the list)
+                                # and WEAPONS (Tab); every change there asks the game for a save
+                                # (IBetweenRunsHost.RequestSave). BetweenRunsHud draws both pages
+  HubWeapons.cs                 # The WEAPONS page between runs: the hands, the bags, the stable
+                                # (CampaignState.Move, the one door) and the enchanter's shop, a carry
+                                # the page's alone
+  DepositPanel.cs               # The deposit panel over WEAPONS (D): ENCHANT, REFINE or MOVE with their
+                                # odds or reasons, the offer list or the source list, the confirm; and
+                                # the take-back ask (T)
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)
@@ -61,6 +70,12 @@ GameEngine.DistanceRPG/         # Game executable
     FogGeometry.cs / FogBoxBuilder.cs / FogState.cs   # Fog-box math + runtime grids
     GridCollision.cs            # Axis-separated circle-vs-tile-grid collision
     TurnSystem.cs               # Turn state machine, drives combat via events
+    Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
+                                # from the wear it has ever cashed (R4); where its slots open, what
+                                # an enchantment costs, a service's runs, and its improvement odds
+    Enchanter.cs                # The enchanter (§6.2–§6.5): a deposit or a transfer, its gates, the
+                                # service clock every run's end ticks, the improvement roll (its own
+                                # stream), a take-back — the one place wear is spent
     EnemyAi.cs                  # Targeting + budget-limited move planning
     CombatRules.cs / Weapons.cs / GameConstants.cs / ...
 GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
@@ -86,13 +101,16 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   add a C# copy of a JSON value: the load validates the code catalogues against
   the JSON instead. Nothing the golden tests pin may go in `tuning.json`.
 - A `tuning.json` key arrives with the code that reads it — except a number the
-  user has ruled and wants in the file first (the Enchanter group's, until Phase
-  6a): declare it in `TuningSchema` with `Played = false`, and it is read,
-  clamped and warned like every key but left out of the save's tuning hash, so
-  turning it never says the numbers changed. The change that gives a rule of
-  play one to read sets it played. A key no rule of play reads at all — the
-  launcher's `SaveSlots`, how many save slots there are — is `Played = false`
-  for good.
+  user has ruled and wants in the file first (the Enchanter group's were, until
+  Phase 6a played each as it read it): declare it in `TuningSchema` with
+  `Played = false`, and it is read, clamped and warned like every key but left
+  out of the save's tuning hash, so turning it never says the numbers changed.
+  The change that gives a rule of play one to read sets it played. A key that
+  starts to play with a save version is hashed from that version (`HashedFrom`:
+  Phase 5's are 1, Phase 6a's 2), so a save of an older version is compared on
+  its own version's keys and never told a number it was not played under has
+  changed. A key no rule of play reads at all — the launcher's `SaveSlots`, how
+  many save slots there are — is `Played = false` for good.
 - Every number of a content file has a range (`Logic/Content/ContentBounds.cs`,
   asked by `ContentValidator.RequireInRange` under `RuleNumberInRange`), its top
   read off a `TuningSchema` clamp or a rule, never a master's value: a new numeric
@@ -105,3 +123,11 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   that fails is set aside, never restored. A new field of the save gets its
   checks in the same change, and everything play writes must still load
   (`SaveConsistencyTests`).
+- The save is versioned (`SaveCodec.CurrentVersion`: 2 since Phase 6a), and
+  every older save must still load. A member appended with a default needs no
+  step (`Logic/Save/SaveFile.cs`' header rule; a list written `null` while
+  empty); a member every document must carry bumps the version, with a step in
+  `SaveCodec.Migrations` that writes it into every older document — pure,
+  walking the document by name, never throwing on a hand edit — pinned by the
+  two saves the pre-rework code wrote (`PreReworkSaveTests`; their
+  `TestData/saves` are never edited).

@@ -32,10 +32,27 @@ namespace GameEngine.DistanceRPG.Logic;
 /// counter itself, so that is play's everyday state; a lock on a retired dungeon,
 /// which play writes when <c>dungeons.json</c> moves <c>retiresOnClear</c> onto a
 /// dungeon already locked; hit points or mana over a maximum the load derives
-/// from today's tuning and content; a soul's tier, which its pin plays at 1; and
+/// from today's tuning and content, and a weapon's wear over the capacity today's
+/// tuning replays for it (held instead to a ceiling no tuning in range can pass,
+/// <see cref="SaveMapper"/>); a soul's tier, which its pin plays at 1; and
 /// the counts no clamp or rule gives an honest ceiling, which
 /// <see cref="SaveMapper"/> holds only to the sanity bound past which the next
-/// step of play would wrap (<see cref="ContentBounds.MostCount"/>).
+/// step of play would wrap (<see cref="ContentBounds.MostCount"/>). And of the
+/// enchanter's queue (Phase 6a.3a): an Enchant's deposit below today's price or
+/// above today's capacity, both today's tuning; a queued enchantment today's
+/// <c>restricted.json</c> would refuse or lists among the never-rolled — the
+/// deposit was legal when it was made, and the file beside the game is
+/// JSON-master data an edit may move since; which dungeon is retired when
+/// something is at the enchanter — check 30 asks that one is, never that it is
+/// the one today's <c>dungeons.json</c> retires on its clear, which an edit may
+/// move; and a run's end's report against the deposits still in the shop, which
+/// a report outlives. And of a transfer (Phase 6a.6): a soul today's relations
+/// would refuse on its weapon, one whose leaving would strand an entry on its
+/// source, and one that would leave a staff or a wand casting nothing — each the
+/// content's to say, <c>restricted.json</c>'s or <c>weapons.json</c>'s, which an
+/// edit beside the game may move since the deposit was made; and a transfer's
+/// report whose soul is not among the seen: the soul was the party's own weapon's,
+/// and nothing asks that every entry a weapon carries was met.
 /// </para>
 /// </summary>
 internal static class SaveConsistency
@@ -89,6 +106,8 @@ internal static class SaveConsistency
 
         if (campaign.Visit is { } visit)
             Visit(campaign, visit, retired, locks);
+
+        Shop(campaign);
     }
 
     /// <summary>4. No run has ended: only a run's end moves the counter or clears a dungeon, and it always writes the summary.</summary>
@@ -216,10 +235,10 @@ internal static class SaveConsistency
     }
 
     /// <summary>
-    /// 15–19. The visit in progress, against the campaign that entered it and
+    /// 15–20. The visit in progress, against the campaign that entered it and
     /// against itself: entered as <see cref="CampaignState.Enter"/> enters, played
     /// as a visit plays — XP only gained, the boss down for good once it falls, a
-    /// drop handed over only then.
+    /// drop handed over only then, and no weapon worn that no member wielded.
     /// </summary>
     private static void Visit(CampaignDto campaign, VisitDto visit, HashSet<string> retired, Dictionary<string, int> locks)
     {
@@ -279,6 +298,266 @@ internal static class SaveConsistency
                     throw new SaveFormatException(where, "taken from a standing row: a drop lies only on a corpse, and nothing rises once the boss is down");
             }
         }
+
+        // 20. No enemy's weapon wears (an enemy's wear feed does nothing), and a
+        // drop is made when it is rolled: neither has banked or cashed any wear
+        // (Phase 6a.1). A weapon the party put down, and a spoil, are the party's,
+        // and carry their wear.
+        for (int f = 0; f < visit.Floors.Count; f++)
+        {
+            var rows = visit.Floors[f].Enemies;
+            for (int k = 0; k < rows.Count; k++)
+            {
+                string where = $"{at}.floors[{f}].enemies[{k}]";
+                Unworn(rows[k].Weapon, $"{where}.weapon", "no enemy weapon is ever one the party wields, so it never wears");
+                if (rows[k].GroundItem is { } lying)
+                    Unworn(lying.Weapon, $"{where}.groundItem.weapon", "a drop is made when it is rolled, and nothing has wielded it since");
+            }
+        }
+    }
+
+    /// <summary>
+    /// 21–30. The enchanter (Phase 6a.3a): the shop, as the hub's deposits fill it
+    /// and every run's end works it, and what the last run's end said of it. A
+    /// deposit takes the next ordinal and cashes the whole pool, which a take-back
+    /// gives back; its runs are the count plus one, or a transfer's; the tick that
+    /// works its last run brings it back; an Enchant buys an enchantment the
+    /// campaign has met, which the weapon has room for; a Transfer (Phase 6a.6)
+    /// names a soul where it lies, on its source or on the weapon — a reorder's
+    /// not its last — and a weapon that takes one from another has room for it; a
+    /// run that counts works the newest, and one that did not works nothing; and
+    /// nothing is deposited before the tutorial is beaten.
+    /// </summary>
+    private static void Shop(CampaignDto campaign)
+    {
+        const string at = $"{At}.enchanter";
+        var queue = campaign.Enchanter ?? [];
+        var seen = new HashSet<string>(campaign.Seen, StringComparer.Ordinal);
+
+        // 21. A deposit takes the next ordinal, and the count moves past it: the shop
+        // is in deposit order, each ordinal its own, each below the count.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            int ordinal = queue[i].Ordinal;
+            if (i > 0 && ordinal <= queue[i - 1].Ordinal)
+                throw new SaveFormatException($"{at}[{i}].ordinal",
+                    $"{ordinal} follows {queue[i - 1].Ordinal}: the shop is in deposit order, and each deposit takes the next ordinal, never one reused");
+            if (ordinal >= campaign.DepositsMade)
+                throw new SaveFormatException($"{at}[{i}].ordinal",
+                    $"{ordinal} is not below the deposits made, {campaign.DepositsMade}: a deposit takes the next ordinal, and the count moves past it");
+        }
+
+        // 22. A deposit cashes the whole pool, and nothing wears a weapon in the shop.
+        for (int i = 0; i < queue.Count; i++)
+            if (queue[i].Weapon.Wear != 0)
+                throw new SaveFormatException($"{at}[{i}].weapon.wear",
+                    $"{queue[i].Weapon.Wear} worn in the shop: the deposit cashed it all, and nothing wears a weapon there");
+
+        // 23. The tick that works a service's last run brings its weapon back.
+        for (int i = 0; i < queue.Count; i++)
+            if (queue[i].RunsWorked >= queue[i].Runs)
+                throw new SaveFormatException($"{at}[{i}].runsWorked",
+                    $"{queue[i].RunsWorked} of {queue[i].Runs} runs worked in the shop: the tick that works the last run brings the weapon back");
+
+        // 24. A service takes the count plus one runs, fixed as it went in, and the
+        // count cannot move while the weapon is in the shop — a transfer the runs of
+        // attaching its soul: the count plus one from another weapon, and the count
+        // for a reorder, which attaches it again as the last of the same count.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            int count = queue[i].Weapon.Enchantments.Count;
+            bool reorder = queue[i].Service == nameof(Service.Transfer) && queue[i].Source is null;
+            if (queue[i].Runs != (reorder ? count : count + 1))
+                throw new SaveFormatException($"{at}[{i}].runs", reorder
+                    ? $"{queue[i].Runs} for a reorder on a weapon holding {count} enchantments: a reorder takes the count, and the count does not move in the shop"
+                    : $"{queue[i].Runs} for a weapon holding {count} enchantments: a service takes the count plus one runs, and the count does not move in the shop");
+        }
+
+        // 25. An Enchant buys an enchantment the campaign has met; a refinement names
+        // none; and neither names a source, which only a transfer has.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            var deposit = queue[i];
+            if (deposit.Service == nameof(Service.Transfer))
+                continue;   // 26's
+            bool enchant = deposit.Service == nameof(Service.Enchant);
+            if (enchant && deposit.Enchantment is null)
+                throw new SaveFormatException($"{at}[{i}].enchantment", "missing on an Enchant: a deposit to enchant names the enchantment it buys");
+            if (enchant && !seen.Contains(deposit.Enchantment!))
+                throw new SaveFormatException($"{at}[{i}].enchantment",
+                    $"{deposit.Enchantment} is not among the seen: the enchanter offers only what the campaign has met");
+            if (!enchant && deposit.Enchantment is not null)
+                throw new SaveFormatException($"{at}[{i}].enchantment", $"{deposit.Enchantment} named on a {deposit.Service}: a refinement attaches nothing");
+            if (deposit.Source is not null)
+                throw new SaveFormatException($"{at}[{i}].source", $"a source held on {A(deposit.Service)}: only a transfer takes a second weapon into the shop");
+            if (deposit.SourceIndex is not null)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex", $"{deposit.SourceIndex} named on {A(deposit.Service)}: only a transfer moves a soul");
+        }
+
+        // 26. A transfer (Phase 6a.6) names the soul it moves by where it lies — on
+        // its source, or on the weapon for a reorder — and no enchantment, which only
+        // an Enchant buys; and the soul lies there: neither weapon changes in the shop.
+        // A reorder names a soul short of the weapon's last: the entry already last
+        // is not moved (IT IS LAST ALREADY, PHASE 6a DECISION 11), and a reorder of
+        // it would complete as a move of nothing but the soul's tier.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            var deposit = queue[i];
+            if (deposit.Service != nameof(Service.Transfer))
+                continue;
+            if (deposit.Enchantment is not null)
+                throw new SaveFormatException($"{at}[{i}].enchantment",
+                    $"{deposit.Enchantment} named on a Transfer: a transfer moves a soul the party owns, named by where it lies, and buys none");
+            if (deposit.SourceIndex is not { } index)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex", "missing on a Transfer: a transfer names the soul it moves by its place");
+            var giver = deposit.Source ?? deposit.Weapon;
+            if (index >= giver.Enchantments.Count)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex",
+                    $"{index} on a {(deposit.Source is null ? "weapon" : "source")} holding {giver.Enchantments.Count} enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop");
+            if (deposit.Source is null && index == giver.Enchantments.Count - 1)
+                throw new SaveFormatException($"{at}[{i}].sourceIndex",
+                    $"{index} names the last enchantment on the weapon: a reorder moves a soul to the end of the weapon, so the one it names is not last already, and nothing changes a weapon in the shop");
+        }
+
+        // 27. What the last run's end said of the shop: a report for each deposit in
+        // it as the run ended, in deposit order, each saying what its deposit bought
+        // as the deposit does (25) — so no more reports than deposits were ever made
+        // — and, on a service it brought back, what the improvement roll did to the
+        // weapon, if anything (Phase 6a.4). A run that counted worked the newest few
+        // a run on — the newest always, the enchanter working on one at least — and
+        // left the older ones stalled, short of their last run; a run that did not
+        // count worked nothing. Nothing ties a report to a deposit still in the shop:
+        // a report outlives the entry it speaks of.
+        if (campaign.LastResult is { Services: { } reports } last)
+        {
+            const string where = $"{At}.lastResult.services";
+            int worked = 0;
+            for (int i = 0; i < reports.Count; i++)
+            {
+                var report = reports[i];
+                bool enchant = report.Service == nameof(Service.Enchant);
+                bool transfer = report.Service == nameof(Service.Transfer);
+                if (enchant && report.Enchantment is null)
+                    throw new SaveFormatException($"{where}[{i}].enchantment", "missing on an Enchant: a report says what its deposit bought, and a deposit to enchant names its enchantment");
+                if (enchant && !seen.Contains(report.Enchantment!))
+                    throw new SaveFormatException($"{where}[{i}].enchantment",
+                        $"{report.Enchantment} is not among the seen: its deposit bought what the campaign had met, and the campaign forgets nothing it has met");
+                if (transfer && report.Enchantment is null)
+                    throw new SaveFormatException($"{where}[{i}].enchantment", "missing on a Transfer: a report of a transfer names the soul it moves");
+                if (!enchant && !transfer && report.Enchantment is not null)
+                    throw new SaveFormatException($"{where}[{i}].enchantment", $"{report.Enchantment} named on a {report.Service}: a refinement attaches nothing");
+
+                // A transfer's (Phase 6a.6): its source, which only a transfer has, and
+                // the tier its soul landed at, said as it comes back and not before.
+                if (!transfer && report.SourceId is not null)
+                    throw new SaveFormatException($"{where}[{i}].sourceId", $"{report.SourceId} named on {A(report.Service)}: only a transfer takes a soul from another weapon");
+                bool landed = transfer && !report.Stalled && report.RunsWorked == report.Runs;
+                if (landed && report.Tier is null)
+                    throw new SaveFormatException($"{where}[{i}].tier", "missing on a Transfer that came back: its soul landed at a tier, which its report says");
+                if (!landed && report.Tier is not null)
+                    throw new SaveFormatException($"{where}[{i}].tier", transfer
+                        ? $"{report.Tier} on a transfer {(report.Stalled ? "stalled" : $"at {report.RunsWorked} of {report.Runs} runs")}: a soul lands as its service comes back, its last run worked"
+                        : $"{report.Tier} on {A(report.Service)}: only a transfer lands a soul at a tier");
+
+                // What the improvement roll did (Phase 6a.4): an outcome and the
+                // modifier it gave a stack of, together, and only as the service
+                // came back — the roll is made as its last run is worked.
+                if ((report.Improved is null) != (report.Modifier is null))
+                    throw new SaveFormatException($"{where}[{i}].{(report.Improved is null ? "improved" : "modifier")}",
+                        $"missing beside {(report.Improved is null ? $"the modifier {report.Modifier}" : $"the outcome {report.Improved}")}: an improvement is an outcome and the modifier it gave a stack of, together");
+                if (report.Improved is not null && (report.Stalled || report.RunsWorked != report.Runs))
+                    throw new SaveFormatException($"{where}[{i}].improved",
+                        $"{report.Improved} on a service {(report.Stalled ? "stalled" : $"at {report.RunsWorked} of {report.Runs} runs")}: the improvement roll is made as a service comes back, its last run worked");
+
+                if (report.Stalled)
+                {
+                    if (report.RunsWorked >= report.Runs)
+                        throw new SaveFormatException($"{where}[{i}].runsWorked",
+                            $"{report.RunsWorked} of {report.Runs} runs on a stalled report: a stalled deposit is still in the shop, short of its last run");
+                    if (last.ServiceTick && i == reports.Count - 1)
+                        throw new SaveFormatException($"{where}[{i}].stalled",
+                            "true on the newest deposit, on a run that counted: a run that counts works the newest, and one at least");
+                    if (last.ServiceTick && i > 0 && !reports[i - 1].Stalled)
+                        throw new SaveFormatException($"{where}[{i}].stalled",
+                            "true after a worked report, on a run that counted: a run that counts works the newest, and the reports are in deposit order");
+                    continue;
+                }
+                if (!last.ServiceTick)
+                    throw new SaveFormatException($"{where}[{i}].stalled",
+                        "false on a run that did not count: a run that did not count works nothing, and reports every deposit stalled");
+                if (report.RunsWorked < 1)
+                    throw new SaveFormatException($"{where}[{i}].runsWorked",
+                        $"{report.RunsWorked} of {report.Runs} runs on a worked report: the run worked it a run at least");
+                worked++;
+            }
+            if (worked > ContentBounds.MostWorked)
+                throw new SaveFormatException(where,
+                    $"{worked} worked, more than the {ContentBounds.MostWorked} the enchanter works on at most (EnchanterWorksOn at its most)");
+            if (reports.Count > campaign.DepositsMade)
+                throw new SaveFormatException(where,
+                    $"{reports.Count} reports and {campaign.DepositsMade} deposits made: a report speaks of a deposit, and each deposit is its own");
+        }
+
+        // 28. The deposit cashed the wear it holds: the weapon has cashed that much at
+        // least. And a take-back puts it back — in the pool, and off what was cashed
+        // (Weapon.RefundWear) — so the weapon it gives back must load: its wear within
+        // the ceiling every weapon row is held to (SaveMapper), under what it had
+        // cashed before the deposit. Play writes both, the weapon having gone in as
+        // one that loaded — short of a cash saturated at the count's ceiling, a
+        // billion hits in, which no play reaches.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            var deposit = queue[i];
+            if (deposit.WearAtDeposit > deposit.Weapon.WearCashed)
+                throw new SaveFormatException($"{at}[{i}].wearAtDeposit",
+                    $"{deposit.WearAtDeposit} is above what the weapon has ever cashed, {deposit.Weapon.WearCashed}: the deposit cashed it");
+            int before = deposit.Weapon.WearCashed - deposit.WearAtDeposit;
+            long banked = ContentBounds.Bar + (long)ContentBounds.MostCapacityPerBar * before;
+            if (deposit.WearAtDeposit > banked)
+                throw new SaveFormatException($"{at}[{i}].wearAtDeposit",
+                    $"{deposit.WearAtDeposit} is above {banked}, the most a weapon that had cashed {before} banks: the deposit cashed what the weapon banked, and a take-back puts it back");
+        }
+
+        // 29. What an Enchant attaches as it finishes must load: the entry is the
+        // weapon's next, so the weapon has room for one more — and so has a weapon a
+        // transfer moves a soul onto from another (Phase 6a.6); a reorder's count
+        // does not move.
+        for (int i = 0; i < queue.Count; i++)
+        {
+            bool adds = queue[i].Service == nameof(Service.Enchant) || (queue[i].Service == nameof(Service.Transfer) && queue[i].Source is not null);
+            if (adds && queue[i].Weapon.Enchantments.Count >= ContentBounds.MostEnchantments)
+                throw new SaveFormatException($"{at}[{i}].weapon.enchantments",
+                    $"{queue[i].Weapon.Enchantments.Count} entries on a deposit to {(queue[i].Service == nameof(Service.Enchant) ? "enchant" : "take a soul")}: the one it attaches would be more than the {ContentBounds.MostEnchantments} a weapon can hold");
+        }
+
+        // 30. The enchanter opens when the tutorial is beaten (§6.3), which retires
+        // it, and retired is never undone: a shop holding anything, a run's end
+        // reporting on one, or a deposit ever made needs a dungeon retired. Asked of
+        // the retired list alone, never of which dungeon today's dungeons.json
+        // retires on its clear — a copy beside the game may move that flag onto
+        // another (as check 3's withdrawal found), and a save play wrote still loads.
+        if (campaign.Retired.Count == 0)
+        {
+            const string why = "the enchanter opens once the tutorial is beaten, which retires it, and takes nothing before";
+            if (queue.Count > 0)
+                throw new SaveFormatException(at, $"{queue.Count} in the shop and no dungeon is retired: {why}");
+            if (campaign.LastResult?.Services is { Count: > 0 } told)
+                throw new SaveFormatException($"{At}.lastResult.services", $"{told.Count} reported at the enchanter and no dungeon is retired: {why}");
+            if (campaign.DepositsMade > 0)
+                throw new SaveFormatException($"{At}.depositsMade", $"{campaign.DepositsMade} made and no dungeon is retired: {why}");
+        }
+    }
+
+    /// <summary>A service by the name the save gives it, with its article: <c>an Enchant</c>, <c>a Refine</c>.</summary>
+    private static string A(string service) => service == nameof(Service.Enchant) ? $"an {service}" : $"a {service}";
+
+    /// <summary>20's one question: a weapon no member has wielded has banked no wear and cashed none.</summary>
+    private static void Unworn(WeaponDto weapon, string at, string why)
+    {
+        if (weapon.Wear != 0)
+            throw new SaveFormatException($"{at}.wear", $"{weapon.Wear} worn: {why}");
+        if (weapon.WearCashed != 0)
+            throw new SaveFormatException($"{at}.wearCashed", $"{weapon.WearCashed} cashed: {why}");
     }
 
     /// <summary>16's one question: what a pool held at the door is no more than what it holds now.</summary>

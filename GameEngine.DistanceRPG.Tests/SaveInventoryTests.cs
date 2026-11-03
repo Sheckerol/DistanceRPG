@@ -42,6 +42,9 @@ public class SaveInventoryTests
             new("_retired", Kept.Saved, "campaign.retired[] = RetiredInOrder"),
             new("LastResult", Kept.Saved, "campaign.lastResult: the summary over the list between runs survives a save and a load"),
             new("Visit", Kept.Saved, "campaign.visit: the Run group and every visited floor, or null between runs"),
+            new("_stable", Kept.Saved, "campaign.stable[], each weapon whole, in the order they were put there — null for an empty stable (Phase 6a.2)"),
+            new("_enchanter", Kept.Saved, "campaign.enchanter[], each deposit whole, in deposit order — null for an empty shop (Phase 6a.3a)"),
+            new("DepositsMade", Kept.Saved, "campaign.depositsMade: the next deposit's ordinal (Phase 6a.3a)"),
             new("_onWiped", Kept.NotSaved, "wiring: the subscription Enter — or a load, through Restore — makes on a visit's Wiped, remade with the visit"),
             new("RunEnded", Kept.NotSaved, "wiring: whoever plays the campaign subscribes afresh"),
         ],
@@ -77,7 +80,9 @@ public class SaveInventoryTests
             new("Forged", Kept.Saved, "forged, by modifier name: the identity spread a ceiling is read off"),
             new("Modifiers", Kept.Saved, "modifiers, by modifier name: the live total"),
             new("_enchantments", Kept.Saved, "enchantments[] in attachment order, (id, tier, xp) — never sorted"),
-            new("ForgedEnchantmentCount", Kept.Saved, "forgedEnchantments"),
+            new("ForgedEnchantmentCount", Kept.Saved, "forgedEnchantments: fixed as the weapon was made, and moved only by a transfer taking a forged entry off (Phase 6a.6), which a save of the weapon after it holds"),
+            new("Wear", Kept.Saved, "wear: the wear banked since its last service (version 2)"),
+            new("WearCashed", Kept.Saved, "wearCashed: the wear ever cashed, which the capacity and its progress are replayed from under the tuning loaded now (version 2)"),
             new("Enchantments", Kept.Derived, "the read-only view of _enchantments"),
             new("Name", Kept.Derived, "the row's, by id: a content edit to a statline reaches every saved copy"),
             new("Class", Kept.Derived, "the row's, by id"),
@@ -96,6 +101,36 @@ public class SaveInventoryTests
             new("Def", Kept.Saved, "id: the content's own entry by id — the tuned def, so a unique's pin holds"),
             new("_tier", Kept.Saved, "tier"),
             new("Xp", Kept.Saved, "xp: the remainder into the tier"),
+        ],
+        [typeof(Deposit)] =
+        [
+            new("Ordinal", Kept.Saved, "enchanter[].ordinal"),
+            new("Weapon", Kept.Saved, "enchanter[].weapon, whole"),
+            new("Service", Kept.Saved, "enchanter[].service, by name"),
+            new("WearAtDeposit", Kept.Saved, "enchanter[].wearAtDeposit: what the deposit cashed, which a take-back returns"),
+            new("Runs", Kept.Saved, "enchanter[].runs: fixed as it went in"),
+            new("EnchantmentId", Kept.Saved, "enchanter[].enchantment, by id"),
+            new("Source", Kept.Saved, "enchanter[].source, whole: a transfer's source, held in the shop as the same deposit (Phase 6a.6)"),
+            new("SourceIndex", Kept.Saved, "enchanter[].sourceIndex: a transfer's soul by its place on the source, or on the weapon for a reorder (Phase 6a.6)"),
+            new("RunsWorked", Kept.Saved, "enchanter[].runsWorked"),
+        ],
+        [typeof(ServiceReport)] =
+        [
+            new("WeaponId", Kept.Saved, "lastResult.services[].weaponId"),
+            new("Service", Kept.Saved, "lastResult.services[].service, by name"),
+            new("RunsWorked", Kept.Saved, "lastResult.services[].runsWorked: 0 on a stalled report play wrote"),
+            new("Runs", Kept.Saved, "lastResult.services[].runs"),
+            new("Stalled", Kept.Saved, "lastResult.services[].stalled"),
+            new("EnchantmentId", Kept.Saved, "lastResult.services[].enchantment, by id"),
+            new("Improved", Kept.Saved, "lastResult.services[].improved and .modifier, each by name: what the improvement roll did (Phase 6a.4)"),
+            new("Tier", Kept.Saved, "lastResult.services[].tier: the tier a finished transfer's soul landed at (Phase 6a.6)"),
+            new("SourceId", Kept.Saved, "lastResult.services[].sourceId: a transfer's source, by catalogue id (Phase 6a.6)"),
+            new("Roll", Kept.NotSaved, "the log's, written at the run's end: the roll as it was drawn, which a save made during the run replays: it holds the visit's map seed and the queued deposit's ordinal, each named in the log where it was made (deposit #n, Phase 6a.5)"),
+        ],
+        [typeof(Improvement)] =
+        [
+            new("Kind", Kept.Saved, "lastResult.services[].improved, by name"),
+            new("Modifier", Kept.Saved, "lastResult.services[].modifier, by name"),
         ],
         [typeof(WeaponXpBook)] =
         [
@@ -200,6 +235,7 @@ public class SaveInventoryTests
             new("_statusFeeds", Kept.Derived, "built by the constructor"),
             new("_movementFeeds", Kept.Derived, "built by the constructor"),
             new("_xpFeeds", Kept.Derived, "built by the constructor"),
+            new("_wearFeeds", Kept.Derived, "built by the constructor"),
             new("_defeatFeeds", Kept.Derived, "built by the constructor"),
             new("_dropFeeds", Kept.Derived, "built by the constructor, the boss named by its saved row"),
             new("_heldDeaths", Kept.NotSaved, "empty outside a raise, which a safe point excludes"),
@@ -234,6 +270,7 @@ public class SaveInventoryTests
             new("RiposteTriggered", Kept.NotSaved, "an event"),
             new("XpCredited", Kept.NotSaved, "an event"),
             new("EnchantmentTiered", Kept.NotSaved, "an event"),
+            new("WeaponWornFull", Kept.NotSaved, "an event"),
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
         ],
     };
@@ -339,6 +376,32 @@ public class SaveInventoryTests
             new("_menu", Kept.NotSaved, "a menu: the one ESC opens over the hub, closed on every showing"),
             new("_answer", Kept.NotSaved, "a menu: what the menu answers under its lines, until the next key or until the menu closes"),
             new("NoticeRows", Kept.NotSaved, "this showing's notices: the log keeps them, and a load has its own to say"),
+            new("_notices", Kept.NotSaved, "this showing's notices, a failed save of the hub's laid ahead of them: the log keeps them"),
+            new("_shownWhole", Kept.NotSaved, "how many of this showing's notices are shown whole"),
+            new("_weapons", Kept.NotSaved, "the WEAPONS page: its rows are the campaign's, read afresh; its choice, its window and a carry are presentation (HubWeapons, below)"),
+            new("_onWeapons", Kept.NotSaved, "which page is up: every showing opens on DUNGEONS"),
+            new("_refusal", Kept.NotSaved, "what the last key was refused with, until the next key"),
+            new("_panel", Kept.NotSaved, "the deposit panel or the take-back ask (Phase 6a.5): the screen's alone, like a carry — the campaign changes only at the ENTER that deposits or takes back, so a save never sees one, and every showing opens with none up (DepositPanel, below)"),
+        ],
+        [typeof(HubWeapons)] =
+        [
+            new("_campaign", Kept.Derived, "the campaign the save restores — the page's rows are read off it afresh each time"),
+            new("_chosen", Kept.NotSaved, "the page's choice: every showing opens on the first row it can choose"),
+            new("_top", Kept.NotSaved, "the window's first row: presentation, kept to the choice"),
+            new("_carried", Kept.NotSaved, "a carry is the page's alone and moves nothing: the campaign changes only as it is put down (CampaignState.Move), so a save never sees one, and a quit mid-carry loses nothing"),
+        ],
+        [typeof(DepositPanel)] =
+        [
+            new("Weapon", Kept.Derived, "the weapon the panel is about: the campaign's, where the save keeps it — in a bag, the stable or the shop"),
+            new("From", Kept.Derived, "where the weapon lay as the panel opened, as the campaign has it — none on a take-back's ask — and asked again at the ENTER (DepositPanel.RefusalNow)"),
+            new("TakingBack", Kept.Derived, "the deposit a take-back asks about: the campaign's shop, saved"),
+            new("_services", Kept.Derived, "the services as the enchanter answers them (Enchanter.ServiceRefusal), asked of the campaign as the panel opens"),
+            new("_offers", Kept.Derived, "the offer as the enchanter answers it (Enchanter.Offers), asked of the campaign as the panel opens"),
+            new("_moves", Kept.Derived, "the souls a MOVE could take as the enchanter answers them (Enchanter.TransferOffers), asked of the campaign as the panel opens, and asked again at the ENTER (Phase 6a.6)"),
+            new("_step", Kept.NotSaved, "which question is up: a panel is the screen's alone, and nothing is deposited until the confirm's ENTER"),
+            new("_service", Kept.NotSaved, "the service chosen: nothing is deposited until the confirm's ENTER"),
+            new("_chosen", Kept.NotSaved, "the offer or the soul chosen: nothing is deposited until the confirm's ENTER"),
+            new("_top", Kept.NotSaved, "the offer list's or the source list's window: presentation, kept to the choice"),
         ],
     };
 
@@ -376,9 +439,11 @@ public class SaveInventoryTests
     public void EverySceneFieldIsViewDerivedOrNamedAsNot()
     {
         // 1b's scene rows, as code (Phase 5.8): every instance field of the two
-        // scenes is in the document's view, derived from what the save restores, or
-        // not saved for the reason given — so a scene field added later fails here
-        // until someone decides whether a resume needs it.
+        // scenes — and of the WEAPONS page the screen between runs holds (Phase
+        // 6a.2), and of its deposit panel (Phase 6a.5) — is in the document's view,
+        // derived from what the save restores, or not saved for the reason given — so
+        // a scene field added later fails here until someone decides whether a resume
+        // needs it.
         const BindingFlags Declared = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly;
         foreach (var (type, rows) in SceneInventory)
         {

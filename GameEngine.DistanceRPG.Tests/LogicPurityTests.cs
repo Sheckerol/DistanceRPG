@@ -123,14 +123,16 @@ public class LogicPurityTests
         Assert.Equal([], ownRandom);
 
         // The scan sees this phase's streams being built where they are drawn —
-        // the stairs' and the boss's, the floor's map — so an assertion above
-        // cannot pass by finding nothing.
+        // the stairs' and the boss's, the floor's map, and the enchanter's
+        // improvement roll (Phase 6a.4) — so an assertion above cannot pass by
+        // finding nothing.
         bool Builds(Type from) => calls.Any(c => c.Op == OpCodes.Newobj && c.Target.DeclaringType == typeof(Mulberry32)
             && Root(c.From.DeclaringType) == from);
         Assert.True(Builds(typeof(StairPlacer)));
         Assert.True(Builds(typeof(DungeonState)));
         Assert.True(Builds(typeof(Floor)));
         Assert.True(Builds(typeof(EnemyPlacer)));
+        Assert.True(Builds(typeof(Enchanter)));
     }
 
     /// <summary>

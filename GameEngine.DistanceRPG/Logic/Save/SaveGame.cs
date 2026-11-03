@@ -129,8 +129,9 @@ public static class SaveGame
     /// <summary>
     /// The campaign as a document, stamped with <see cref="SaveCodec.CurrentVersion"/>
     /// and the hash of the tuning it is being played under — the current
-    /// content's — and never the tuning's values (§5.3): between runs, or with
-    /// the visit in progress at a safe point.
+    /// content's, on the current version's keys, which the document says
+    /// (<see cref="SaveFile.TuningHashVersion"/>) — and never the tuning's values
+    /// (§5.3): between runs, or with the visit in progress at a safe point.
     /// </summary>
     /// <param name="campaign">The campaign, at a safe point (<see cref="IsSafePoint"/>).</param>
     /// <param name="view">What the scene is showing, carried for it; null for nothing to say.</param>
@@ -148,8 +149,8 @@ public static class SaveGame
             throw new InvalidOperationException(
                 $"A visit to '{campaign.Visit!.Def.Id}' is not at a safe point ({campaign.Visit.Turns!.Phase}{(campaign.Visit.Turns.Events.Running ? ", a raise running" : "")}): a campaign is saved between runs, or at a player turn with nothing in flight.");
 
-        return new SaveFile(SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning), SaveMapper.Capture(campaign), view,
-            savedAt is { } at ? TimeText(at) : null);
+        return new SaveFile(SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning, SaveCodec.CurrentVersion), SaveCodec.CurrentVersion,
+            SaveMapper.Capture(campaign), view, savedAt is { } at ? TimeText(at) : null);
     }
 
     /// <summary>
@@ -189,9 +190,13 @@ public static class SaveGame
     /// from the seed, and nothing re-derived that the save holds. No floor's
     /// system is open: whoever plays the visit opens it
     /// (<see cref="DungeonState.OpenTurns"/>), as an arrival does. A different
-    /// tuning warns and loads (<see cref="LoadedCampaign.TuningChanged"/>); an id
-    /// the content no longer has refuses the save, naming where, and so does a time
-    /// that is no time (<see cref="SavedAtOf"/>), before anything is built.
+    /// tuning warns and loads (<see cref="LoadedCampaign.TuningChanged"/>) — asked
+    /// on the keys of the version the save's hash is of
+    /// (<see cref="SaveFile.TuningHashVersion"/>, PHASE 6a DECISION 9), so a key
+    /// that began to play since is no number the campaign was played under; an id
+    /// the content no longer has refuses the save, naming where, and so do a time
+    /// that is no time (<see cref="SavedAtOf"/>) and a hash of a version the
+    /// document is older than, before anything is built.
     /// </summary>
     /// <param name="file">A document as <see cref="SaveCodec.Read"/> returns it, at <see cref="SaveCodec.CurrentVersion"/>.</param>
     /// <param name="content">
@@ -213,10 +218,13 @@ public static class SaveGame
         if (file.Version != SaveCodec.CurrentVersion)
             throw new SaveFormatException(SaveCodec.VersionMember,
                 $"{file.Version}: a restore reads version {SaveCodec.CurrentVersion}, which SaveCodec.Read lifts an older document to");
+        if (file.TuningHashVersion < 1 || file.TuningHashVersion > file.Version)
+            throw new SaveFormatException(SaveCodec.TuningHashVersionMember,
+                $"{file.TuningHashVersion} is no version of this document: a tuning hash is of the keys of version 1 to {file.Version}, never of a key set newer than its document");
         SavedAtOf(file);   // a time that is no time refuses the save before a floor is built
 
         var campaign = SaveMapper.Restore(file.Campaign, content);
-        bool changed = !string.Equals(file.TuningHash, TuningJson.Hash(content.Tuning), StringComparison.Ordinal);
+        bool changed = !string.Equals(file.TuningHash, TuningJson.Hash(content.Tuning, file.TuningHashVersion), StringComparison.Ordinal);
         return new LoadedCampaign(campaign, changed, file.View);
     }
 }

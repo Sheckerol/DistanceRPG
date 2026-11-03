@@ -20,6 +20,25 @@ namespace GameEngine.DistanceRPG.Logic;
 public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUntilAvailable, bool Early);
 
 /// <summary>
+/// Where a weapon the party owns is, between runs (§6.2, Phase 6a.2): a member's
+/// slot — <see cref="MemberId"/> and the slot, 0 the hand and the rest the bag —
+/// or the stable, <see cref="MemberId"/> null and <see cref="Index"/> its place in
+/// <see cref="CampaignState.Stable"/>, where <c>Stable.Count</c> is the stable's
+/// end: where a weapon put there goes. What the hub's moves name
+/// (<see cref="CampaignState.Move"/>).
+/// </summary>
+/// <param name="MemberId">The member whose slot it is, by roster id, or null for the stable.</param>
+/// <param name="Index">The slot, or the place in the stable.</param>
+public readonly record struct WeaponPlace(string? MemberId, int Index)
+{
+    /// <summary>A place in the stable: <c>Stable.Count</c> is its end.</summary>
+    public static WeaponPlace InTheStable(int index) => new(null, index);
+
+    /// <summary>Whether it is the stable's, rather than a member's slot.</summary>
+    public bool IsStable => MemberId is null;
+}
+
+/// <summary>
 /// The campaign (§6.7): what lives <em>outside</em> any one dungeon and outlasts
 /// every visit — the party, the permanent half of the game — and the visit in
 /// progress, the renewable half, which is null between runs. §6.7's "a save with
@@ -35,10 +54,11 @@ public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUnt
 /// <para>
 /// And what the campaign has met, as against what a run is carrying: the set of
 /// enchantment ids a weapon has brought into the party's hands (§3.3). It is
-/// save data (§5.1) and it is the one collection that only ever grows — §6.4's
-/// enchanter offers "what you have seen", and this is the list it will be
-/// reading. It is campaign-wide, never per floor or per visit: an entry met on
-/// floor 2 is still met after the party walks out, and on every visit after.
+/// save data (§5.1) and it is the one collection that only ever grows — §6.2's
+/// enchanter offers from it (<see cref="Enchanter.Offers"/>), less the souls and
+/// the kinds that do nothing yet. It is campaign-wide, never per floor or per
+/// visit: an entry met on floor 2 is still met after the party walks out, and on
+/// every visit after.
 /// </para>
 /// <para>
 /// <strong>Pickup is the trigger, not sight.</strong> An entry is met when the
@@ -50,7 +70,7 @@ public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUnt
 /// <strong>Unique souls go in.</strong> The set is what the campaign has met, and
 /// whether an entry may then be copied is a different question with an answer
 /// already in the content: <see cref="EnchantmentCatalogue.NeverRolled"/>. Filtering
-/// here instead would make the set answer a question §6.4 has not asked yet.
+/// here instead would make the set answer the enchanter's question for it.
 /// </para>
 /// <para>
 /// <strong>And it is never handed out as a <see cref="HashSet{T}"/>.</strong> .NET
@@ -75,6 +95,26 @@ public sealed record DungeonListing(DungeonDef Def, bool Selectable, int RunsUnt
 /// party kept. The dungeon itself is discarded whole. Between runs, the hub's
 /// dungeon list is read off those numbers (<see cref="Listings"/>).
 /// </para>
+/// <para>
+/// <strong>And the stable</strong> (§6.2, Phase 6a.2; PHASE 6a DECISION 7): the
+/// weapons the party owns and is not carrying, in the order they were put there
+/// (<see cref="Stable"/>), and unbounded. It changes by hand only between runs,
+/// through the hub's one door (<see cref="Move"/>), which never leaves a member
+/// carrying no weapon and arms a hand it empties from the bag; a load brings it
+/// back through <see cref="Restore"/>. A new campaign's is empty, and so is a
+/// save's from before it.
+/// </para>
+/// <para>
+/// <strong>And the enchanter's queue</strong> (§6.2, §6.7, Phase 6a.3a): the
+/// deposits in the shop, in deposit order (<see cref="AtTheEnchanter"/>), and how
+/// many deposits the campaign has ever made (<see cref="DepositsMade"/>), the next
+/// one's ordinal. A deposit and a take-back change it by hand, between runs,
+/// through the hub's doors (<see cref="Enqueue"/>, <see cref="TakeOut"/>), which
+/// the enchanter calls (<see cref="Enchanter"/>); every run's end works it, the
+/// visit gone, and brings a finished service's weapon back to the end of the stable
+/// (<see cref="Return"/>) — a transfer's two, its source after it (Phase 6a.6); a
+/// load brings it back through <see cref="Restore"/>.
+/// </para>
 /// Engine-free and deterministic, like everything else under <c>Logic/</c>: it
 /// rolls nothing — a visit's seed is handed to <see cref="Enter"/> by whoever
 /// enters.
@@ -94,6 +134,18 @@ public sealed class CampaignState
     private readonly Dictionary<string, int> _lockedUntilRun = new(StringComparer.Ordinal);
     private readonly HashSet<string> _cleared = new(StringComparer.Ordinal);
     private readonly HashSet<string> _retired = new(StringComparer.Ordinal);
+
+    // The stable (§6.2): the weapons owned and not carried, in the order they
+    // were put there. Written by the hub's moves between runs (Move), by the
+    // enchanter's doors — a deposit takes a weapon out (Enqueue), a take-back and a
+    // finished service put one at its end (TakeOut, Return) — and by a load
+    // (Restore) alone.
+    private readonly List<Weapon> _stable = new();
+
+    // The enchanter's queue (§6.2): the deposits in the shop, in deposit order.
+    // Written by the hub's doors between runs (Enqueue, TakeOut), by the run's
+    // end's tick (Return) and by a load (Restore) alone.
+    private readonly List<Deposit> _enchanter = new();
 
     // The subscription Enter (or a load, through Restore) made on the visit in
     // progress's Wiped, taken off again at the run's end, so a discarded visit
@@ -163,7 +215,12 @@ public sealed class CampaignState
     /// A campaign as a save describes it (§5.1, §6.7): the party as the load
     /// rebuilt it, what it has met, the run counter, every lock a clear wrote — an
     /// early offer's rewrite as it stands — the dungeons cleared and retired, how
-    /// the last run ended, and the visit in progress, or none between runs. The
+    /// the last run ended, the visit in progress, or none between runs, the
+    /// stable, in its order, and the enchanter's queue in deposit order with how
+    /// many deposits were ever made — each filled here, before the visit is held,
+    /// never through the hub's doors (<see cref="Move"/>, <see cref="Enqueue"/>), so
+    /// a mid-run save with a stable and a queue comes back whole though those doors
+    /// are shut until its run ends. The
     /// one door the run's-end records come back through: internal, so there is
     /// still no public setter on the counter and no public <c>Retire</c> (a run's
     /// end is the only other writer). Nothing is re-derived and nothing is met: a
@@ -179,22 +236,39 @@ public sealed class CampaignState
     /// The ids are the load's to have checked against the content
     /// (<see cref="SaveGame.Restore"/>): this takes them as they are, and refuses
     /// only what no campaign can hold — a negative counter or lock, a dungeon
-    /// locked twice, and a visit with nobody to make it.
+    /// locked twice, a visit with nobody to make it, a stable or a queue that
+    /// holds a null or one weapon twice between them, and a queue out of deposit
+    /// order or holding an ordinal the deposits made have not reached.
     /// </para>
     /// </summary>
-    /// <exception cref="ArgumentException">The party names a null member, an id is null, a dungeon is locked twice, or a visit is handed in with no party.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">The counter or a lock is negative.</exception>
+    /// <exception cref="ArgumentException">The party names a null member, an id is null, a dungeon is locked twice, a visit is handed in with no party, the stable or the queue holds a null or a weapon twice between them, or the queue is out of deposit order or holds an ordinal not below the deposits made.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The counter, a lock or the deposits made is negative.</exception>
     internal static CampaignState Restore(IReadOnlyList<PartyMemberState> party, IReadOnlyList<string> seen, int runCounter,
         IReadOnlyList<(string DungeonId, int LockedUntilRun)> locks, IReadOnlyList<string> cleared, IReadOnlyList<string> retired,
-        RunResult? lastResult, DungeonState? visit)
+        RunResult? lastResult, DungeonState? visit, IReadOnlyList<Weapon> stable, IReadOnlyList<Deposit>? enchanter = null, int depositsMade = 0)
     {
         ArgumentNullException.ThrowIfNull(seen);
         ArgumentNullException.ThrowIfNull(locks);
         ArgumentNullException.ThrowIfNull(cleared);
         ArgumentNullException.ThrowIfNull(retired);
+        ArgumentNullException.ThrowIfNull(stable);
         ArgumentOutOfRangeException.ThrowIfNegative(runCounter);
         if (seen.Concat(cleared).Concat(retired).Any(id => id is null))
             throw new ArgumentException("A campaign's records name their entries by id, and one is null.");
+        if (stable.Any(weapon => weapon is null))
+            throw new ArgumentException("The stable holds weapons, and one is null.", nameof(stable));
+        if (stable.Distinct(ReferenceEqualityComparer.Instance).Count() != stable.Count)
+            throw new ArgumentException("The stable holds a weapon twice: a weapon is in one place.", nameof(stable));
+        enchanter ??= [];
+        ArgumentOutOfRangeException.ThrowIfNegative(depositsMade);
+        if (enchanter.Any(deposit => deposit?.Weapon is null))
+            throw new ArgumentException("The queue holds deposits of weapons, and one is null.", nameof(enchanter));
+        var queued = enchanter.SelectMany(deposit => deposit.Source is { } source ? new[] { deposit.Weapon, source } : [deposit.Weapon]).ToArray();
+        if (stable.Concat(queued).Distinct(ReferenceEqualityComparer.Instance).Count() != stable.Count + queued.Length)
+            throw new ArgumentException("The stable and the queue hold a weapon twice between them: a weapon is in one place.", nameof(enchanter));
+        for (int i = 0; i < enchanter.Count; i++)
+            if (enchanter[i].Ordinal < (i == 0 ? 0 : enchanter[i - 1].Ordinal + 1) || enchanter[i].Ordinal >= depositsMade)
+                throw new ArgumentException($"Deposit {i}'s ordinal, {enchanter[i].Ordinal}, is out of deposit order or not below the {depositsMade} deposits made.", nameof(enchanter));
 
         var campaign = new CampaignState(party)
         {
@@ -211,6 +285,9 @@ public sealed class CampaignState
         }
         campaign._cleared.UnionWith(cleared);
         campaign._retired.UnionWith(retired);
+        campaign._stable.AddRange(stable);   // not through Move: the hub's door is the player's, and shut while a visit is held
+        campaign._enchanter.AddRange(enchanter);   // nor through Enqueue, for the same reason: before the visit is held
+        campaign.DepositsMade = depositsMade;
         if (visit is not null)
         {
             if (campaign._party.Count == 0)
@@ -367,6 +444,14 @@ public sealed class CampaignState
     /// nothing.
     /// </para>
     /// <para>
+    /// <strong>The enchanter's clock</strong> (§6.3): once the visit is gone, the
+    /// run's end works the shop (<see cref="Enchanter.Tick"/>) — a run that counted
+    /// works the newest deposits a run on and brings back what they finish, each
+    /// with its improvement roll made on the run's map seed, one that did not works
+    /// nothing — and the result carries what it did
+    /// (<see cref="RunResult.Services"/>).
+    /// </para>
+    /// <para>
     /// <strong>Spoils, not gear</strong> (§4.4): only the run's spoils
     /// (<see cref="DungeonState.Spoils"/>) still in some member's bag count,
     /// found by reference — what the party carried in is never taken, and a spoil
@@ -434,16 +519,25 @@ public sealed class CampaignState
             ? visit.EntrySnapshot.ClawBack(_party, tuning.DeathXpLossPercent)
             : [];
 
-        // The visit goes, and nothing of the campaign stays wired to it.
+        // The visit goes, and nothing of the campaign stays wired to it — but its
+        // map seed, which a finishing service's improvement roll is keyed by.
+        long mapSeed = visit.MapSeed;
         visit.Wiped -= _onWiped;
         _onWiped = null;
         Visit = null;
+
+        // The enchanter's clock (§6.3), on every run's end with the visit gone, so
+        // a finished service's weapon goes back to the stable through the campaign's
+        // own path: a run that counted works the newest deposits a run on, and a
+        // service it finishes rolls its improvement on the run's seed; one that did
+        // not works nothing, and says so.
+        var services = Enchanter.Tick(this, mapSeed, counted: tick);
 
         var result = new RunResult(def.Id,
             ending == RunEnding.Wiped ? RunOutcome.Death : bossDown ? RunOutcome.BossKill : RunOutcome.Retreat,
             bossDown, deepest, deepest >= visit.BossFloor ? visit.BossFloor : null,
             ServiceTick: tick, MercyTick: mercy, RunCounter, lockedUntil, retired,
-            kept, lost, clawbacks);
+            kept, lost, clawbacks, services.Count > 0 ? services : null);
         LastResult = result;
         RunEnded?.Invoke(result);
         return result;
@@ -712,7 +806,7 @@ public sealed class CampaignState
     /// <see cref="PartyMemberState.From"/> off the roster. Without this the only
     /// entries the campaign would ever meet are the ones taken off a corpse, and a
     /// party starting with <c>staff_of_renewal</c>, <c>wand_of_the_nova</c> or the
-    /// Efficiency dagger would reach §6.4's enchanter to be told it cannot offer
+    /// Efficiency dagger would reach §6.2's enchanter to be told it cannot offer
     /// <c>regeneration</c>, an element or <c>vampiric</c> — entries it has been
     /// carrying since turn 0. They are in a bag; how they got there is not this
     /// set's question.
@@ -724,5 +818,259 @@ public sealed class CampaignState
         foreach (var weapon in member.Inventory)
             if (weapon is not null)
                 See(weapon);
+    }
+
+    // ── The stable (§6.2, Phase 6a.2) ────────────────────────────────────────
+
+    /// <summary>
+    /// The stable (§6.2): every weapon the party owns and is not carrying, in the
+    /// order they were put there — a list, never a set, so the view a save stores
+    /// and the hub lists is that order. Unbounded (PHASE 6a DECISION 7). Empty on
+    /// a new campaign.
+    /// </summary>
+    public IReadOnlyList<Weapon> Stable => _stable.AsReadOnly();
+
+    /// <summary>
+    /// The weapon at <paramref name="place"/>: a member's slot's, which may be
+    /// empty (null), or the stable's — its end holding nothing.
+    /// </summary>
+    /// <exception cref="ArgumentException">No member of the party has the id.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">The slot is not one the member has, or the place is past the stable's end.</exception>
+    public Weapon? WeaponAt(WeaponPlace place)
+    {
+        if (place.IsStable)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(place.Index, nameof(place));
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(place.Index, _stable.Count, nameof(place));
+            return place.Index < _stable.Count ? _stable[place.Index] : null;
+        }
+        var bag = MemberOf(place).Inventory;
+        ArgumentOutOfRangeException.ThrowIfNegative(place.Index, nameof(place));
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(place.Index, bag.Length, nameof(place));
+        return bag[place.Index];
+    }
+
+    /// <summary>
+    /// The member a move of the weapon at <paramref name="from"/> to
+    /// <paramref name="to"/> would leave carrying no weapon (PHASE 6a DECISION 7),
+    /// or null when it leaves every member armed. Only the member it is taken
+    /// from can be left with none, and only when nothing comes back in its place
+    /// — the weapon put down where nothing lies, in another member's bag or at
+    /// the stable's end — and it was the one weapon that member carried. A swap
+    /// always hands one back, and a weapon put down in its own member's bag stays
+    /// carried.
+    /// </summary>
+    /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
+    public PartyMemberState? WouldDisarm(WeaponPlace from, WeaponPlace to)
+    {
+        if (from.IsStable || WeaponAt(from) is null || WeaponAt(to) is not null)
+            return null;
+        if (!to.IsStable && to.MemberId == from.MemberId)
+            return null;
+        var member = MemberOf(from);
+        return member.Inventory.Count(carried => carried is not null) == 1 ? member : null;
+    }
+
+    /// <summary>
+    /// Whether a move of the weapon at <paramref name="from"/> to <paramref name="to"/>
+    /// would come straight back, and leave everything as it was: a weapon in a hand
+    /// put down where nothing lies in its own member's bag, ahead of every weapon
+    /// that bag carries, which the emptied hand takes up again at once — it takes the
+    /// first weapon in the bag (<see cref="PartyMemberState.ArmFromBag"/>, the rule
+    /// <see cref="Move"/> keeps). A member's only weapon put in its own bag always
+    /// does. The hub asks first and says why, as it asks <see cref="WouldDisarm"/>,
+    /// so no move, log line or save is made of a change that changes nothing.
+    /// </summary>
+    /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
+    public bool ComesStraightBack(WeaponPlace from, WeaponPlace to)
+    {
+        if (from.IsStable || from.Index != 0 || to.IsStable || to.MemberId != from.MemberId || to.Index == 0
+            || WeaponAt(from) is null || WeaponAt(to) is not null)
+            return false;
+        var bag = MemberOf(from).Inventory;
+        for (int slot = 1; slot < to.Index; slot++)
+            if (bag[slot] is not null)
+                return false;   // the hand would take up this one instead
+        return true;
+    }
+
+    /// <summary>
+    /// Move a weapon the party owns, by hand between runs (§6.2; PHASE 6a
+    /// DECISION 7): the hub's one door onto the stable and the bags. The weapon at
+    /// <paramref name="from"/> goes to <paramref name="to"/>, and whatever lay
+    /// there comes back to <paramref name="from"/> in its place — a swap: into a
+    /// member's hand is how a weapon is equipped, from the stable or another bag.
+    /// Put down where nothing lies — a member's empty slot, or the stable's end —
+    /// it leaves its old place empty: a bag slot is left empty, and the stable
+    /// closes up, so a weapon put at the stable's end from the stable moves there.
+    /// A hand the move empties is armed from its bag, as the rest before a
+    /// dungeon arms it (<see cref="PartyMemberState.ArmFromBag"/>). A move onto its
+    /// own place moves nothing.
+    /// <para>
+    /// Refused, and nothing moves: during a visit — the stable and the bags are
+    /// changed by hand only between runs — and a move that would leave a member
+    /// carrying no weapon (<see cref="WouldDisarm"/>), which the hub asks first and
+    /// says why. Nothing is met: every weapon moved was the party's already.
+    /// </para>
+    /// </summary>
+    /// <returns>The weapon moved; the weapon it was swapped with, or null; and the weapon a hand the move emptied took up from the bag, or null.</returns>
+    /// <exception cref="InvalidOperationException">A visit is in progress, <paramref name="from"/> holds no weapon, or the move would leave a member carrying none.</exception>
+    /// <exception cref="ArgumentException">A member the places name is not in the party.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A place is not one the party or the stable has.</exception>
+    internal (Weapon Moved, Weapon? Swapped, Weapon? Armed) Move(WeaponPlace from, WeaponPlace to)
+    {
+        if (Visit is { } visit)
+            throw new InvalidOperationException(
+                $"A visit to '{visit.Def.Id}' is in progress: the stable and the bags are changed by hand only between runs.");
+        var moved = WeaponAt(from) ?? throw new InvalidOperationException($"Nothing lies at {from} to move.");
+        var swapped = WeaponAt(to);
+        if (WouldDisarm(from, to) is { } unarmed)
+            throw new InvalidOperationException($"The move would leave {unarmed.Id} carrying no weapon (PHASE 6a DECISION 7).");
+        if (from == to)
+            return (moved, null, null);
+
+        if (swapped is not null)
+        {
+            Put(to, moved);
+            Put(from, swapped);
+        }
+        else if (to.IsStable)
+        {
+            Take(from);
+            _stable.Add(moved);   // the stable's end, after the stable has closed up behind it
+        }
+        else
+        {
+            Take(from);
+            Put(to, moved);
+        }
+
+        var armed = !from.IsStable && from.Index == 0 ? MemberOf(from).ArmFromBag() : null;   // null for a hand the move filled again
+        return (moved, swapped, armed);
+    }
+
+    /// <summary>The member a place in the party names.</summary>
+    /// <exception cref="ArgumentException">No member of the party has the id.</exception>
+    private PartyMemberState MemberOf(WeaponPlace place)
+        => _party.FirstOrDefault(member => member.Id == place.MemberId)
+            ?? throw new ArgumentException($"'{place.MemberId}' is no member of the party.", nameof(place));
+
+    /// <summary>Lay <paramref name="weapon"/> at <paramref name="place"/>, over what is there: a slot, or a place in the stable.</summary>
+    private void Put(WeaponPlace place, Weapon weapon)
+    {
+        if (place.IsStable)
+            _stable[place.Index] = weapon;
+        else
+            MemberOf(place).Inventory[place.Index] = weapon;
+    }
+
+    /// <summary>Take what is at <paramref name="place"/> away: a slot is left empty, and the stable closes up behind it.</summary>
+    private void Take(WeaponPlace place)
+    {
+        if (place.IsStable)
+            _stable.RemoveAt(place.Index);
+        else
+            MemberOf(place).Inventory[place.Index] = null;
+    }
+
+    // ── The enchanter's queue (§6.2, Phase 6a.3a) ────────────────────────────
+
+    /// <summary>
+    /// The deposits in the shop (§6.2), in deposit order — the ordinals rising — a
+    /// list, never a set, so the view a save stores and the hub lists is that
+    /// order. Each weapon here is out of the party's hands: in no bag and not in
+    /// the stable. No length of its own (P6:302–303). Empty on a new campaign.
+    /// </summary>
+    public IReadOnlyList<Deposit> AtTheEnchanter => _enchanter.AsReadOnly();
+
+    /// <summary>How many deposits the campaign has ever made: the next deposit's ordinal (<see cref="Deposit.Ordinal"/>). Never lowered — a take-back or a finished service reuses no ordinal.</summary>
+    public int DepositsMade { get; private set; }
+
+    /// <summary>
+    /// Queue <paramref name="entry"/>, the deposit of the weapon at
+    /// <paramref name="from"/>, by hand between runs: the hub's door into the shop,
+    /// which the enchanter calls once it has cashed the weapon's wear
+    /// (<see cref="Enchanter.Deposit"/>, its one caller). The weapon leaves its
+    /// place — a bag slot is left empty, and the stable closes up behind it — and so
+    /// does a transfer's source, from <paramref name="source"/>: both wait in the
+    /// shop as the one deposit (PHASE 6a DECISION 13). A hand either empties is armed
+    /// from the bag as a move's is (<see cref="PartyMemberState.ArmFromBag"/>), once
+    /// both are gone, and the count of deposits made moves past its ordinal.
+    /// </summary>
+    /// <param name="from">Where the deposit's weapon lies.</param>
+    /// <param name="entry">The deposit.</param>
+    /// <param name="source">Where a transfer's source lies, when it is another weapon; null for every other deposit, and for a reorder.</param>
+    /// <returns>The weapon a hand the weapon left took up from the bag, and the one a hand the source left took up; each null when no hand was emptied.</returns>
+    /// <exception cref="InvalidOperationException">A visit is in progress, or the deposit would leave a member carrying no weapon (PHASE 6a DECISION 7) — a transfer's asked with both its weapons gone.</exception>
+    /// <exception cref="ArgumentException"><paramref name="entry"/> is not the deposit of the weapon at <paramref name="from"/>, or of the source at <paramref name="source"/>; or its ordinal is not the next.</exception>
+    internal (Weapon? Armed, Weapon? SourceArmed) Enqueue(WeaponPlace from, Deposit entry, WeaponPlace? source = null)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (Visit is { } visit)
+            throw new InvalidOperationException(
+                $"A visit to '{visit.Def.Id}' is in progress: the shop is changed by hand only between runs.");
+        if (!ReferenceEquals(WeaponAt(from), entry.Weapon))
+            throw new ArgumentException($"Deposit {entry.Ordinal} is of {entry.Weapon.Name}, and {from} holds another: a deposit takes the weapon where it lies.", nameof(entry));
+        if ((source is null) != (entry.Source is null) || (source is { } at && !ReferenceEquals(WeaponAt(at), entry.Source)))
+            throw new ArgumentException($"Deposit {entry.Ordinal}'s source is {entry.Source?.Name ?? "none"}, and {source?.ToString() ?? "no place"} is named for it: a transfer takes its source where it lies.", nameof(source));
+        if (entry.Ordinal != DepositsMade)
+            throw new ArgumentException($"Deposit {entry.Ordinal} is not the next: {DepositsMade} deposits have been made.", nameof(entry));
+        WeaponPlace[] places = source is { } given ? [from, given] : [from];
+        foreach (var member in places.Where(place => !place.IsStable).Select(MemberOf).Distinct())
+            if (member.Inventory.Count(carried => carried is not null) == places.Count(place => place.MemberId == member.Id))
+                throw new InvalidOperationException($"The deposit would leave {member.Id} carrying no weapon (PHASE 6a DECISION 7).");
+
+        foreach (var place in places.OrderByDescending(place => place.IsStable ? place.Index : -1))
+            Take(place);   // the stable's later place first, so the earlier one has not moved
+        _enchanter.Add(entry);
+        DepositsMade++;
+        var armed = !from.IsStable && from.Index == 0 ? MemberOf(from).ArmFromBag() : null;
+        var sourceArmed = source is { IsStable: false, Index: 0 } emptied ? MemberOf(emptied).ArmFromBag() : null;
+        return (armed, sourceArmed);
+    }
+
+    /// <summary>
+    /// Take <paramref name="deposit"/> out of the shop by hand, between runs: the
+    /// hub's door for a take-back (<see cref="Enchanter.TakeBack"/>, its one
+    /// caller), its weapon to the end of the stable, and a transfer's source after
+    /// it.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">A visit is in progress, or <paramref name="deposit"/> is not in the shop.</exception>
+    internal void TakeOut(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        if (Visit is { } visit)
+            throw new InvalidOperationException(
+                $"A visit to '{visit.Def.Id}' is in progress: the shop is changed by hand only between runs.");
+        Release(deposit);
+    }
+
+    /// <summary>
+    /// A service finished at the run's end (§6.2): <paramref name="finished"/> leaves
+    /// the shop and its weapon goes to the end of the stable, a transfer's source
+    /// after it (PHASE 6a DECISIONS 7 and 13).
+    /// The run's end's own path — the visit already gone — never the hub's doors,
+    /// and asked by the enchanter's clock alone (<see cref="Enchanter.Tick"/>,
+    /// which <see cref="EndRun"/> alone asks).
+    /// </summary>
+    /// <exception cref="InvalidOperationException"><paramref name="finished"/> is not in the shop.</exception>
+    internal void Return(Deposit finished)
+    {
+        ArgumentNullException.ThrowIfNull(finished);
+        Release(finished);
+    }
+
+    /// <summary>A deposit out of the shop, by reference, and its weapon to the end of the stable, a transfer's source after it: what a take-back and a finished service share.</summary>
+    private void Release(Deposit deposit)
+    {
+        int at = _enchanter.FindIndex(queued => ReferenceEquals(queued, deposit));
+        if (at < 0)
+            throw new InvalidOperationException($"Deposit {deposit.Ordinal}, of {deposit.Weapon.Name}, is not in the shop.");
+        _enchanter.RemoveAt(at);
+        _stable.Add(deposit.Weapon);
+        if (deposit.Source is { } source)
+            _stable.Add(source);
     }
 }

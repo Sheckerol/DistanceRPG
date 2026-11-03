@@ -300,7 +300,7 @@ public sealed record Tuning
 
     /// <summary>
     /// The bar every point-growing pool opens on (§2.1): max HP, max mana and —
-    /// from Phase 6a — a weapon's wear capacity alike, so the 30 is never a bare
+    /// since Phase 6a — a weapon's wear capacity alike, so the 30 is never a bare
     /// literal in three places. A point costs <c>currentMax / governingStat</c>
     /// from here, which is why a CON 1 wizard and a CON 4 fighter start level and
     /// diverge rather than starting apart. Below 1 there is no step to take, and
@@ -392,13 +392,27 @@ public sealed record Tuning
     public int StairGatherTiles { get; init; }
 
     // ---- Enchanter (Phase 6a; the user's ruling of 2026-09-25) ----
-    // What a deposit costs (§6.1, §6.2): how a weapon's wear capacity grows, where
-    // its enchantment slots open, and how much wear attaching each enchantment
-    // needs. The user ruled the numbers and keeps each in tuning.json, so they are
-    // keys ahead of their reader: no rule of play reads one until Phase 6a builds
-    // the enchanter, and until then a save's hash leaves them out
-    // (TuningKey.Played). A weapon's capacity opens on StartingPool, the one bar
+    // What a hit wears (§6.1), what a deposit costs (§6.1, §6.2) — how a weapon's
+    // wear capacity grows, where its enchantment slots open, and how much wear
+    // attaching each enchantment needs — how many deposits the enchanter works on at
+    // once (§6.2), and the improvement roll a finished service makes (§6.4, Phase
+    // 6a.4). The user ruled the deposit's numbers and keeps each in tuning.json, so
+    // they were declared ahead of their reader; Phase 6a plays each as a rule of it
+    // reads it (TuningKey.Played), and a save's hash covers each from version 2
+    // (TuningKey.HashedFrom). A weapon's capacity opens on StartingPool, the one bar
     // every pool opens on, which stays one key.
+
+    /// <summary>
+    /// The wear a weapon banks for every hit it lands (§6.1): each body a swing,
+    /// a cleave, a shot or a wand's cast strikes, and each landed cast of a staff
+    /// (<see cref="Wear.Accrue"/>, PHASE 6a DECISION 1) — per hit, never per
+    /// swing, per turn or scaled by damage, so the pool is a plain count of the
+    /// work a weapon has done. It banks up to the weapon's
+    /// <see cref="Weapon.WearCapacity"/> and no further, and a deposit at the
+    /// enchanter spends it all. 0 means no weapon ever wears, so none can be
+    /// enchanted: a dial, not an error.
+    /// </summary>
+    public int WearPerHit { get; init; }
 
     /// <summary>
     /// The capacity a full bar's worth of cashed wear adds to a weapon's
@@ -406,7 +420,8 @@ public sealed record Tuning
     /// progress carries — a deposit short of a full bar still counts toward the
     /// next point, and what one cashes past a bar starts the next. The growth is
     /// the same whichever service the deposit bought (§6.4). 0 freezes capacity.
-    /// No rule reads it yet: Phase 6a's enchanter will.
+    /// Read by <see cref="Wear.Capacity"/>, which replays a weapon's capacity from
+    /// the wear it has ever cashed, as a member's pools are replayed from its XP.
     /// </summary>
     public int WearCapacityPerBar { get; init; }
 
@@ -414,11 +429,13 @@ public sealed record Tuning
     /// The capacity a weapon's first enchantment slot opens at (§6.2): slot n opens
     /// at <c>FirstSlotCapacity + SlotCapacityStep × (n − 1)</c>, up to
     /// <see cref="EnchantmentSlots"/>. What a weapon arrives with fills its slots
-    /// from the first. No rule reads it yet: Phase 6a's enchanter will.
+    /// from the first. Read by <see cref="Wear.SlotOpensAt"/>: the enchanter
+    /// attaches enchantment n only once slot n is open at the capacity the weapon
+    /// is deposited at.
     /// </summary>
     public int FirstSlotCapacity { get; init; }
 
-    /// <summary>The capacity between one enchantment slot and the next (<see cref="FirstSlotCapacity"/>); 0 opens every slot at once. No rule reads it yet: Phase 6a's enchanter will.</summary>
+    /// <summary>The capacity between one enchantment slot and the next (<see cref="FirstSlotCapacity"/>); 0 opens every slot at once. Read by <see cref="Wear.SlotOpensAt"/>.</summary>
     public int SlotCapacityStep { get; init; }
 
     /// <summary>
@@ -428,7 +445,9 @@ public sealed record Tuning
     /// so no <c>tuning.json</c> can hold a weapon to fewer slots than its own
     /// souls fill. Not the five of §1.5's Light shape, which decides what a unique
     /// arrives with and stays a rule constant: the two agree by the docs and mean
-    /// different things. No rule reads it yet: Phase 6a's enchanter will.
+    /// different things. Read by the enchanter's gates (<see cref="Enchanter.Refusal"/>):
+    /// a weapon holding this many is refused a further enchantment, and refining
+    /// is left.
     /// </summary>
     public int EnchantmentSlots { get; init; }
 
@@ -437,12 +456,53 @@ public sealed record Tuning
     /// (§6.2): attaching enchantment #n needs a free slot and a deposit of at least
     /// <c>FirstEnchantmentWear + EnchantmentWearStep × (n − 1)</c>. A deposit still
     /// spends the whole pool (§6.1), and capacity above the price is breathing
-    /// room. No rule reads it yet: Phase 6a's enchanter will.
+    /// room. Read by <see cref="Wear.Price"/>.
     /// </summary>
     public int FirstEnchantmentWear { get; init; }
 
-    /// <summary>How much more wear each later enchantment needs than the one before (<see cref="FirstEnchantmentWear"/>); 0 prices every one as the first. No rule reads it yet: Phase 6a's enchanter will.</summary>
+    /// <summary>How much more wear each later enchantment needs than the one before (<see cref="FirstEnchantmentWear"/>); 0 prices every one as the first. Read by <see cref="Wear.Price"/>.</summary>
     public int EnchantmentWearStep { get; init; }
+
+    /// <summary>
+    /// How many deposited weapons the enchanter works on at once (§6.2): the
+    /// newest, "the two most recently deposited" (S:97–98). A run that counts
+    /// works each of them a run on (<see cref="Enchanter.Tick"/>); a deposit past
+    /// them stalls the oldest until one of the newest comes back — a transfer one
+    /// deposit, its two weapons together (Phase 6a.6). The queue has no
+    /// length of its own: dumping the whole stable achieves nothing. Its figure is
+    /// the doc's, and it is a key by the user's standing rule that a number they
+    /// may revisit lives in the file.
+    /// </summary>
+    public int EnchanterWorksOn { get; init; }
+
+    /// <summary>
+    /// The chance, as a percentage, that a finished service improves the weapon
+    /// anyway (§6.4, S:1149–1154): flat when it enchants or moves an enchantment
+    /// onto the weapon (PHASE 6a DECISION 13), and times
+    /// <c>1 + wear cashed ÷ StartingPool</c> when it refines — 6 on a fresh full bar,
+    /// 7 at capacity 40, 9 at capacity 60 (R4's consequence 2). A deposit that
+    /// cashed no wear rolls nothing. §5.3's name, in whole percent as
+    /// <see cref="DefeatStackChance"/> keeps its own. Read by
+    /// <see cref="Wear.ImproveOdds"/>, whose odds the enchanter rolls on as a
+    /// service finishes.
+    /// </summary>
+    public int GraftBaseChance { get; init; }
+
+    /// <summary>
+    /// Of the services whose improvement roll lands, the percentage that graft a
+    /// modifier the weapon has never carried; the rest deepen one it carries (§6.4:
+    /// deepen "uncommon", a graft "rare"). A branch with nothing it may take falls
+    /// through to the other. Provisional: §6.4 gives no number (PHASE 6a DECISION 5).
+    /// </summary>
+    public int GraftSharePercent { get; init; }
+
+    /// <summary>
+    /// How many times likelier a deepen lands on the class's signature than on any
+    /// other modifier the weapon carries (§6.4: "biased toward the class
+    /// signature"); 1 is no bias. A caster has no signature, so it has no bias
+    /// either. Provisional: §6.4 gives no number (PHASE 6a DECISION 5).
+    /// </summary>
+    public int DeepenSignatureWeight { get; init; }
 
     // ---- Inventory (§4.4) ----
 

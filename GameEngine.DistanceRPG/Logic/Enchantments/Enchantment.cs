@@ -105,7 +105,8 @@ public sealed record EnchantmentDef(
 /// <summary>
 /// An enchantment attached to a weapon: a catalogue entry at a tier. Immutable
 /// and shared; a weapon's list of these is in attachment order, which is
-/// gameplay (§1.7) and is never reordered.
+/// gameplay (§1.7) and is never reordered but by the enchanter's transfer, which
+/// takes an entry off and puts it back last (§6.5; <see cref="Transferred"/>).
 /// </summary>
 public sealed record Enchantment(EnchantmentDef Def, int Tier)
 {
@@ -172,7 +173,29 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// squaring the tier.
     /// </para>
     /// </summary>
-    public int EffectiveLock => Def.Lock * Tier;
+    public int EffectiveLock => LockAt(Def, Tier);
+
+    /// <summary>
+    /// The mana <paramref name="def"/> reserves at <paramref name="tier"/>: the one
+    /// formula behind <see cref="EffectiveLock"/>, for a screen that names the lock
+    /// of an entry not yet attached — the enchanter's offer, at the tier it attaches
+    /// at — so the lock it says is the lock the entry has once on.
+    /// </summary>
+    public static int LockAt(EnchantmentDef def, int tier)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        return def.Lock * tier;
+    }
+
+    /// <summary>
+    /// This entry as a transfer lands it on another weapon, or last on its own
+    /// (§6.5): a tier down, the new tier from no XP — "the only place a tier goes
+    /// backwards" — and tier 1 the floor, so an entry at tier 1 moves intact, its XP
+    /// with it, and so does every unique soul, pinned there (S:1101–1106: "Tier 1
+    /// travels intact"). The one expression the enchanter lands a moved soul with,
+    /// and what the screen says it arrives at.
+    /// </summary>
+    public Enchantment Transferred() => Tier > 1 ? new Enchantment(Def, Tier - 1) : this;
 
     /// <summary>
     /// What leaving this tier costs (§3.3): <c>xpToNextTier = currentTierCost /

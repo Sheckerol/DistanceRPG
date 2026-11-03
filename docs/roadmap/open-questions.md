@@ -55,6 +55,18 @@ enchanter exists nothing can put a shield on a weapon that did not ship with
 one. Both are filter gaps rather than content gaps, and both are resolved by
 whoever writes §6.4's offer.
 
+**Phase 6a.3b wrote the offer, and it closes the enchanter's half of the
+`Echoing` gap.** `Enchanter.Offers` is what the campaign has met,
+`CampaignState.SeenInOrder`, less `NeverRolled` and less the kinds declared inert
+— the inert half of the test `LootTable.DropOrder` applies, asked through the one
+predicate both now share (`LootTable.IsInert`) — so `Echoing` is never offered,
+and a save whose shop names it is refused as one no play wrote. What `Echoing`
+does, and who raises `AttackDeclared`, are untouched and as open as above. Of the
+`aegis` half, the offer does what a filter can: `aegis` passes it, and would be
+offered with nothing against it — a defender's step fires on any weapon. But the
+offer lists only what a campaign has met, and nothing puts `aegis` there, so
+where it comes from is **PHASE 6a DECISION 4** below.
+
 ## What decides a `Serrated`/`Arcane` pair (§3.3)
 
 §3.3's worked example on attachment order reads: "A dagger that leads with
@@ -276,7 +288,7 @@ attaching enchantment *n* needs a free slot and a deposit of at least
 them the ruling left to the build.
 
 **Shipped provisionally: each number its own key**, in the Enchanter group and
-read by nothing until Phase 6a builds the enchanter — `WearCapacityPerBar`,
+read by the enchanter since Phase 6a — `WearCapacityPerBar`,
 `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
 `FirstEnchantmentWear` and `EnchantmentWearStep` — and a weapon's starting
 capacity `StartingPool`, the Phase 2 pass's one key for every pool's first bar,
@@ -391,3 +403,557 @@ update asks which slot, on NEW CAMPAIGN's list, setting a slot in use aside as
 NEW CAMPAIGN does; or (b) it stays listed as the `OLD AUTOSAVE` until it is
 loaded, and its load then asks for a slot to move it into. settled.md's Phase 5
 implementation pass records the ruling.
+
+## What counts as a hit for wear (§6.1) — PHASE 6a DECISION 1
+
+A weapon banks `WearPerHit` "per hit rather than per swing, per turn or scaled by
+damage" (settled.md's `WearPerHit = 1` entry; phase-6-between-runs.md §6.1). That
+much is settled, so every body a hit lands on counts: a swing, each body a cleave
+fans to, a shot carried on, a brace, a counter, an ally caught by friendly fire,
+and each body a wand's area cast strikes. A status's tick and an enchantment's own
+discharge are no hits (the one names no weapon, the other rides the hit that
+counted), and an enemy carries no pools. Two cases the words leave open: whether a
+staff's cast — which deals no damage, and may heal or ward an ally — is a hit, and
+what a wipe does to the run's wear.
+
+**Shipped provisionally: a staff's landed cast wears it once, on an ally or an
+enemy alike** (§1.3, "a cast is a hit"), a wand's Cast being no hit of its own —
+its hits are the bodies its shape strikes; **and a wipe keeps the run's wear**:
+"a wipe forfeits spoils, not gear" (settled.md), and the claw-back is the member
+pools' alone. The log says when a member's weapon fills
+(`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`), and the weapon line
+reads `WEAR 30/30 FULL` in green.
+
+**What the pick lets a player do.** A staff whose cast lands on its own side — a
+heal, a ward — can fill its wear with no enemy in play: cast on itself or an
+ally, end the turn, cast again as the mana comes back, on a cleared floor or
+anywhere safe. A blade or a wand earns only by striking a body. Wear is what
+every service at the enchanter is paid in (R4), so this loop is what the pick
+rules on; alternative (a)'s second half, only a staff's casts on enemies count,
+closes it.
+
+**This decides how a caster and a wipe earn toward the enchanter, so it is the
+user's to decide.** The alternatives: (a) staves accrue nothing — so a staff is
+never enchanted or refined, against §6.2's caster cases — or only a staff's casts
+on enemies count; or (b) a wipe claws back `DeathXpLossPercent` of the run's wear,
+as it does XP. settled.md's Phase 6a implementation pass records the ruling.
+
+## How a weapon's capacity is kept (§6.1, §6.7) — PHASE 6a DECISION 2
+
+The user's ruling of 2026-09-25 on what a deposit costs (R4, settled.md) gives a
+weapon's `WearCapacity` a start, 30 (`StartingPool`), a growth of
+`WearCapacityPerBar` a full bar of wear cashed, the bar the capacity at the time,
+and a progress that carries from one deposit to the next. The v2 hand-off
+(settled.md) words the save as holding "`wear` and `wearCapacity` … and beside
+them the capacity's progress toward its next point"; how the capacity is kept is
+the build's, and a pick other than those words bends the hand-off — settled.md
+marks it where the hand-off stands, the one of its two bends that is the user's
+to rule.
+
+**Shipped provisionally: the save keeps `wear` and `wearCashed`, the wear the
+weapon has ever cashed**, and its capacity and the progress toward the next
+point are replayed from `StartingPool` on read (`Wear.Capacity`), as a member's
+maximum HP and mana are from its XP (settled.md: "Max HP and wear capacity move
+with it"; `Progression`'s "one integer is the whole pool"). So a `StartingPool` or
+`WearCapacityPerBar` edit re-derives every weapon's capacity at once, and the
+numbers-changed notice says so. Wear over a capacity a tuning lowered since is
+kept, never taken away, and the weapon reads full (`WEAR 30/20 FULL`). A save's
+wear is held to a ceiling no tuning in range can pass, `10000 + 1000 ×
+wearCashed` (`StartingPool` and `WearCapacityPerBar` at their clamps' tops).
+
+**This decides whether a tuning edit moves a weapon's grown capacity, so it is
+the user's to decide.** The alternative: keep the capacity and its progress as
+numbers, as the hand-off words it; the migration then writes a capacity that
+reads as `StartingPool`, and a grown capacity stays where it grew whatever the
+tuning says later. settled.md's Phase 6a implementation pass records the ruling.
+
+## The tuning hash of a save from before Phase 6a (§5.3) — PHASE 6a DECISION 9
+
+A save records the hash of the `tuning.json` numbers a rule of play reads
+(settled.md, the hash entry), and a load under other numbers says `THE NUMBERS
+HAVE CHANGED SINCE THIS CAMPAIGN WAS SAVED` once. Phase 6a starts to play keys a
+phase-5 save was never played under — `WearPerHit` and `WearCapacityPerBar` from
+6a.1, the rest of the Enchanter group as the enchanter reads them — so a hash
+over the current keys would differ from every phase-5 save's, though no number
+it was played under moved: the cost the entry on the gameplay numbers still
+compiled accepts for a new key.
+
+**Shipped provisionally: a save's hash is compared on the keys played at the
+version that wrote it.** Each key names the save version whose hash first covers
+it (`HashedFrom`: 1 for Phase 5's, 2 for Phase 6a's); a save names the version
+its hash is of (`tuningHashVersion`), which the step that lifts a version-1
+document writes as 1; and a load compares on that version's keys. A phase-5 save
+therefore resumes with nothing to say unless a number it was played under moved,
+and its next save is hashed on version 2's keys. The log's numbers-changed line
+prints the game's hash on the same keys and names the version. **During the
+Phase 6a steps** version 2's key set grows — at the enchanter's queue (6a.3a) and
+at the improvement roll (6a.4) — so a save written on an earlier 6a build shows
+the notice once under a later one, though no number moved; a released version 2
+never does.
+
+**This decides what a phase-5 save says on its first resume, so it is the user's
+to decide.** The alternative: accept one `THE NUMBERS HAVE CHANGED SINCE THIS
+CAMPAIGN WAS SAVED` on the first resume of every phase-5 save, as a new key costs
+(the entry on the gameplay numbers still compiled), with no new member at the
+save's root. settled.md's Phase 6a implementation pass records the ruling.
+
+## The stable (§6.2) — PHASE 6a DECISION 7
+
+§6.2 puts a deposited weapon in the shop, out of the party's hands, and says the
+campaign keeps "the stable": the weapons the party owns and is not carrying
+(phase-6-between-runs.md §6.2, §6.7; ROADMAP's "Needs `CampaignState` and the
+stable"). No ruling gives the stable a size, says where a weapon goes when its
+service is done, or says whether a member may be left with nothing in hand; and
+the bags are six slots a member (settled.md, "Carry limit is unified with the
+loadout").
+
+**Shipped provisionally: the stable is the campaign's, unbounded, in the order
+weapons were put there**, and it is the screen between runs' WEAPONS page (TAB):
+a weapon is taken up and put down in another member's hand or bag, or in the
+stable, and back out again — onto a weapon it swaps, onto a hand it equips.
+Spoils carried home stay in the bags, as ever. **No move leaves a member
+carrying no weapon**: it is refused, `EACH MEMBER KEEPS A WEAPON - [A] WOULD
+CARRY NONE`, and the weapon stays taken up. A hand a move empties is armed from
+the bag as the rest before a dungeon arms it. A finished service at the enchanter
+returns its weapons to the stable's end (Phase 6a.3a), and a deposit is refused
+on the same rule — `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE
+FIRST` — and a transfer (Phase 6a.6) is asked with both of its weapons gone, its
+reason shown on the source's row.
+
+**This decides where the party's spare weapons live and whether a member can be
+left unarmed, so it is the user's to decide.** The alternatives: (a) a capped
+stable; (b) a finished weapon returns to the bag it came from, or to the stable
+when that bag is full; or (c) a member may be left unarmed, as a wipe that takes
+every spoil it held already can leave one. settled.md's Phase 6a implementation
+pass records the ruling.
+
+## Autosaving between runs (§5.1's safe points) — PHASE 6a DECISION 10
+
+A save is taken only at a safe point, and between runs is always one (settled.md,
+the save's safe points); SAVE GAME saves there by hand. The list of when the game
+saves on its own — a run's entry, every player turn's start, every floor arrival,
+a run's end, NEW CAMPAIGN and every quit — names nothing between runs, since
+nothing changed the campaign there before Phase 6a: the screen between runs only
+chose a dungeon. From Phase 6a it moves weapons between the bags and the stable,
+and the enchanter's deposits and take-backs follow.
+
+**Shipped provisionally: every change the hub makes to the campaign is saved**,
+into the campaign's own slot, at the end of the frame it was made in — a move
+(Phase 6a.2), a deposit and a take-back (Phase 6a.5). The screen asks
+through its host (`IBetweenRunsHost.RequestSave`), which the game answers with
+the same request the dungeon's autosaves make, written through the one door
+every save of the campaign goes through; the log says `Saving the campaign
+between runs, after a change on the hub`. A save that fails is said at once under
+the hub's title, in orange, as one over a floor is — but where a floor's notice
+goes after a few seconds, the hub's stays, and the next screen says it too, until
+a later save goes through, which takes it back from both.
+
+**This decides whether a crash between runs can cost the changes made there, so
+it is the user's to decide.** The alternative: only the run's end, SAVE GAME and
+the quit save, as the list stands, so a crash between runs loses whatever the hub
+changed since the last of them. settled.md's Phase 6a implementation pass records
+the ruling.
+
+## When a service's enchantment attaches (§6.2, §6.4) — PHASE 6a DECISION 3
+
+A deposit cashes the weapon's whole pool, and its capacity grows on the cash:
+that much is the user's ruling on what a deposit costs (R4, settled.md: "+1 per
+full bar … cashed in", "the pool itself still empties at every deposit"), so the
+wear leaves and the capacity grows as the weapon goes in. What the words leave
+open is when the service's purchase lands: the enchantment an Enchant buys, and
+the improvement roll either service may win (§6.4, Phase 6a.4).
+
+**Shipped provisionally: the chosen enchantment is attached when the service's
+last run is worked**, inside the end of the run that works it — last, at tier 1
+with no XP — and the weapon comes back to the stable then. Until then it is in the
+shop, out of the party's hands, and its enchantments are what they were. The
+improvement roll is made at the same moment (since Phase 6a.4), on a stream of the
+completing run's map seed and the deposit's ordinal, both saved, so a reload never
+rerolls it (R1).
+
+**This decides when a deposit's purchase lands, so it is the user's to decide.**
+The alternatives: (a) attach and roll at the deposit, on a seed the campaign saves
+for the purpose — the weapon then waits out its runs already enchanted; or (b)
+grow the capacity when the service finishes, the wear still leaving the pool at
+the deposit ("cashed in" read as the service's return). settled.md's Phase 6a
+implementation pass records the ruling.
+
+## The `+ 1` in a service's time (§6.2) — PHASE 6a DECISION 6
+
+§6.2 has a service cost runs, "the current enchantment count + 1", for every
+deposit, a refinement too (settled.md, "Service costs runs"). That the enchanter
+works on the two newest deposits is the doc's too ("the enchanter keeps its
+two-newest-slots rule"), and that its two is a `tuning.json` key,
+`EnchanterWorksOn`, follows the user's standing rule that a number they may
+revisit lives in the file. The `+ 1` is the one number of the rule not yet asked
+of.
+
+**Shipped provisionally: the `+ 1` stays a rule**, never a key: a service takes
+the weapon's count, what it arrived with included, plus one runs that count. So the
+tutorial's one run keeps landing on a first enchantment's one run, and attaching
+five in a row takes 1, 3, 6, 10 and 15 runs.
+
+**This decides whether the base of every service's time is a number to turn, so
+it is the user's to decide.** The alternative: a key beside the count
+(`count + ServiceBaseRuns`, 1 shipped), read with the rest of the Enchanter
+group's. settled.md's Phase 6a implementation pass records the ruling.
+
+## Taking a weapon back from the enchanter early (§6.2) — PHASE 6a DECISION 8
+
+§6.2 puts a deposited weapon in the shop until its service is done, and says
+nothing of wanting it back sooner. A deposit cashes the weapon's pool and grows
+its capacity at once (R4; DECISION 3's context).
+
+**Shipped provisionally: any queued weapon, worked or stalled, can be taken back
+between runs**, to the end of the stable. Its service is forfeit — nothing
+attached, nothing rolled — and the runs worked are lost, the ordinal never reused.
+**The deposit's cash is reversed exactly**: the wear goes back into the pool and
+off what the weapon has cashed, so its capacity and the progress toward the next
+point are as they were before it went in. The take-back is the enchanter's since
+Phase 6a.3a, and since Phase 6a.5 T on a weapon's row in the shop asks for it and
+says what it costs — `TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR
+COMES BACK` — and only Enter takes it back.
+
+*Why not keep the cash spent:* capacity grows at the deposit. A take-back that
+kept the growth would let a player deposit to refine, take the weapon back at once,
+and bank a point of capacity a full bar with no downtime, forfeiting only a 6 to 9
+in 100 roll — every bar between two slots a free action, which R4's consequences 1
+("the bars that open a slot are refinements") and 3 (71 runs of downtime, 31 at
+the least) rule out, as does §6.2's "dumping the whole stable achieves nothing".
+
+**This decides what a deposit commits a weapon to, so it is the user's to
+decide.** The alternatives: (a) no taking back — a deposit is final until its
+service is done; (b) a take-back keeps the cash spent and the capacity grown,
+**opening the loop above**; or (c) the capacity grows when the service finishes
+(DECISION 3's (b)), which closes the loop with the take-back unchanged.
+settled.md's Phase 6a implementation pass records the ruling.
+
+## What an earlier Phase 6a build does with a later step's save (§5.2) — PHASE 6a DECISION 14
+
+Every Phase 6a step reads a version-2 save as its own, and the reader passes over
+a member it does not know (the save's header rule), so an earlier step's build
+loads a later step's save and its next save drops what it did not read. From Phase
+6a.2 that next save comes at the first weapon moved between runs. From Phase 6a.3a
+what it drops holds weapons: a 6a.1 or 6a.2 build that opens a 6a.3a save loses the
+enchanter's queue — every weapon in the shop — with no notice; a 6a.1 build loses
+the stable the same way. Only builds between released versions can do this, and a
+playtester playing each step is who meets it.
+
+**Shipped provisionally: the save stays at version 2**, as every Phase 6a step
+has it, and the README's Saves section and each step's commit say not to open a
+slot a later Phase 6a build saved with an earlier one. This reads the standing
+instruction that new persistent state goes in "with a version bump and a
+migration so phase-5 saves still load" as met by Phase 6a.1's one bump, from
+which every Phase 5 save migrates; the 6a.3a review read it per step, and asked
+that the choice be put to the user as it stands.
+
+**This decides whether an older development build can lose a playtester's weapons,
+so it is the user's to decide.** The alternative: lift the save to version 3 with a
+step that writes nothing but the version (and removes a stray member a hand gave an
+older document), so a 6a.1 or 6a.2 build sets a 6a.3a save aside as a newer
+build's, kept and never deleted — and bump again at every later step that adds
+weapons to the save (6a.6's transfer), the tuning hash's version following or
+staying 2. settled.md's Phase 6a implementation pass records the ruling.
+
+Phase 6a.6 stayed at version 2 too, its transfer's members appended. A 6a.3a,
+6a.4 or 6a.5 build reads the shop and the last run's reports, and a `Transfer` is
+no service it knows, so it refuses a save with a transfer in either and sets it
+aside, kept and never deleted. A 6a.1 or 6a.2 build passes over the shop unread,
+as above, and its next save loses both of a transfer's weapons with the rest of
+the shop.
+
+## Where `aegis` comes from (§6.2's offer; the `Echoing` entry above) — PHASE 6a DECISION 4
+
+The entry on `Echoing` above calls `aegis`'s lack of any source a filter gap
+rather than a content gap, "resolved by whoever writes §6.4's offer". Phase 6a.3b
+wrote it (`Enchanter.Offers`): what the campaign has met, less `neverRolled` and
+the kinds declared inert. `aegis` passes that — it is neither, and its step on the
+defender fires on any weapon, so it is offered with no refusal and no note. But
+nothing puts it among what a campaign has met: `LootTable.DropOrder` leaves it out
+of every class's drops (its behaviour is a compiled step on the defender rather
+than a row in a loop, so the class-event test finds nothing for it), and no weapon
+the content ships carries it. So the offer alone can never contain it.
+
+**Shipped provisionally: `aegis` stays out of reach until content carries it.**
+The offer lists only what the campaign has met, as §6.2 words it ("from
+everything your campaign has seen"), so a playtester never sees `aegis` at the
+enchanter. It stays in the catalogue, checked at load, and it fires on any weapon
+that carries it.
+
+**This decides whether a shield can ever be put on a weapon, so it is the user's
+to decide.** The alternatives: (a) the offer also lists the catalogue's
+defender-step kinds (`aegis`) unmet, as a standing offer; or (b) a drop may roll
+`aegis`, as a class-agnostic arrival — the drop pool taught that a defender's step
+fires on any class, which moves what drops — and the offer then takes it as it
+takes any entry met. settled.md's Phase 6a implementation pass records the ruling.
+
+## What the enchanter refuses, and how a refusal shows (§6.2, §6.5) — PHASE 6a DECISION 12
+
+§6.2 has you pick the enchantment "from everything your campaign has seen", and
+§3.3 that "any enchantment goes on any weapon … nothing keys off `WeaponClass`"
+(phase-3-loot.md); settled.md that "only opposed enchantments exclude each other
+… a second rule would be a cap by another name", and that a lock the wielder
+cannot afford leaves the enchantment dormant. None says what the enchanter does
+with an entry the relations would refuse on the weapon, or with one the weapon
+could carry and never fire, or whether a refused choice is shown.
+
+**Shipped provisionally** (Phase 6a.3b, `Enchanter.Offers`; the deposit panel lists
+the offer since Phase 6a.5, a refused entry dimmed with its reason, and a refused
+service — ENCHANT, REFINE, or MOVE since Phase 6a.6 — dimmed the same way, its
+number key saying why; MOVE's list of souls since Phase 6a.6, a refused soul
+dimmed with its reason):
+- the enchanter refuses what `restricted.json` refuses: an entry an exclusion
+  group pairs with one the weapon carries (`COLD - CANNOT SIT WITH FLAMING`, the
+  weapon's entries asked in the order they were attached), and an entry whose
+  prerequisite is not on the weapon ahead of where it would land, last (`BURNING -
+  NEEDS FLAMING AHEAD OF IT`), the very question content validation asks of every
+  weapon;
+- it refuses a status applier onto a wand (`REGENERATION - A WAND CASTS NO
+  STATUS`), the content rule that no wand carries one: an area cast names its
+  caster as its own target, so the status would land on the wielder. **This bends
+  the phase docs**: §3.3's "any enchantment goes on any weapon … nothing keys off
+  `WeaponClass`", §6.2's "on any weapon, forever after", and settled.md's "a
+  second rule would be a cap by another name". The rule is Phase 1.8's content
+  rule, not a ruling;
+- it refuses a staff's status for one side onto a staff whose cast is for the
+  other (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`): a staff's first entry
+  picks whom it casts on, and the cast lands every status its entries apply on
+  that one body, so Mire on a Staff of Renewal would mire the ally it casts on,
+  and Regeneration on a Staff of Mire would heal every enemy it mires. The same
+  bend of the phase docs as the wand's, for the same hazard — a status landing on
+  the wrong body — but with no content rule behind it: no shipped staff mixes
+  sides and a staff's drop rolls no second entry, so the enchanter is the first
+  way to make one (Phase 6a.3b's review);
+- everything else attaches: the same entry again, an entry whose lock the wielder
+  cannot pay (it sleeps), and an entry that never fires on the weapon, which the
+  offer notes (`NEVER FIRES ON A SWORD`, a staff's status on a blade; `NEVER FIRES
+  ON A STAFF`, anything that rides a strike or a kill, since a staff casts and
+  never strikes). An element on a staff is offered with no note: it fires on the
+  cast, paying its trigger, and types a cast that lands no damage, so it spends
+  mana for nothing;
+- a refused choice is listed with its reason, never hidden — and, since Phase 6a's
+  audit, chosen like the rest: W/S stop on it, dimmed and marked, and Enter on it
+  says why and chooses nothing, since a list that passed over its refused lines
+  never showed a run of them longer than its window past either end of what could
+  be chosen. An Enchant with nothing left to choose — every offer refused, or
+  none left (nothing met, or only what the enchanter never offers) — is refused
+  as such (`NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT`), and
+  refining is left;
+- a transfer (Phase 6a.6; `Enchanter.TransferRefusal`) asks the moved soul the
+  same relations, the wand's rule and the staff's side on the weapon it lands on
+  — its own entries, less the soul for a reorder — and refuses one that would
+  strand an entry on the weapon it leaves, whose prerequisite was ahead of it and
+  would no longer be (`BURNING NEEDS FLAMING AHEAD OF IT`: settled.md's "refuses a
+  transfer that would strand a unique's lingering effect", the `requires` row
+  asked of what the source keeps; an entry that lacked its prerequisite already is
+  not the move's doing, and is not asked);
+- **the caster clause**: it refuses a transfer after which a staff's or a wand's
+  first entry — the one it comes off, or the one it lands on — is one it cannot
+  cast, or none: a staff's must apply a status, a wand's must be an element, the
+  dungeon's own two gates (`Weapon.CastsWith`; `THE ROTWOOD WOULD CAST NOTHING`). A
+  caster left with neither could neither cast nor strike, so it could never earn
+  wear again. **This narrows settled.md's "that effect can be transferred onto a
+  dagger"**: a staff arrives with one soul, so it gives its effect away only once
+  it has grown to capacity 35 and been given a second status to cast. A wand's
+  Cold becomes Flaming through a third element, since the two cannot sit together.
+  **Tightened at Phase 6a.6's review** for a staff whose first entry the move
+  changes: that entry picks whom the cast lands every status on, and the dungeon
+  asks only that it apply one. Serrated does — Bleeding, on enemies — but on a
+  strike, never a cast, and nothing kept it from coming first: moved onto a Staff
+  of Renewal behind its Regeneration, then a Ward enchanted on, then the
+  Regeneration moved away, the staff cast on enemies and landed its Ward on them.
+  So the new first must be a staff's cast as content makes one, a status it casts
+  (content's `RuleCasterInnate`; `THE STAFF OF RENEWAL WOULD CAST NOTHING`), and a
+  status the staff keeps that its cast landed on the side the old first chose
+  must land on the same side after (`THE STAFF OF RENEWAL WOULD CAST WARD ON AN
+  ENEMY`: no staff play makes can meet it, but a unique `weapons.json` gives both
+  sides can). A staff wrong already is not the move's doing, and is not asked, as
+  the stranding rule reads a prerequisite.
+
+**This decides what the enchanter will attach, and whether §3.3's "any weapon"
+holds, so it is the user's to decide.** The alternatives: (a) hide refused
+choices; (b) refuse never-firing entries too, as the drop table does; (c) also ask
+content's arrival rules (Overheal beside a healer, a dependency only on a
+currency weapon); (d) **keep settled.md's dagger whole**: allow a caster left
+with no castable first entry, which casts nothing until it is given one — the
+WEAPONS page already says so of such a weapon (`CASTS NOTHING - ITS FIRST
+ENCHANTMENT IS ITS CAST`); (e) **keep §3.3**: a status applier attaches to a wand, the
+wand's area cast skips it, and the offer notes it `NEVER FIRES ON A WAND`, as it
+notes any entry that never fires. For the staff: (f) attach a status for the
+other side with a note instead, the cast landing it where it lands today; (g) have
+a staff's cast skip an entry for the other side — a change to how a cast plays —
+and note it `NEVER FIRES ON A STAFF`; or (h) give `weapons.json` the rule too, so
+a unique staff cannot ship what the enchanter refuses, as the wand's rule is
+shared. And for an element on a staff: (i) note it as never firing, or refuse it.
+And for how a list's refused lines are walked (Phase 6a's audit): (j) W/S pass
+over a refused line, as the game's other lists pass over what cannot be chosen,
+the window pulling in the refused lines past either end of what can be as far as
+it has room — quicker to walk, but a run of them longer than the window at either
+end stays out of view: a crossbow with every slot filled, whose reorders are all a
+MOVE may choose, listed 37 refused souls over them in a window of 25. settled.md's
+Phase 6a implementation pass records the ruling.
+
+## How a landed improvement chooses (§6.4) — PHASE 6a DECISION 5
+
+§6.4 gives a service coming back from the enchanter a chance to improve the
+weapon anyway, and settles the chance: `GraftBaseChance`, 3 in 100, flat when it
+enchants, and times `1 + wear ÷ StartingPool` when it refines (settled.md;
+R4's consequence 2). What a roll that lands does, its table gives in words alone:
+**deepen**, +1 stack on a modifier the weapon already carries, "uncommon, biased
+toward the class signature"; **graft**, +1 stack of a modifier it has never
+carried, "rare" — "deepen stays the common result and a graft stays the surprise",
+and refinement moves whether the roll lands, "not what it lands on". It gives no
+number for either. What a roll does when the outcome it drew has nothing to take
+— every modifier the weapon carries at its forged-plus-five ceiling, or nothing
+left it may graft — it speaks to twice, and the two sentences pull apart: "A
+modifier at its ceiling cannot be deepened, and a weapon with every modifier
+capped rolls nothing at all" (§6.4's rules), and "A finished weapon is not inert.
+Even with its signature capped, a weapon can still gain *breadth* through grafts
+at 5 apiece — which is what keeps a max-farmed drop worth depositing at all" (the
+next rule). A max-farmed drop has every modifier it carries capped, so read
+literally — every modifier it carries — the first says that drop's landed roll is
+nothing, and the second says it grafts.
+
+**Shipped provisionally** (Phase 6a.4, `Enchanter.Improve`):
+- of the rolls that land, `GraftSharePercent` (25) in 100 graft, and the rest
+  deepen — the second draw off the roll's stream, which neither service moves;
+- a deepen weighs the class's signature `DeepenSignatureWeight` (3) against 1 for
+  every other modifier the weapon carries below its ceiling, so on a Tower Guard
+  (Block x2, Push x1) Block deepens three times in four; a staff or a wand has no
+  signature, so it has no bias;
+- a graft is drawn evenly among the modifiers the weapon has never carried that
+  the relations let it take (the kind, the exclusions, the prerequisites, and
+  never a forged-only one, so never `Charges`) — the relations and nothing else.
+  So it may land on one the weapon never reads, such as `CRIT MULTIPLIER` on a
+  staff, whose cast crits at a fixed x2 (a wand's area cast does read it), and
+  the summary's green line names it as the story. The record pulls both ways on
+  that. For it: "every other modifier is at worst inert on the wrong weapon"
+  (settled.md's relations entry, `Charges`, the negative one, alone kept out),
+  and "restriction is reserved for grafts that would be negative, not merely
+  off-class" (§6.4). Against it: the same relations entry sharpens §1.1's rule to
+  "no stack may be dead"; the caster crit ruling is made "without reopening
+  `CritMultiplier`, which stays a martial-only stat" (settled.md); and "a dead
+  stack is a farm cycle or a service roll that bought nothing" (settled.md's
+  "nothing is capped at the ceiling" entry);
+- an outcome with nothing to take falls through to the other. §6.4's "every
+  modifier capped" is read as every modifier the weapon may hold, so the roll
+  that changes nothing is the one with nothing to deepen and nothing to graft,
+  and a weapon whose carried modifiers are all capped still grafts, "a finished
+  weapon is not inert". With neither, the roll that landed changes nothing, which
+  the summary says as it says a roll that missed: `NO CHANGE` (the log tells the
+  two apart: `landed, nothing to deepen or graft`).
+
+Both numbers are `tuning.json` keys, each comment starting `Provisional:` (the
+file's marker), by the user's standing rule that a number they may revisit lives
+in the file; `GraftBaseChance`, the doc's own 3, is a key beside them and not
+provisional.
+
+**This decides what a landed roll gives, and how often each, so it is the user's
+to decide.** The alternatives: (a) no fall-through: an outcome drawn with nothing
+to take gives nothing, so a capped weapon's deepens are lost rolls — which is
+§6.4's "rolls nothing at all" read literally, for the deepens; read so for the
+grafts too, a weapon whose every carried modifier is capped rolls nothing at all;
+(b) other numbers — the share and the weight are guesses, §6.4 saying only
+"uncommon" and "rare"; (c) the split as a rule of the code rather than two keys;
+or (d) a graft only of what the weapon reads: the candidates narrowed to the
+modifiers its attack or its cast reads, so a staff is never grafted `CRIT
+MULTIPLIER` — a rule of the code beside the modifiers no weapon stacks, keyed on
+a staff's cast, or a `kind` row in `restricted.json`, though a row for casters
+would keep it off a wand too, whose cast reads it.
+settled.md's Phase 6a implementation pass records the ruling.
+
+## Reordering a weapon's own enchantments (§6.5, §3.3) — PHASE 6a DECISION 11
+
+settled.md says "reordering means detaching and re-attaching, which is a
+transfer: a tier and a service", and §6.5 that a move costs "one attachment's
+service time". Two texts disagree on the weapon whose every slot is filled:
+§6.2 ("You choose what gets attached"), beside settled.md's words, calls
+changing the order of a five-enchantment weapon "one of the more expensive
+things you can do", and settled.md elsewhere says "a weapon at five enchantments
+therefore has refinement as its only remaining service".
+
+**Shipped provisionally** (Phase 6a.6; `Enchanter.TransferRuns`,
+`Enchanter.TransferRefusal`): a reorder is a transfer whose source is the weapon
+itself — MOVE's list offers the weapon's own souls last; on an Arming Sword
+carrying Flaming and Vampiric, `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT
+T1 - 2 RUNS`:
+- it takes the **count** in runs, the service time of attaching the soul again as
+  the last of the same count ("one attachment's service time"), not the count plus
+  one every other deposit takes; and its gates are the same attachment's — slot n
+  open and a deposit of its price, n the count;
+- so it is **allowed at five**, where a move from another weapon is refused
+  (`ALL 5 SLOTS ARE FILLED`), and the WEAPONS page's price line names the one move
+  left there, `ALL 5 SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF 50 WEAR`. With
+  no soul to choose at five, MOVE is dimmed with the reorder's own slot and price
+  (`ENCHANTMENT 5 NEEDS A DEPOSIT OF 50 WEAR - IT CARRIES 20`), never with the
+  slots the other moves are refused by (Phase 6a.6's review);
+- the entry already last is not moved (`IT IS LAST ALREADY`): the move would
+  change nothing but its tier. **So a reorder needs two souls, and costs 2 runs at
+  the least**: a weapon with one soul has nothing to reorder, and its row says so;
+- **a weapon forged whole keeps every forged mark** — a unique reordered, its souls
+  all forged — since the forged ones are still a prefix with the soul last. **A
+  weapon forged in part loses the moved soul's mark**: a forged entry cannot
+  stand behind an acquired one, so it lands acquired, as it would on another
+  weapon (DECISION 13), and its damage share or cast levels no longer teach the
+  weapon. So a staff given a Ward that reorders its Regeneration behind it casts
+  its acquired Ward and levels no staff proficiency; a wand variant given a second
+  element that reorders its first behind it has no forged entry left. The screen
+  names no entry forged or acquired anywhere, and does not say this either
+  (Phase 6a.6's review).
+
+**This decides between texts that disagree, so it is the user's to decide.** The
+alternatives: (a) a reorder costs the count plus one runs, as every deposit does
+in §6.2 and settled.md's "service costs runs … `enchantments + 1`"; (b) at five
+enchantments a reorder is refused, and refining is the only service left, as
+settled.md's "refinement as its only remaining service" has it; (c) the entry
+already last may be "moved" too, a tier and the runs spent for nothing but the
+roll — a one-soul weapon could then reorder, for 1 run; and for the forged mark
+on a weapon forged in part: (d) refuse a reorder that would put a forged entry
+behind an acquired one; (e) keep the mark with the entry wherever it stands, a
+mark on each entry rather than a count of the first ones — a change to the save;
+or (f) say the loss on the MOVE row or the confirm. settled.md's Phase 6a
+implementation pass records the ruling.
+
+## How a transfer works (§6.5, §6.7) — PHASE 6a DECISION 13
+
+§6.5 moves an enchantment from one weapon to another at the enchanter, a tier
+down and "one attachment's service time", and says no more of how: whether the
+weapon it lands on needs a slot and a deposit, what happens to the weapon it
+leaves while the move is made, what the queue counts it as, and what it rolls.
+§6.7's `Deposit` record names one weapon and no enchantment.
+
+**Shipped provisionally** (Phase 6a.6; `Service.Transfer`, `Enchanter.Deposit`):
+- a transfer is the Enchant service with the soul brought from a weapon the party
+  owns rather than from the offer: the weapon it lands on needs the free slot and
+  the deposit of attaching it as its next (R4), its whole pool is cashed, it takes
+  the runs of that attachment, and it gets enchanting's flat odds of improving (3
+  in 100); a reorder's are DECISION 11's;
+- the soul may come from any weapon the party owns out of the shop — a member's or
+  the stable's — whatever it is: a forged innate, a unique's soul, one of a kind
+  that does nothing yet, the source list noting that one `DOES NOTHING YET` as it
+  notes one that never fires (Phase 6a's audit). The enchanter moves what it never
+  offers to copy;
+- **the source's wear is left in its pool**, uncashed, and comes back with it;
+- **both weapons stay in the shop until it is done, as one deposit**, which holds
+  one of the `EnchanterWorksOn` newest places, not two; the WEAPONS page lists the
+  source `HELD` under the weapon, and T on either takes both back, the weapon's
+  cash reversed (DECISION 8);
+- when it comes back, the soul drops a tier and starts that tier at no XP; tier 1,
+  and every unique soul, pinned there, moves intact, its XP with it; it lands
+  last, and **acquired**: a forged innate's mark stays with the weapon forged with
+  it, whose forged count drops — so a staff given a new cast this way no longer
+  levels staff proficiency on it, and a dagger given a staff's effect levels none.
+  A reorder, which moves the soul on the weapon forged with it, keeps the mark
+  where the weapon is forged whole and loses it where it is not (DECISION 11);
+- the deposit record gains the soul by its place — its source, and its index there
+  — and `Service` gains `Transfer` (§6.7 named two); a run's report of one names
+  its soul, its source and the tier it landed at, and the save keeps both.
+
+**This decides what a move costs and what it holds, so it is the user's to
+decide.** The alternatives: (a) a transfer needs no wear, since the soul was paid
+for once; (b) only the weapon is held, the soul leaving its source at the deposit;
+(c) a caster's first entry counts as forged whatever its origin; (d) a transfer
+holds two of the worked places, since §6.2 works "the two most recently deposited
+weapons" and a transfer deposits two; (e) a transfer rolls nothing; or (f) the
+source's wear is cashed too, growing its capacity as any deposit does.
+settled.md's Phase 6a implementation pass records the ruling.

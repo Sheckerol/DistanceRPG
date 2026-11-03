@@ -1,20 +1,27 @@
 using GameEngine.Core;
 using GameEngine.Core.UI;
 using GameEngine.DistanceRPG.Logic;
+using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using Run = GameEngine.DistanceRPG.DungeonHud.Run;
 
 namespace GameEngine.DistanceRPG;
 
 /// <summary>
-/// The between-runs screen's text (§4.5, §6.7), drawn with the engine's bitmap
-/// <see cref="TextRenderer"/> as the dungeon's HUD is: the last run's summary,
-/// the hub's dungeon list under it, and the keys that choose from it — and, under
+/// The between-runs screen's text (§4.5, §6.2, §6.7), drawn with the engine's
+/// bitmap <see cref="TextRenderer"/> as the dungeon's HUD is: on the DUNGEONS page
+/// the last run's summary, the hub's dungeon list under it, and the keys that
+/// choose from it; on the WEAPONS page (Phase 6a.2) the party's hands and bags,
+/// the stable and the enchanter's shop down the left (<see cref="HubWeapons"/>), a window that scrolls with
+/// the choice, the chosen weapon said whole on the right (<see cref="DetailRows"/>),
+/// a refused key over the keys, and the deposit panel or the take-back ask over the
+/// dimmed page (Phase 6a.5; <see cref="PanelRows"/>) — and, under
 /// the title, the notices the game hands it (<see cref="NoticeText"/>): on the
 /// first one a campaign opens on, the save's word on it, shown whole
 /// (<see cref="Resumed"/>, the numbers changed since it was saved, a save set
 /// aside and where), and then anything else, capped; on a later one, a save that
-/// could not be written. While the menu ESC opens is up, the hub dims under it and
+/// could not be written, and one of the hub's own that could not, at once. While
+/// the menu ESC opens is up, the hub dims under it and
 /// the menu is drawn over it as the dungeon's pause menu is
 /// (<see cref="DungeonHud.PauseMenuLayout"/>) — its options, the slot the campaign
 /// saves into, and what a save by hand came to — and the keys line along the
@@ -32,7 +39,8 @@ namespace GameEngine.DistanceRPG;
 /// not a range, and not even the tutorial's fixed two.</item>
 /// <item><strong>The summary is the last run's own</strong>
 /// (<see cref="SummaryLines"/>): the facts its end showed over the last floor,
-/// less that panel's key, since here ENTER descends.</item>
+/// less that panel's key, since here ENTER descends — and where the enchanter's
+/// lines were cut short, the key that shows the rest (<see cref="HubSummaryLines"/>).</item>
 /// </list>
 /// Every string it draws comes from an <c>internal static</c> member and is
 /// tested (<c>BetweenRunsHudTests</c>), and so is where the rows go
@@ -53,13 +61,24 @@ public sealed class BetweenRunsHud : IDisposable
     internal const string ChooseHeading = "CHOOSE A DUNGEON";
 
     /// <summary>
-    /// The keys the screen answers, along the bottom: W/S or the arrows move the
-    /// choice, ENTER descends into it, ESC opens the menu — the dungeon's pause menu,
-    /// over the hub, where the campaign is saved by hand and play is left for the
-    /// title (the user's ruling of 2026-09-25 on the save model, R2(d), R2(e)). NEW
-    /// CAMPAIGN is the title's (R2(e)), so no key here begins one.
+    /// The keys the DUNGEONS page answers, along the bottom: W/S or the arrows move
+    /// the choice, ENTER descends into it, TAB turns to the WEAPONS page, ESC opens
+    /// the menu — the dungeon's pause menu, over the hub, where the campaign is
+    /// saved by hand and play is left for the title (the user's ruling of
+    /// 2026-09-25 on the save model, R2(d), R2(e)). NEW CAMPAIGN is the title's
+    /// (R2(e)), so no key here begins one.
     /// </summary>
-    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - ESC MENU";
+    internal const string KeysLine = "W/S OR ARROWS CHOOSE - ENTER DESCENDS - TAB WEAPONS - ESC MENU";
+
+    /// <summary>The keys the WEAPONS page answers while browsing (§6.2, Phase 6a.2): W/S or the arrows move the choice, ENTER takes the weapon chosen up, D deposits it at the enchanter and T takes a weapon in the shop back (Phase 6a.5), TAB turns back to DUNGEONS, ESC opens the menu.</summary>
+    internal const string WeaponsKeysLine = "W/S OR ARROWS CHOOSE - ENTER TAKES IT UP - D DEPOSITS - T TAKES BACK - TAB DUNGEONS - ESC MENU";
+
+    /// <summary>
+    /// The keys line with a weapon taken up, which names it: <c>CARRYING THE
+    /// ARMING SWORD - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK</c>.
+    /// TAB is not named: it does nothing while a weapon is carried.
+    /// </summary>
+    internal static string CarryingKeysLine(Weapon carried) => $"CARRYING {HubWeapons.The(carried)} - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK";
 
     /// <summary>How the menu's keys line ends, after its options: ESC closes the menu.</summary>
     private const string EscCloses = "ESC CLOSES";
@@ -155,6 +174,21 @@ public sealed class BetweenRunsHud : IDisposable
     /// <summary>How many characters a summary line runs to before a list on it wraps: a little over half the shipped window at the dungeon's summary scale.</summary>
     private const int SummaryLineChars = 64;
 
+    /// <summary>How many of the enchanter's finished and worked services the hub's summary names before it says how many more (<see cref="MoreAtTheEnchanter"/>): the hub cuts a long summary short, so it can name more than the dungeon's end panel, which cannot.</summary>
+    internal const int HubServiceLines = 3;
+
+    /// <summary>How many weapons the summary's stalled line names before it says how many more.</summary>
+    internal const int MostStalledNames = 3;
+
+    /// <summary>What the summary says when a run that did not count ends with weapons in the shop (§6.3): the enchanter works only on a run that counts.</summary>
+    internal const string WorkedNothing = "THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT";
+
+    /// <summary>The head of the summary's line of stalled weapons, the names after it.</summary>
+    internal const string StalledHeading = "STALLED AT THE ENCHANTER:";
+
+    /// <summary>What the hub alone appends to <see cref="MoreAtTheEnchanter"/>: the page that shows the rest. The dungeon's end panel shares the summary, and TAB does nothing there.</summary>
+    internal const string TabWeapons = " - TAB WEAPONS";
+
     /// <summary>
     /// A run's summary (§4.4), a line a fact, the headline first. It says what
     /// the run was — <c>CLEARED</c>, <c>RETREATED</c>, <c>DEFEATED</c> — and where
@@ -167,9 +201,23 @@ public sealed class BetweenRunsHud : IDisposable
     /// them (<see cref="DungeonHud.RunSummaryLines"/>). The between-runs screen
     /// shows them again above the list, where they are the context the next
     /// choice is made in.
+    /// <para>
+    /// <strong>And the enchanter</strong> (§6.2, §6.3; Phase 6a.3a), after whether
+    /// the run counted, when anything was in the shop: each service the run
+    /// finished, back in the stable with what it attached — a transfer's two
+    /// weapons a line each — and each it worked a run on, at most
+    /// <paramref name="mostServiceLines"/> lines of them and then how many more
+    /// (<see cref="MoreAtTheEnchanter"/>); then the weapons it left stalled,
+    /// wrapped as the spoils are, at most <see cref="MostStalledNames"/> named. A
+    /// run that did not count worked nothing, and says so. It names no key unless
+    /// handed one: the dungeon's end panel shares these lines, and the hub hands
+    /// its own (<see cref="HubSummaryLines"/>).
+    /// </para>
     /// </summary>
     /// <param name="result">The run's end, as the campaign returned it.</param>
-    internal static IReadOnlyList<Run> SummaryLines(RunResult result)
+    /// <param name="mostServiceLines">How many lines of finished and worked services to say before saying how many more — a service told whole, a transfer's two lines together: the hub's <see cref="HubServiceLines"/>, the dungeon's end panel fewer.</param>
+    /// <param name="moreTail">What the line of how many more ends with: the hub's <see cref="TabWeapons"/>, and nothing where TAB does nothing.</param>
+    internal static IReadOnlyList<Run> SummaryLines(RunResult result, int mostServiceLines = HubServiceLines, string moreTail = "")
     {
         ArgumentNullException.ThrowIfNull(result);
         var content = GameContent.Current;
@@ -201,9 +249,9 @@ public sealed class BetweenRunsHud : IDisposable
 
         // What was carried home, or lost with the party.
         if (result.SpoilsKept.Count > 0)
-            lines.AddRange(Wrapped("SPOILS KEPT:", result.SpoilsKept.Select(w => w.Name.ToUpperInvariant()), DungeonHud.Orange));
+            lines.AddRange(Wrapped("SPOILS KEPT:", result.SpoilsKept.Select(w => w.ShownName), DungeonHud.Orange));
         if (result.SpoilsLost.Count > 0)
-            lines.AddRange(Wrapped("SPOILS LOST:", result.SpoilsLost.Select(w => w.Name.ToUpperInvariant()), DungeonHud.Red));
+            lines.AddRange(Wrapped("SPOILS LOST:", result.SpoilsLost.Select(w => w.ShownName), DungeonHud.Red));
         if (result.SpoilsKept.Count == 0 && result.SpoilsLost.Count == 0)
             lines.Add(new Run(result.BossDefeated ? "NO SPOILS CARRIED" : "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", DungeonHud.Grey));
 
@@ -230,6 +278,9 @@ public sealed class BetweenRunsHud : IDisposable
             : mercyReachable ? $"RUN NOT COUNTED - A FAILED RUN COUNTS FROM FLOOR {content.Tuning.MercyFloor}" : "RUN NOT COUNTED";
         lines.Add(new Run($"{counted} - {DungeonHud.Runs(result.RunCounter)} SO FAR", DungeonHud.Cyan));
 
+        // What the enchanter did on the run's end, which the count decided.
+        lines.AddRange(ServiceLines(result, mostServiceLines, moreTail));
+
         // What the clear did to the dungeon.
         if (result.Retired)
             lines.Add(new Run($"{dungeon} IS CLOSED FOR GOOD", DungeonHud.Yellow));
@@ -238,6 +289,138 @@ public sealed class BetweenRunsHud : IDisposable
 
         return lines;
     }
+
+    /// <summary>
+    /// The summary's lines for the enchanter (§6.2, §6.3), off the run's reports
+    /// (<see cref="RunResult.Services"/>), none for an empty shop: on a run that
+    /// counted, each finished service (cyan, and green when its improvement roll
+    /// grafted) — <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC
+    /// - NO CHANGE</c>, <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - REFINED -
+    /// GRAFTED BLOCK</c>, a transfer's source on a line of its own under the weapon
+    /// its soul went to (<see cref="SourceBack"/>) — then each worked one — <c>THE
+    /// ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/>
+    /// lines of those together, a service never split, and then <c>AND 2 MORE AT THE
+    /// ENCHANTER</c>, <paramref name="moreTail"/> after it; then the stalled weapons
+    /// in yellow, wrapped, <c>STALLED AT THE ENCHANTER: RIPOSTE BLADE</c>. On a run
+    /// that did not count, the one grey line <see cref="WorkedNothing"/>. A weapon
+    /// and an enchantment are named by the content's rows, and by the bare id where
+    /// a row is gone, so the summary never throws while it draws.
+    /// </summary>
+    private static IEnumerable<Run> ServiceLines(RunResult result, int most, string moreTail)
+    {
+        var reports = result.Services ?? [];
+        if (reports.Count == 0)
+            yield break;
+        if (!result.ServiceTick)
+        {
+            yield return new Run(WorkedNothing, DungeonHud.Grey);
+            yield break;
+        }
+
+        var told = reports.Where(report => report.Finished).Concat(reports.Where(report => !report.Stalled && !report.Finished)).ToList();
+        int said = 0, lines = 0;
+        foreach (var report in told)
+        {
+            var saying = new List<Run>
+            {
+                new(report.Finished ? BackFromTheEnchanter(report) : WorkedThe(report),
+                    report.Improved?.Kind == ImprovementKind.Graft ? DungeonHud.Green : DungeonHud.Cyan),   // a graft is the story (§6.4)
+            };
+            if (report.Finished && SourceBack(report) is { } source)
+                saying.Add(new Run(source, DungeonHud.Cyan));
+            if (lines + saying.Count > most)
+                break;   // told whole or not at all, and in order
+            foreach (var line in saying)
+                yield return line;
+            lines += saying.Count;
+            said++;
+        }
+        if (said < told.Count)
+            yield return new Run(MoreAtTheEnchanter(told.Count - said) + moreTail, DungeonHud.Cyan);
+
+        var stalled = reports.Where(report => report.Stalled).Select(report => WeaponName(report.WeaponId)).ToList();
+        if (stalled.Count > 0)
+        {
+            var named = stalled.Take(MostStalledNames).ToList();
+            if (stalled.Count > MostStalledNames)
+                named.Add($"AND {stalled.Count - MostStalledNames} MORE");
+            foreach (var line in Wrapped(StalledHeading, named, DungeonHud.Yellow))
+                yield return line;
+        }
+    }
+
+    /// <summary>
+    /// A finished service's line, what it bought and then what its improvement roll
+    /// did (§6.4, Phase 6a.4): <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER -
+    /// ATTACHED VAMPIRIC - NO CHANGE</c>, <c>… - REFINED - DEEPENED CRIT WINDOW</c>, or
+    /// <c>… - GRAFTED BLOCK</c>, which the summary draws green. A weapon that came
+    /// back as it went — a roll that missed, or found nothing to improve, or none
+    /// made — says <c>NO CHANGE</c>. A transfer's weapon says where its soul landed
+    /// (Phase 6a.6): <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT
+    /// T2 - NO CHANGE</c>, or a reorder's <c>… - FLAMING NOW LAST AT T1 - …</c>, short
+    /// enough that the widest names and a two-digit tier still fit the dungeon's end
+    /// panel at its scale.
+    /// </summary>
+    internal static string BackFromTheEnchanter(ServiceReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        string what = (report.Service, report.EnchantmentId) switch
+        {
+            (Service.Enchant, { } id) => $"ATTACHED {EnchantmentName(id)}",
+            (Service.Transfer, { } soul) => $"{EnchantmentName(soul)} {(report.SourceId is null ? "NOW LAST" : "MOVED ON")}{(report.Tier is { } tier ? $" AT T{tier}" : "")}",
+            _ => "REFINED",
+        };
+        return $"{WeaponName(report.WeaponId)} IS BACK FROM THE ENCHANTER - {what} - {Outcome(report.Improved)}";
+    }
+
+    /// <summary>
+    /// A finished transfer's source, back in the stable beside the weapon its soul
+    /// went to, the soul gone from it (Phase 6a.6): <c>NAMELESS KNIFE IS BACK FROM THE
+    /// ENCHANTER - VAMPIRIC MOVED OFF</c>. Null for any other report, and for a
+    /// reorder, whose weapon was its own source.
+    /// </summary>
+    internal static string? SourceBack(ServiceReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        return report is { Service: Service.Transfer, SourceId: { } source }
+            ? $"{WeaponName(source)} IS BACK FROM THE ENCHANTER - {(report.EnchantmentId is { } soul ? EnchantmentName(soul) : "ITS ENCHANTMENT")} MOVED OFF"
+            : null;
+    }
+
+    /// <summary>What an improvement roll did, as a finished service's line ends: <c>DEEPENED CRIT WINDOW</c>, <c>GRAFTED BLOCK</c>, or <c>NO CHANGE</c>.</summary>
+    internal static string Outcome(Improvement? improved) => improved switch
+    {
+        null => "NO CHANGE",
+        { Kind: ImprovementKind.Graft } => $"GRAFTED {DungeonHud.ModifierName(improved.Modifier)}",
+        _ => $"DEEPENED {DungeonHud.ModifierName(improved.Modifier)}",
+    };
+
+    /// <summary>A worked service's line, not finished yet: <c>THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c>.</summary>
+    internal static string WorkedThe(ServiceReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        return $"THE ENCHANTER WORKED {HubWeapons.The(WeaponName(report.WeaponId))} - {report.RunsWorked} OF {DungeonHud.Runs(report.Runs)}";
+    }
+
+    /// <summary>How many more finished and worked services there are than the summary named: <c>AND 2 MORE AT THE ENCHANTER</c>.</summary>
+    internal static string MoreAtTheEnchanter(int more) => $"AND {more} MORE AT THE ENCHANTER";
+
+    /// <summary>
+    /// The summary as the hub shows it over its list: <see cref="SummaryLines"/> at
+    /// <see cref="HubServiceLines"/>, and the enchanter's line of how many more it did
+    /// not name pointing at the page that shows them — <c>AND 2 MORE AT THE
+    /// ENCHANTER - TAB WEAPONS</c>. Here, and never in the dungeon's end panel, where
+    /// TAB does nothing.
+    /// </summary>
+    internal static IReadOnlyList<Run> HubSummaryLines(RunResult result) => SummaryLines(result, HubServiceLines, TabWeapons);
+
+    /// <summary>A weapon by its catalogue id, as the summary names it: the content's row's name, upper-cased — the bare id where the content has none.</summary>
+    private static string WeaponName(string id)
+        => Weapon.Shown(GameContent.Current.Weapons.TryGet(id, out var def) ? def.Name : id);
+
+    /// <summary>An enchantment by its id, as the summary and the shop name it: the content's row's name, upper-cased — the bare id where the content has none.</summary>
+    internal static string EnchantmentName(string id)
+        => (GameContent.Current.Enchantments.TryGet(id, out var def) ? def.Name : id).ToUpperInvariant();
 
     /// <summary>A list under a heading, as many summary lines as it takes: the heading and the items on the first, the rest indented under it, comma-separated.</summary>
     private static IEnumerable<Run> Wrapped(string heading, IEnumerable<string> items, Vector4 color)
@@ -384,13 +567,26 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The line along the bottom, and its colour, in grey: the keys the screen
-    /// answers (<see cref="KeysLine"/>), and while the menu is up, the menu's
-    /// (<see cref="MenuKeysLine"/>) in their place.
+    /// answers in what it is doing — the DUNGEONS page's (<see cref="KeysLine"/>),
+    /// the WEAPONS page's (<see cref="WeaponsKeysLine"/>), a carry's, naming the
+    /// weapon (<see cref="CarryingKeysLine"/>) — and while the menu, the deposit
+    /// panel or the take-back ask is up, its own (<see cref="MenuKeysLine"/>,
+    /// <see cref="DepositPanel.KeysLine"/>) in their place.
     /// </summary>
-    /// <param name="menu">Whether the menu is up.</param>
+    /// <param name="mode">What the screen is doing.</param>
     /// <param name="hasTitle">Whether the session has a title to quit to.</param>
-    internal static (string Text, Vector4 Color) BottomLine(bool menu = false, bool hasTitle = true)
-        => (menu ? MenuKeysLine(hasTitle) : KeysLine, DungeonHud.Grey);
+    /// <param name="carried">The weapon taken up, while carrying.</param>
+    /// <param name="panel">The deposit panel or the take-back ask, while one is up.</param>
+    internal static (string Text, Vector4 Color) BottomLine(BetweenRunsScene.HubMode mode = BetweenRunsScene.HubMode.Dungeons, bool hasTitle = true, Weapon? carried = null,
+        DepositPanel? panel = null)
+        => (mode switch
+        {
+            BetweenRunsScene.HubMode.Menu => MenuKeysLine(hasTitle),
+            BetweenRunsScene.HubMode.Weapons => WeaponsKeysLine,
+            BetweenRunsScene.HubMode.Carrying => carried is null ? WeaponsKeysLine : CarryingKeysLine(carried),
+            BetweenRunsScene.HubMode.Deposit or BetweenRunsScene.HubMode.Ask => panel?.KeysLine ?? WeaponsKeysLine,
+            _ => KeysLine,
+        }, DungeonHud.Grey);
 
     /// <summary>
     /// Where the rows go in a window <paramref name="windowHeight"/> pixels tall.
@@ -427,13 +623,471 @@ public sealed class BetweenRunsHud : IDisposable
         return new ScreenLayout(listTop, Math.Clamp(room, 0, summaryLines), shift);
     }
 
+    // ── The WEAPONS page (§6.2, Phase 6a.2) ─────────────────────────────────
+
+    /// <summary>Where the WEAPONS page's two columns start, from the window's centre: the rows on the left, the chosen weapon's detail on the right — 40 and 660 across the shipped 1280.</summary>
+    internal const float LeftColumn = -600f;
+    internal const float RightColumn = 20f;
+
+    /// <summary>How wide each column is: nothing drawn in one runs into the other, or off a 1280-wide window.</summary>
+    internal const float ColumnWidth = 580f;
+
+    /// <summary>How wide a line across the window may run — the keys, the refusal — with 20 px either side of the shipped 1280.</summary>
+    internal const float FullWidth = 1240f;
+
+    /// <summary>A row of the page: its scale and the height it takes before the next.</summary>
+    internal const float WeaponRowScale = 1.5f;
+    internal const float WeaponRowPitch = 19f;
+
+    /// <summary>The detail panel's lines: where the weapon is, its name, then the rest.</summary>
+    internal const float DetailWhereScale = 1.3f;
+    private const float DetailWherePitch = 20f;
+    internal const float DetailNameScale = 2f;
+    private const float DetailNamePitch = 26f;
+    internal const float DetailScale = 1.4f;
+    private const float DetailPitch = 18f;
+
+    /// <summary>
+    /// The refusal row's distance up from the bottom: one row over the keys line,
+    /// in the warning's orange — what the last key was refused with, a put-down, D
+    /// on a shut enchanter or a dimmed service's number, until the next key — and
+    /// the clearance the page's rows and the deposit panel keep above it.
+    /// </summary>
+    internal const float RefusalFromBottom = 50f;
+    private const float RefusalClearance = 6f;
+
+    /// <summary>The top of the WEAPONS page under the notices, the lowest a row's glyphs may reach over the refusal row, and how many rows fit between.</summary>
+    internal readonly record struct WeaponsLayout(float Top, float Bottom, int Rows);
+
+    /// <summary>
+    /// Where the WEAPONS page goes in a window <paramref name="windowHeight"/>
+    /// pixels tall: from where the last run's heading sits on DUNGEONS, pushed down
+    /// by <paramref name="noticeRows"/> rows of notices (<see cref="NoticeShift"/>),
+    /// to the refusal row's clearance over the keys line; the rows between are the
+    /// window the choice scrolls (<see cref="HubWeapons.ScrollTop"/>). At least one,
+    /// so the choice is always in view.
+    /// </summary>
+    internal static WeaponsLayout WeaponsPage(float windowHeight, int noticeRows = 0)
+    {
+        float top = LastRunHeadingY + NoticeShift(noticeRows);
+        float bottom = windowHeight - RefusalFromBottom - RefusalClearance;
+        int rows = (int)MathF.Floor((bottom - top - GlyphHeight * WeaponRowScale) / WeaponRowPitch) + 1;
+        return new WeaponsLayout(top, bottom, Math.Max(1, rows));
+    }
+
+    /// <summary>How many characters a detail line runs to before a list on it wraps: the right column's width at <see cref="DetailScale"/>.</summary>
+    internal static int DetailChars => (int)(ColumnWidth / (GlyphAdvance * DetailScale));
+
+    /// <summary>
+    /// A weapon's capacity said whole (R4, §6.1), for the detail panel: the
+    /// capacity, and how far the wear cashed has come toward the next point of it —
+    /// <c>CAPACITY 31 - 12 OF 31 CASHED TOWARD 32</c>. Under a tuning that freezes
+    /// it (<see cref="Tuning.WearCapacityPerBar"/> 0), <c>CAPACITY 30 - IT DOES NOT
+    /// GROW</c>.
+    /// </summary>
+    internal static string CapacityLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        var pool = weapon.WearPool;
+        int perBar = GameContent.Current.Tuning.WearCapacityPerBar;
+        return perBar > 0
+            ? $"CAPACITY {pool.Max} - {pool.XpIntoNext} OF {pool.XpToNext} CASHED TOWARD {pool.Max + perBar}"
+            : $"CAPACITY {pool.Max} - IT DOES NOT GROW";
+    }
+
+    /// <summary>Where a weapon row's weapon is, over its detail: <c>IN THE HAND OF [A]</c>, <c>IN THE BAG OF [A]</c>, <c>IN THE STABLE</c>.</summary>
+    internal static string WhereLine(WeaponPlace place)
+        => place.IsStable ? "IN THE STABLE"
+            : place.Index == 0 ? $"IN THE HAND OF {HubWeapons.MemberLine(place.MemberId!)}"
+            : $"IN THE BAG OF {HubWeapons.MemberLine(place.MemberId!)}";
+
+    /// <summary>What a room says, over the detail panel: where it is.</summary>
+    internal static string RoomLine(WeaponPlace place)
+        => place.IsStable ? "THE END OF THE STABLE - IT KEEPS ANY NUMBER OF WEAPONS"
+            : place.Index == 0 ? $"THE HAND OF {HubWeapons.MemberLine(place.MemberId!)} IS EMPTY"
+            : $"ROOM IN THE BAG OF {HubWeapons.MemberLine(place.MemberId!)}";
+
+    /// <summary>Under a room's line: how a weapon comes to be there.</summary>
+    internal const string RoomHint = "TAKE A WEAPON UP - THEN PUT IT DOWN HERE";
+
+    /// <summary>Under a caster's enchantments, in the warning's orange, when it casts nothing (<see cref="CastsNothing"/>): why.</summary>
+    internal const string CastsNothingLine = "CASTS NOTHING - ITS FIRST ENCHANTMENT IS ITS CAST";
+
+    /// <summary>
+    /// Whether <paramref name="weapon"/> is a caster that casts nothing: a staff
+    /// whose first enchantment applies no status, a wand whose first is no
+    /// element — or either carrying none. The dungeon's own gates ask the same, the
+    /// staff's cast (<c>TurnSystem.CanCastOn</c>) and the wand's
+    /// (<see cref="TurnSystem.CanCastArea"/>), so such a weapon never casts, and
+    /// cannot strike: a caster casts. No weapon the content ships is made so, and
+    /// the enchanter leaves none so (<see cref="Enchanter.TransferRefusal"/> asks the
+    /// same question, <see cref="Weapon.CastsWith"/>, of what a transfer would leave;
+    /// Phase 6a.6); only a hand-edited save can put one on the WEAPONS page, whose
+    /// detail then says why.
+    /// </summary>
+    internal static bool CastsNothing(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return !weapon.CastsWith(weapon.Innate?.Def);
+    }
+
+    /// <summary>
+    /// A weapon's enchantment slots said whole (R4, §6.2), for the detail panel: how
+    /// many it holds, how many slots its capacity has opened, and the slot it waits
+    /// on — the one its next enchantment needs, or the next to open when that one is
+    /// open already — <c>ENCHANTMENTS 1 - SLOTS OPEN 1 OF 5 - SLOT 2 OPENS AT
+    /// CAPACITY 35</c>; or <c>ENCHANTMENTS 2 - ALL 5 SLOTS OPEN</c>. What a weapon
+    /// arrives with fills its slots from the first, so a unique carrying three at
+    /// capacity 30 waits on slot 4.
+    /// </summary>
+    internal static string SlotsLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        int count = weapon.Enchantments.Count;
+        int slots = GameContent.Current.Tuning.EnchantmentSlots;
+        int open = Wear.SlotsOpen(weapon.WearCapacity);
+        if (open >= slots)
+            return $"ENCHANTMENTS {count} - ALL {slots} SLOTS OPEN";
+        string line = $"ENCHANTMENTS {count} - SLOTS OPEN {open} OF {slots}";
+        if (count >= slots)
+            return line;
+        int next = Math.Max(count + 1, open + 1);
+        return $"{line} - SLOT {next} OPENS AT CAPACITY {Wear.SlotOpensAt(next)}";
+    }
+
+    /// <summary>
+    /// What a weapon's next enchantment costs (R4, §6.2), for the detail panel: the
+    /// deposit it needs and the runs it spends in the shop — <c>THE NEXT NEEDS A
+    /// DEPOSIT OF 35 WEAR - 2 RUNS IN THE SHOP</c> — or, with every slot filled, what
+    /// the one move left there costs, <c>ALL 5 SLOTS ARE FILLED - A REORDER NEEDS A
+    /// DEPOSIT OF 50 WEAR</c>: a reorder attaches its soul again as the last of the
+    /// same count, at that attachment's price (PHASE 6a DECISION 11). Refining, which
+    /// has no price, is always left, and it is all that is left to a weapon holding
+    /// more than there are slots — a <c>tuning.json</c> that lowered them since —
+    /// whose reorder the slots refuse too: <c>ALL 3 SLOTS ARE FILLED - REFINING IS
+    /// LEFT</c>.
+    /// </summary>
+    internal static string PriceLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        int count = weapon.Enchantments.Count;
+        int slots = GameContent.Current.Tuning.EnchantmentSlots;
+        if (count > slots)
+            return $"ALL {slots} SLOTS ARE FILLED - REFINING IS LEFT";
+        return count == slots
+            ? $"ALL {slots} SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF {Wear.Price(count)} WEAR"
+            : $"THE NEXT NEEDS A DEPOSIT OF {Wear.Price(count + 1)} WEAR - {DungeonHud.Runs(Wear.ServiceRuns(count))} IN THE SHOP";
+    }
+
+    /// <summary>Over a weapon in the shop's detail, where the others say where they are.</summary>
+    internal const string AtTheEnchanterLine = "AT THE ENCHANTER";
+
+    /// <summary>What a deposit bought, and its runs: <c>ENCHANT VAMPIRIC - 1 OF 2 RUNS</c>, <c>REFINE - 0 OF 1 RUN</c>, a transfer's <c>TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 0 OF 2 RUNS</c> or a reorder's <c>MOVE FLAMING TO THE END - 0 OF 2 RUNS</c>.</summary>
+    internal static string ServiceLine(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        string what = deposit.Service switch
+        {
+            Service.Enchant when deposit.EnchantmentId is { } id => $"ENCHANT {EnchantmentName(id)}",
+            Service.Transfer => deposit.Source is { } source
+                ? $"TAKE {SoulName(deposit)} FROM {HubWeapons.The(source)}"
+                : $"MOVE {SoulName(deposit)} TO THE END",
+            _ => "REFINE",
+        };
+        return $"{what} - {HubWeapons.ShopRuns(deposit)}";
+    }
+
+    /// <summary>
+    /// A transfer's source held in the shop, over its detail (Phase 6a.6): what it
+    /// is there for, <c>HELD - GIVING VAMPIRIC TO THE RIPOSTE BLADE</c>. The soul is
+    /// still on it until the service is done.
+    /// </summary>
+    internal static string HeldLine(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        return $"HELD - GIVING {SoulName(deposit)} TO {HubWeapons.The(deposit.Weapon)}";
+    }
+
+    /// <summary>A transfer's soul by name, as the shop's lines say it, or <c>AN ENCHANTMENT</c> where nothing lies at its place (a hand-edited save the checks would have refused).</summary>
+    private static string SoulName(Deposit deposit) => deposit.Soul is { } soul ? EnchantmentName(soul.Id) : "AN ENCHANTMENT";
+
+    /// <summary>A worked deposit's state: when it comes back, <c>WORKING - BACK AFTER 1 MORE RUN THAT COUNTS</c>.</summary>
+    internal static string WorkingLine(Deposit deposit)
+    {
+        ArgumentNullException.ThrowIfNull(deposit);
+        int left = deposit.Runs - deposit.RunsWorked;
+        return $"WORKING - BACK AFTER {left} MORE {(left == 1 ? "RUN THAT COUNTS" : "RUNS THAT COUNT")}";
+    }
+
+    /// <summary>A stalled deposit's state: what it waits on, <c>STALLED - 2 NEWER DEPOSITS ARE AHEAD OF IT</c>.</summary>
+    internal static string StalledLine(int ahead)
+        => $"STALLED - {ahead} NEWER {(ahead == 1 ? "DEPOSIT IS" : "DEPOSITS ARE")} AHEAD OF IT";
+
+    /// <summary>
+    /// The detail panel for the row chosen, top to bottom, on the right: for a
+    /// weapon, where it is, its name — a unique's in orange — and the dungeon's
+    /// readouts with no wielder (<see cref="DungeonHud.WeaponStats"/>, the
+    /// modifiers and the enchantments, each list wrapped to the column), under a
+    /// caster that casts nothing why, in orange (<see cref="CastsNothingLine"/>),
+    /// then its wear said whole (<see cref="DungeonHud.WearLine"/>, green once
+    /// full), its capacity (<see cref="CapacityLine"/>), its slots
+    /// (<see cref="SlotsLine"/>) and what its next enchantment costs
+    /// (<see cref="PriceLine"/>). For a weapon in the shop, that it is at the
+    /// enchanter, its name, what its deposit bought and its runs
+    /// (<see cref="ServiceLine"/>), whether it is worked or stalled and on what
+    /// (<see cref="WorkingLine"/>, <see cref="StalledLine"/>), and the readouts, wear
+    /// and capacity — no slots or price, which its service is changing. For a
+    /// transfer's source held there, what it is held for (<see cref="HeldLine"/>),
+    /// how its deposit stands, and its own readouts, wear and capacity. For a room,
+    /// what it is and what it is for. Nothing for a row that is none of these.
+    /// </summary>
+    internal static IReadOnlyList<ListRow> DetailRows(HubWeapons.Row row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        var rows = new List<ListRow>();
+        if (row is { Kind: HubWeapons.RowKind.Room, Place: { } room })
+        {
+            rows.Add(new ListRow(RoomLine(room), DungeonHud.White, DetailScale, DetailPitch));
+            rows.Add(new ListRow(RoomHint, DungeonHud.Grey, DetailScale, DetailPitch));
+            return rows;
+        }
+        if (row is { Kind: HubWeapons.RowKind.Shop, Weapon: { } shopWeapon, Deposit: { } deposit })
+        {
+            rows.Add(new ListRow(AtTheEnchanterLine, DungeonHud.Grey, DetailWhereScale, DetailWherePitch));
+            rows.Add(new ListRow(HubWeapons.Name(shopWeapon), shopWeapon.Unique ? DungeonHud.Orange : DungeonHud.White, DetailNameScale, DetailNamePitch));
+            rows.Add(row.Held
+                ? new ListRow(HeldLine(deposit), DungeonHud.Grey, DetailScale, DetailPitch)
+                : new ListRow(ServiceLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
+            rows.Add(row.Stalled
+                ? new ListRow(StalledLine(row.Ahead), DungeonHud.Yellow, DetailScale, DetailPitch)
+                : new ListRow(WorkingLine(deposit), DungeonHud.Cyan, DetailScale, DetailPitch));
+            Readouts(rows, shopWeapon, row.Held);
+            return rows;
+        }
+        if (row is not { Kind: HubWeapons.RowKind.Weapon, Place: { } place, Weapon: { } weapon })
+            return rows;
+
+        rows.Add(new ListRow(WhereLine(place), DungeonHud.Grey, DetailWhereScale, DetailWherePitch));
+        rows.Add(new ListRow(HubWeapons.Name(weapon), weapon.Unique ? DungeonHud.Orange : DungeonHud.White, DetailNameScale, DetailNamePitch));
+        Readouts(rows, weapon);
+        rows.Add(new ListRow(SlotsLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
+        rows.Add(new ListRow(PriceLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
+        return rows;
+    }
+
+    /// <summary>What every weapon's detail says under its name: its statline, modifiers and enchantments with no wielder, why a caster casts nothing, its wear — a transfer's <paramref name="held"/> source's as the move leaves it (<see cref="HeldWearLine"/>) — and its capacity.</summary>
+    private static void Readouts(List<ListRow> rows, Weapon weapon, bool held = false)
+    {
+        rows.Add(new ListRow(DungeonHud.WeaponStats(weapon), DungeonHud.White, DetailScale, DetailPitch));
+        foreach (string line in Listed("* ", DungeonHud.ModifierReadout(weapon), DetailChars))
+            rows.Add(new ListRow(line, DungeonHud.White, DetailScale, DetailPitch));
+        foreach (string line in Listed("* ", DungeonHud.EnchantmentReadout(weapon), DetailChars))
+            rows.Add(new ListRow(line, DungeonHud.Cyan, DetailScale, DetailPitch));
+        if (CastsNothing(weapon))
+            rows.Add(new ListRow(CastsNothingLine, DungeonHud.Orange, DetailScale, DetailPitch));
+        rows.Add(new ListRow(held ? HeldWearLine(weapon) : DungeonHud.WearLine(weapon), DungeonHud.WearColor(weapon, DungeonHud.White), DetailScale, DetailPitch));
+        rows.Add(new ListRow(CapacityLine(weapon), DungeonHud.Grey, DetailScale, DetailPitch));
+    }
+
+    /// <summary>
+    /// A transfer's source's wear, held in the shop beside the weapon its soul goes to
+    /// with its wear left uncashed (PHASE 6a DECISION 13): short of full as every
+    /// weapon's says it (<see cref="DungeonHud.WearLine"/>), and full, what the move
+    /// does with it — <c>WEAR 40 OF 40 - FULL - THE MOVE LEAVES IT UNSPENT</c> — never
+    /// the full line's <c>TIME TO ROTATE IT INTO THE SHOP</c>, since it is there.
+    /// </summary>
+    internal static string HeldWearLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return weapon.WornFull ? $"WEAR {weapon.Wear} OF {weapon.WearCapacity} - FULL - THE MOVE LEAVES IT UNSPENT" : DungeonHud.WearLine(weapon);
+    }
+
+    /// <summary>
+    /// A readout's entries — separated by two spaces, as the dungeon's readouts
+    /// separate them — as lines of at most <paramref name="chars"/> characters: the
+    /// first led by <paramref name="lead"/>, the rest indented under it, an entry
+    /// never split. None for an empty readout.
+    /// </summary>
+    internal static IEnumerable<string> Listed(string lead, string readout, int chars)
+    {
+        ArgumentNullException.ThrowIfNull(lead);
+        ArgumentNullException.ThrowIfNull(readout);
+        var entries = readout.Split("  ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (entries.Length == 0)
+            yield break;
+        string indent = new(' ', lead.Length);
+        var line = new System.Text.StringBuilder(lead).Append(entries[0]);
+        foreach (string entry in entries.Skip(1))
+        {
+            if (line.Length + 2 + entry.Length > chars)
+            {
+                yield return line.ToString();
+                line.Clear().Append(indent).Append(entry);
+            }
+            else
+            {
+                line.Append("  ").Append(entry);
+            }
+        }
+        yield return line.ToString();
+    }
+
+    // ── The deposit panel (§6.2, Phase 6a.5) ────────────────────────────────
+
+    /// <summary>The panel's lines, top to bottom: its heading, the weapon's state under it, a service a line, the offer list's heading and its lines, and the ask, a gap under the rest.</summary>
+    internal const float PanelHeadingScale = 2f;
+    private const float PanelHeadingPitch = 30f;
+    internal const float PanelStateScale = 1.4f;
+    private const float PanelStatePitch = 30f;
+    internal const float PanelOptionScale = 1.5f;
+    private const float PanelOptionPitch = 24f;
+    internal const float PanelOfferHeadingScale = 1.6f;
+    private const float PanelOfferHeadingPitch = 28f;
+    internal const float PanelOfferScale = 1.5f;
+    internal const float PanelOfferPitch = 20f;
+    internal const float PanelAskScale = 1.5f;
+    private const float PanelAskGap = 12f;
+
+    /// <summary>The top of the deposit panel under the notices, the lowest a line's glyphs may reach over the refusal row, and how many of the offer list's lines its window shows.</summary>
+    internal readonly record struct PanelLayout(float Top, float Bottom, int OfferRows);
+
+    /// <summary>
+    /// Where the deposit panel goes in a window <paramref name="windowHeight"/>
+    /// pixels tall: where the WEAPONS page's rows start, under the notices
+    /// (<see cref="WeaponsPage"/>), down to the refusal row's clearance, which stays
+    /// clear for what a dimmed service's key says. The offer list's window is as
+    /// many lines as fit between its heading and the confirm's ask, which is
+    /// reserved even before it is asked, so the list never moves as the confirm
+    /// comes up — at least one, so the choice is always in view.
+    /// </summary>
+    internal static PanelLayout PanelPlace(float windowHeight, int noticeRows = 0)
+    {
+        var page = WeaponsPage(windowHeight, noticeRows);
+        float firstOffer = page.Top + PanelOfferHeadingPitch;
+        int rows = (int)MathF.Floor((page.Bottom - firstOffer - PanelAskGap - GlyphHeight * PanelAskScale) / PanelOfferPitch);
+        return new PanelLayout(page.Top, page.Bottom, Math.Max(1, rows));
+    }
+
+    /// <summary>
+    /// The deposit panel's lines as the screen draws them, centred over the dimmed
+    /// page, top to bottom (<see cref="DepositPanel"/>):
+    /// <list type="bullet">
+    /// <item>on the services — and on the confirm of a refinement — the heading, the
+    /// weapon's state in grey, and a service a line: white, dimmed where refused, the
+    /// one confirmed yellow and marked <c>&gt; … &lt;</c>;</item>
+    /// <item>on the offer list — and the confirm of an enchantment — its heading, and
+    /// a window of <paramref name="offerRows"/> of its lines that scrolls with the
+    /// choice (<see cref="DepositPanel.Window"/>): the choice yellow and marked, a
+    /// refused offer dimmed, the rest white;</item>
+    /// <item>on the source list — and the confirm of a MOVE — its heading and a
+    /// window of its lines the same way (Phase 6a.6);</item>
+    /// <item>on the take-back ask, the weapon's name — a unique's orange — and what
+    /// its deposit bought and its runs, in cyan (<see cref="ServiceLine"/>);</item>
+    /// </list>
+    /// and on the confirm and the ask, the ask itself, in yellow, a gap under the rest.
+    /// </summary>
+    internal static IReadOnlyList<ListRow> PanelRows(DepositPanel panel, int offerRows)
+    {
+        ArgumentNullException.ThrowIfNull(panel);
+        var rows = new List<ListRow>();
+        var weapon = panel.Weapon;
+        switch (panel.Current)
+        {
+            case DepositPanel.Step.Ask:
+                rows.Add(new ListRow(HubWeapons.Name(weapon), weapon.Unique ? DungeonHud.Orange : DungeonHud.White, PanelHeadingScale, PanelHeadingPitch));
+                rows.Add(new ListRow(ServiceLine(panel.TakingBack!), DungeonHud.Cyan, PanelStateScale, PanelStatePitch));
+                break;
+
+            case DepositPanel.Step.Offer:
+            case DepositPanel.Step.Confirm when panel.Service == Service.Enchant:
+            {
+                rows.Add(new ListRow(DepositPanel.OfferHeading(weapon), DungeonHud.White, PanelOfferHeadingScale, PanelOfferHeadingPitch));
+                int top = panel.Window(offerRows);
+                for (int i = top; i < Math.Min(panel.Offers.Count, top + offerRows); i++)
+                {
+                    var offer = panel.Offers[i];
+                    string line = DepositPanel.OfferLine(offer);
+                    bool chosen = i == panel.Chosen;
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, offer.Refusal is not null), PanelOfferScale, PanelOfferPitch));
+                }
+                break;
+            }
+
+            case DepositPanel.Step.Sources:
+            case DepositPanel.Step.Confirm when panel.Service == Service.Transfer:
+            {
+                rows.Add(new ListRow(DepositPanel.SourcesHeading(weapon, panel.ChosenMove), DungeonHud.White, PanelOfferHeadingScale, PanelOfferHeadingPitch));
+                int top = panel.Window(offerRows);
+                for (int i = top; i < Math.Min(panel.Moves.Count, top + offerRows); i++)
+                {
+                    var move = panel.Moves[i];
+                    string line = DepositPanel.MoveLine(move);
+                    bool chosen = i == panel.Chosen;
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, move.Refusal is not null), PanelOfferScale, PanelOfferPitch));
+                }
+                break;
+            }
+
+            default:
+                rows.Add(new ListRow(DepositPanel.Heading(weapon), DungeonHud.White, PanelHeadingScale, PanelHeadingPitch));
+                rows.Add(new ListRow(DepositPanel.StateLine(weapon), DungeonHud.Grey, PanelStateScale, PanelStatePitch));
+                foreach (var option in panel.Services)
+                {
+                    bool chosen = panel.Current == DepositPanel.Step.Confirm && option.Service == panel.Service;
+                    rows.Add(new ListRow(chosen ? $"> {option.Text} <" : option.Text,
+                        chosen ? DungeonHud.Yellow : option.Dimmed ? DungeonHud.DarkGrey : DungeonHud.White, PanelOptionScale, PanelOptionPitch));
+                }
+                break;
+        }
+
+        if (panel.Ask is { } ask)
+        {
+            rows[^1] = rows[^1] with { Pitch = rows[^1].Pitch + PanelAskGap };
+            rows.Add(new ListRow(ask, DungeonHud.Yellow, PanelAskScale, PanelOptionPitch));
+        }
+        return rows;
+    }
+
+    /// <summary>How far the deposit panel's backing reaches past its lines' glyphs, on every side.</summary>
+    internal const float PanelBackingPad = 10f;
+
+    /// <summary>
+    /// The solid backing under the deposit panel's <paramref name="rows"/> — the
+    /// services, a list and its confirm, or the take-back ask — drawn from
+    /// <paramref name="top"/> in a window <paramref name="windowWidth"/> pixels wide:
+    /// as wide as its widest line, centred as the lines are, from the first line's
+    /// top to the last line's glyphs, <see cref="PanelBackingPad"/> past them all
+    /// round. Over the page's detail column the panel's lines were drawn on the
+    /// page's own, a refused one's grey on dimmed grey (Phase 6a's audit).
+    /// </summary>
+    internal static (float X, float Y, float Width, float Height) PanelBacking(IReadOnlyList<ListRow> rows, float top, float windowWidth)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        if (rows.Count == 0)
+            return (windowWidth / 2f, top, 0f, 0f);
+        float widest = rows.Max(row => row.Text.Length * GlyphAdvance * row.Scale);
+        float height = rows.Take(rows.Count - 1).Sum(row => row.Pitch) + GlyphHeight * rows[^1].Scale;
+        float width = MathF.Min(windowWidth, widest + 2f * PanelBackingPad);
+        return (windowWidth / 2f - width / 2f, top - PanelBackingPad, width, height + 2f * PanelBackingPad);
+    }
+
+    /// <summary>
+    /// The colour of a line on the offer list or the source list: the choice yellow,
+    /// and a refused line dimmed — chosen, a shade lighter, its marks saying it is the
+    /// choice while its colour says ENTER will not take it (PHASE 6a DECISION 12).
+    /// </summary>
+    internal static Vector4 ListColor(bool chosen, bool refused)
+        => refused ? chosen ? DungeonHud.Grey : DungeonHud.DarkGrey : chosen ? DungeonHud.Yellow : DungeonHud.White;
+
     // ── Drawing ──────────────────────────────────────────────────────────────
 
     /// <summary>
     /// The screen: its title, the startup notices under it (when there are any),
     /// the last run above (when there has been one), the list under it with the
     /// choice marked, and the keys along the bottom — and, while the menu is up,
-    /// the hub dimmed under it and the menu over it (<see cref="DungeonHud.PauseMenuLayout"/>).
+    /// the hub dimmed under it and the menu over it (<see cref="DungeonHud.PauseMenuLayout"/>);
+    /// while the deposit panel or the take-back ask is up, WEAPONS dimmed under it
+    /// and the panel over it (<see cref="PanelRows"/>).
     /// </summary>
     public void Render(BetweenRunsScene scene)
     {
@@ -453,9 +1107,56 @@ public sealed class BetweenRunsHud : IDisposable
         for (int i = 0; i < notices.Count; i++)
             DrawCentered(w, NoticeTop + i * NoticePitch, notices[i], NoticeScale, NoticeColor(notices[i]));
 
+        if (scene.OnWeapons)
+            DrawWeapons(scene, w, h, notices.Count);
+        else
+            DrawDungeons(scene, w, h, notices.Count);
+
+        if (scene.MenuOpen)
+        {
+            // The hub dims under the menu, as the floor does under the pause menu,
+            // and the menu is drawn over it.
+            _text.Flush(_game.ShaderManager);
+            _fade.Draw(_game.ShaderManager, MenuDim);
+            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
+                         scene.MenuAnswer))
+                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+        }
+        else
+        {
+            if (scene.Panel is { } panel)
+            {
+                // The page dims under the deposit panel, as the hub does under the
+                // menu, and the panel is drawn over it — on a solid backing, since
+                // its lines sit on the page's own, and a dimmed refusal over dimmed
+                // page text read as neither.
+                _text.Flush(_game.ShaderManager);
+                _fade.Draw(_game.ShaderManager, MenuDim);
+                var place = PanelPlace(h, notices.Count);
+                var panelRows = PanelRows(panel, place.OfferRows);
+                FillBlack(PanelBacking(panelRows, place.Top, w), w, h);
+                float y = place.Top;
+                foreach (var row in panelRows)
+                {
+                    DrawCentered(w, y, row.Text, row.Scale, row.Color);
+                    y += row.Pitch;
+                }
+            }
+            if (scene.Refusal is { } refusal)
+                DrawCentered(w, h - RefusalFromBottom, refusal, KeysLineScale, DungeonHud.Orange);
+        }
+
+        var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel);
+        DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
+        _text.Flush(_game.ShaderManager);
+    }
+
+    /// <summary>The DUNGEONS page: the last run above (when there has been one), and the list under it with the choice marked.</summary>
+    private void DrawDungeons(BetweenRunsScene scene, int w, int h, int noticeRows)
+    {
         var rows = ListRows(scene.Listings, scene.Chosen);
-        IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? SummaryLines(lastRun) : [];
-        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), notices.Count);
+        IReadOnlyList<Run> summary = scene.LastResult is { } lastRun ? HubSummaryLines(lastRun) : [];
+        var layout = Layout(h, Math.Max(0, summary.Count - 1), rows.Sum(row => row.Pitch), noticeRows);
 
         if (summary.Count > 0)
         {
@@ -478,21 +1179,66 @@ public sealed class BetweenRunsHud : IDisposable
             DrawCentered(w, rowY, row.Text, row.Scale, row.Color);
             rowY += row.Pitch;
         }
+    }
 
-        if (scene.MenuOpen)
+    /// <summary>
+    /// The WEAPONS page (§6.2): the rows down the left, as many as the window
+    /// holds, scrolled to keep the choice in view — the choice marked, a weapon
+    /// taken up in cyan where it still lies — and the chosen row said whole on the
+    /// right (<see cref="DetailRows"/>).
+    /// </summary>
+    private void DrawWeapons(BetweenRunsScene scene, int w, int h, int noticeRows)
+    {
+        var page = scene.Weapons;
+        var rows = page.Rows();
+        var layout = WeaponsPage(h, noticeRows);
+        int top = page.Window(layout.Rows);
+        var carried = page.Carried?.Weapon;
+        float left = w / 2f + LeftColumn;
+        for (int i = top; i < Math.Min(rows.Count, top + layout.Rows); i++)
         {
-            // The hub dims under the menu, as the floor does under the pause menu,
-            // and the menu is drawn over it.
-            _text.Flush(_game.ShaderManager);
-            _fade.Draw(_game.ShaderManager, MenuDim);
-            foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
-                         scene.MenuAnswer))
-                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+            var row = rows[i];
+            bool isCarried = carried is not null && ReferenceEquals(row.Weapon, carried);
+            DrawRuns(left, layout.Top + (i - top) * WeaponRowPitch, WeaponRowScale, HubWeapons.Runs(row, chosen: i == page.Chosen, isCarried));
         }
 
-        var (bottom, bottomColor) = BottomLine(scene.MenuOpen, scene.HasTitle);
-        DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
-        _text.Flush(_game.ShaderManager);
+        float right = w / 2f + RightColumn;
+        float y = layout.Top;
+        foreach (var line in DetailRows(page.ChosenRow))
+        {
+            _text.DrawText(line.Text, right, y, line.Scale, line.Color);
+            y += line.Pitch;
+        }
+    }
+
+    /// <summary>
+    /// A rectangle of the window, in the HUD's pixels (the top left the origin),
+    /// filled black: the fade drawn whole through a scissor, which GL counts from
+    /// the viewport's bottom left in its own pixels, so the rectangle is scaled from
+    /// the window's size to the viewport's.
+    /// </summary>
+    private void FillBlack((float X, float Y, float Width, float Height) box, int w, int h)
+    {
+        if (box.Width <= 0f || box.Height <= 0f || w <= 0 || h <= 0)
+            return;
+        var viewport = new int[4];
+        GL.GetInteger(GetPName.Viewport, viewport);
+        float sx = viewport[2] / (float)w, sy = viewport[3] / (float)h;
+        GL.Enable(EnableCap.ScissorTest);
+        GL.Scissor(viewport[0] + (int)MathF.Floor(box.X * sx), viewport[1] + (int)MathF.Floor((h - box.Y - box.Height) * sy),
+            (int)MathF.Ceiling(box.Width * sx), (int)MathF.Ceiling(box.Height * sy));
+        _fade.Draw(_game.ShaderManager, 1f);
+        GL.Disable(EnableCap.ScissorTest);
+    }
+
+    /// <summary>Runs side by side from <paramref name="x"/>, each where the last ended: a row read as one line, in its colours.</summary>
+    private void DrawRuns(float x, float y, float scale, IReadOnlyList<Run> runs)
+    {
+        foreach (var run in runs)
+        {
+            _text.DrawText(run.Text, x, y, scale, run.Color);
+            x += run.Text.Length * GlyphAdvance * scale;
+        }
     }
 
     /// <summary>The keys line's scale.</summary>

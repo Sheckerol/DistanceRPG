@@ -31,6 +31,13 @@ Consequence worth stating plainly: **you cannot enchant a weapon you have not
 fought with.** A fresh unique straight off the floor is inert until it has done
 some work.
 
+(Built in Phase 6a: every body a hit lands on banks `WearPerHit`, up to the
+weapon's capacity, and nothing else wears a weapon. Whether a staff's cast is a
+hit, and what a wipe does to the run's wear, is PHASE 6a DECISION 1 in
+open-questions.md, and how a weapon's capacity is kept is DECISION 2, both
+provisional and the user's to rule; settled.md's Phase 6a implementation pass
+records the rest.)
+
 ### A deposit spends the whole pool
 
 Wear does not part-pay and it does not carry over. **Depositing empties the
@@ -235,7 +242,11 @@ single weapon.
 
 The enchanter is not a gamble. **You pick the enchantment**, from everything
 your campaign has seen — anything currently on a weapon in the stable, and
-anything that has ever passed through your hands.
+anything that has ever passed through your hands. (Built in Phase 6a.3b: the
+offer is what the campaign has met, less the unique souls and what does nothing
+yet. What it refuses on a weapon, and how a refusal shows, is PHASE 6a DECISION
+12 in open-questions.md, provisional and the user's to rule; it bends "on any
+weapon, forever after" below. Where `aegis` comes from is PHASE 6a DECISION 4.)
 
 This is the one place in itemisation that is deliberately not a roll, and it is
 what makes every other roll bearable. Drops are class-locked and variant-rolled,
@@ -292,6 +303,13 @@ That is a soft cap that enforces itself: dumping the whole stable achieves
 nothing, so you choose what matters. It stays legible in a way a pure
 last-in-only rule would not — "the smith is working on these two" reads
 correctly at a glance, where a silently stalled queue reads as a bug.
+
+(Built in Phase 6a: the two is `tuning.json`'s `EnchanterWorksOn`, and the
+screen between runs lists the shop `WORKING` and `STALLED`. Where the weapons
+the party is not carrying live — the stable — is PHASE 6a DECISION 7 in
+open-questions.md, taking a weapon back from the shop early DECISION 8, and the
+`+ 1` in a service's time staying a rule DECISION 6, each provisional and the
+user's to rule.)
 
 ## 6.3 What counts as a run
 
@@ -354,7 +372,11 @@ than a stroll. It still does not demand a good run.
 
 Note the mercy tick and the success tick are currently worth the same. Since a
 boss can sit anywhere from floor 5 to floor 10, that is deliberate for now —
-see the open questions.
+settled.md's "A deeper boss pays more" keeps the tick at one per win, the tick
+rewarding the achievement and the drop the depth, and its "Entering does not
+tick service" keeps the mercy tick at one. (Reworded in Phase 6a: this read
+"see the open questions", which have held no question on it since the roadmap
+was split into these files.)
 
 **The tutorial has no mercy tick at all**, since its boss sits on floor 2 (§4.3)
 and the bar is three. It needs no exception to say so: **the enchanter is not
@@ -598,6 +620,15 @@ Rules that keep it coherent:
   service it can still buy: the fork closes itself at the top end without a
   rule.
 
+(Built in Phase 6a: the roll is made as the service's last run is worked, on a
+stream of the finishing run's map seed and the deposit's ordinal, so a reload
+never rerolls it — PHASE 6a DECISION 3 in open-questions.md. How a landed roll
+chooses — how often it grafts, how strongly a deepen favours the signature, and
+what a roll with nothing to take does, where the first and third rules above
+pull apart — is DECISION 5, and a reorder at five enchantments, which the last
+rule's "only service it can still buy" meets, is DECISION 11; each provisional
+and the user's to rule.)
+
 ## 6.5 Transferring an enchantment
 
 Enchantments can be moved to a new weapon at the enchanter, **dropping a tier**
@@ -629,6 +660,17 @@ the reason you keep the body.
 you wanted Flaming is not a dead weapon — it is a body with the
 wrong soul in it, and the enchanter moves souls. The roll sets what you start
 with, never what you end with.
+
+(Built in Phase 6a.6: a move is the Enchant service with the soul brought from
+a weapon the party owns — the weapon needs the free slot and the deposit of
+attaching it, both weapons wait in the shop as one deposit, the source's wear
+left in its pool, and the soul lands last, acquired. How a transfer works is
+PHASE 6a DECISION 13 in open-questions.md, and a reorder's runs, and a reorder
+at five enchantments, are PHASE 6a DECISION 11, both provisional and the user's
+to rule. What the enchanter refuses is DECISION 12's: its caster clause — no
+move leaves a staff or a wand casting nothing — narrows "can be transferred onto
+a dagger" in settled.md, and a wand's Cold becomes Flaming through a third
+element, since the two cannot sit together.)
 
 ## 6.6 The farm — where potions come from
 
@@ -869,6 +911,14 @@ they share everything except what the wear buys:
 record Deposit(Weapon Weapon, Service Service, int WearAtDeposit);
 enum Service { Enchant, Refine }
 ```
+
+(Built in Phase 6a, extended — PHASE 6a DECISION 13 in open-questions.md: the
+queue entry also holds its ordinal, the runs it takes and has worked, the
+enchantment an Enchant attaches, and a transfer's source and the soul's place on
+it; `Service` gains `Transfer`, §6.5's move. A weapon keeps `Wear` and the wear
+it has ever cashed, its capacity and that capacity's progress replayed from the
+latter under the tuning loaded — PHASE 6a DECISION 2. settled.md's Phase 6a
+implementation pass records both, with the save's version 2 they are kept in.)
 
 The graft roll is `GraftBaseChance` for `Enchant` and
 `GraftBaseChance * (1 + wear / StartingWearCapacity)` for `Refine` (§6.4) — one

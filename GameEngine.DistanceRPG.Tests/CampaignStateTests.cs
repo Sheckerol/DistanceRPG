@@ -6,8 +6,9 @@ namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
 /// What the campaign has met (§3.3): the enchantment ids a weapon has brought
-/// into the party's hands, which is what §6.4's enchanter will offer from and
-/// what §5.1 saves. Small, and the one collection that only ever grows.
+/// into the party's hands, which is what §6.2's enchanter offers from
+/// (<see cref="Enchanter.Offers"/>) and what §5.1 saves. Small, and the one
+/// collection that only ever grows.
 /// </summary>
 public class CampaignStateTests
 {
@@ -128,25 +129,28 @@ public class CampaignStateTests
     }
 
     [Fact]
-    public void SeenKeepsUniqueSouls_AndTheOfferFilterIsNeverRolled()
+    public void SeenKeepsUniqueSouls_AndTheOfferDropsThemAndTheInert()
     {
         // The Nameless Knife's three souls, two of which no roll and no service
         // may ever grant. They still go in: the set is what the campaign has MET,
         // and whether an entry may then be copied is a different question with an
         // answer already in the content (§5.5's neverRolled). Filtering here would
-        // make the set answer a question §6.4 has not asked yet.
+        // make the set answer the enchanter's question for it. An entry that does
+        // nothing yet goes in too: Echoing, met, is met.
         var campaign = new CampaignState();
         campaign.See(TestWeapons.Get("flensing_knife_unique"));
-        Assert.Equal(new[] { "overheal", "serrated", "vampiric" }, campaign.SeenInOrder);
+        campaign.See(Carrying("echoing"));
+        Assert.Equal(new[] { "echoing", "overheal", "serrated", "vampiric" }, campaign.SeenInOrder);
 
         var neverRolled = GameContent.Current.Enchantments.NeverRolled;
         Assert.Contains("serrated", neverRolled);
         Assert.Contains("overheal", neverRolled);
         Assert.DoesNotContain("vampiric", neverRolled);   // the Efficiency dagger carries it at tier 3, so it is an ordinary entry
+        Assert.DoesNotContain("echoing", neverRolled);    // no soul: an entry declared inert (LootTable.IsInert)
 
-        // What an offer could draw from is therefore the met set less that filter
-        // - one line, over a view whose order is fixed.
-        Assert.Equal(new[] { "vampiric" }, campaign.SeenInOrder.Where(id => !neverRolled.Contains(id)));
+        // The enchanter asks it (Phase 6a.3b): its offer is the met set, in the
+        // view's fixed order, less the souls and the kinds that do nothing yet.
+        Assert.Equal(new[] { "vampiric" }, Enchanter.Offers(campaign, TestWeapons.Get("tower_guard")).Select(offer => offer.Id));
     }
 
     [Fact]
@@ -194,11 +198,14 @@ public class CampaignStateTests
         Assert.Equal(fresh.RetiredInOrder, fresh.RetiredInOrder);
 
         // And the type hands out no other view to iterate by accident: no public
-        // set, no hash-ordered list, nothing but the named ordered views.
+        // set, no hash-ordered list, nothing but the named ordered views — the
+        // stable among them, a list in the order its weapons were put there (Phase
+        // 6a.2), and the enchanter's queue, in deposit order (Phase 6a.3a).
         string[] orderedViews =
         [
             nameof(CampaignState.SeenInOrder), nameof(CampaignState.Party),
             nameof(CampaignState.LockedInOrder), nameof(CampaignState.ClearedInOrder), nameof(CampaignState.RetiredInOrder),
+            nameof(CampaignState.Stable), nameof(CampaignState.AtTheEnchanter),
         ];
         var iterable = typeof(CampaignState)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)

@@ -91,9 +91,10 @@ namespace GameEngine.DistanceRPG;
 /// (<see cref="SaveGame.IsSafePoint"/>) and only once the frame a save was asked
 /// for in is over, so no write runs inside a turn system's raise: when a run is
 /// entered, at every player turn's start and after every floor arrival (the
-/// scene asks, <see cref="IRunHost.RequestSave"/>), at a run's end, when NEW
-/// CAMPAIGN begins one — on the title, or <c>--new-campaign</c> at launch — by
-/// hand, and on leaving play — the menus' QUIT TO TITLE
+/// scene asks, <see cref="IRunHost.RequestSave"/>), at a run's end, after every
+/// change the hub makes between runs (<see cref="IBetweenRunsHost.RequestSave"/>,
+/// PHASE 6a DECISION 10), when NEW CAMPAIGN begins one — on the title, or
+/// <c>--new-campaign</c> at launch — by hand, and on leaving play — the menus' QUIT TO TITLE
 /// (<see cref="QuitToTitle"/>) or the window's close button (<see cref="OnClosing"/>),
 /// both through the quit's own door (<see cref="SaveOnQuit"/>). A quit during the
 /// enemies' turn plays it out to the next player turn first, on the playing
@@ -195,9 +196,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     private Action? _pendingScene;
 
     // A save was asked for since the last one — a run entered or ended, a player
-    // turn begun, a floor arrived on: written at the end of the frame, once no
-    // raise is running, and not before the campaign stands at a safe point.
+    // turn begun, a floor arrived on, a change on the hub: written at the end of
+    // the frame, once no raise is running, and not before the campaign stands at a
+    // safe point.
     private bool _saveRequested;
+
+    // Who asked for it between runs, for its log line alone (When): the run's end
+    // (SaveAtTheRunsEnd), or, when it did not, the hub, after a change it made
+    // (IBetweenRunsHost.RequestSave). Cleared with the request it goes with.
+    private bool _runsEndAsked;
 
     // A save by hand was asked for — SAVE GAME, into the campaign's own slot:
     // written at the end of the frame, through the same door as the requests
@@ -661,11 +668,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     private void DropCampaign()
     {
         if (_campaign is { } dropped)
+        {
             dropped.RunEnded -= SaveAtTheRunsEnd;
+            dropped.RunEnded -= LogTheEnchanter;
+        }
         _campaign = null;
         _slot = null;
         _saveRequested = false;
         _handSaveRequested = false;
+        _runsEndAsked = false;
         _failedSaves.Clear();
     }
 
@@ -673,24 +684,113 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// Play <paramref name="campaign"/> from now on, bound to
     /// <paramref name="slot"/> (the user's ruling of 2026-09-25 on the save slots,
     /// R5): every save of it goes there, and nothing rebinds it — this is the one
-    /// place a campaign's slot is set. Its run's end is a save request, and the
-    /// campaign it replaces keeps no wire to the game.
+    /// place a campaign's slot is set. Its run's end is a save request, and what
+    /// the enchanter did on it a few lines of the log; the campaign it replaces
+    /// keeps no wire to the game.
     /// </summary>
     private void Adopt(CampaignState campaign, SaveSlot slot)
     {
         if (_campaign is { } replaced)
+        {
             replaced.RunEnded -= SaveAtTheRunsEnd;
+            replaced.RunEnded -= LogTheEnchanter;
+        }
         _campaign = campaign;
         _slot = slot;
+        _runsEndAsked = false;
         campaign.RunEnded += SaveAtTheRunsEnd;
+        campaign.RunEnded += LogTheEnchanter;
     }
 
     /// <summary>
     /// A run has ended, by the way out or by a wipe — which ends it inside the turn
     /// system's raise — so the save is only asked for here, and written once the
-    /// frame is over (<see cref="WriteRequestedSave"/>).
+    /// frame is over (<see cref="WriteRequestedSave"/>), its log line saying it is
+    /// the run's end's (<see cref="When"/>).
     /// </summary>
-    private void SaveAtTheRunsEnd(RunResult result) => _saveRequested = true;
+    private void SaveAtTheRunsEnd(RunResult result)
+    {
+        _saveRequested = true;
+        _runsEndAsked = true;
+    }
+
+    /// <summary>
+    /// A run has ended: what the enchanter did on it, in the log (§6.3; Phase
+    /// 6a.3a) — Logic never logs, so the run's end hands its reports over in the
+    /// result, and they are written here (<see cref="EnchanterLines"/>). Nothing
+    /// when the shop was empty.
+    /// </summary>
+    private void LogTheEnchanter(RunResult result)
+    {
+        foreach (string line in EnchanterLines(result))
+            Log.Info(line);
+    }
+
+    /// <summary>
+    /// The log's lines for what a run's end did at the enchanter, off its reports
+    /// (<see cref="RunResult.Services"/>): whether the run counted, what it worked
+    /// with each one's runs and what it left stalled — <c>[Enchanter] Run counted:
+    /// worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte Blade 0/1</c>, or
+    /// <c>[Enchanter] Run not counted: nothing worked; stalled …</c> — then a line
+    /// for each service it finished, with its improvement roll as it was drawn
+    /// (Phase 6a.4): <c>[Enchanter] Wand of the Cone finished: attached vampiric;
+    /// improvement roll 2417 of 3000 against 90: no change</c>, <c>… finished:
+    /// refined; improvement roll 12 of 3000 against 180: grafted Block</c> (or
+    /// <c>deepened …</c>, or <c>landed, nothing to deepen or graft</c>), or <c>…
+    /// finished: refined; no wear, no roll</c>; a transfer's says where its soul
+    /// went (Phase 6a.6), <c>… finished: vampiric moved on at T2 from Nameless
+    /// Knife; …</c>, or a reorder's <c>… flaming moved to the end at T1; …</c>. The
+    /// line shows the roll without its
+    /// keys, which the log names where each was made: the run's map seed as the run
+    /// begins, and the deposit's ordinal where the deposit was made (<c>deposit
+    /// #3</c>, Phase 6a.5; <see cref="BetweenRunsScene.DepositedLine"/>), in the
+    /// session that made it — a finished deposit's is in no save. A save made during
+    /// the run holds both, and a load of it replays the roll. None for an empty shop.
+    /// A weapon by its content row's name, and its id where the content has none.
+    /// </summary>
+    internal static IReadOnlyList<string> EnchanterLines(RunResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        var reports = result.Services ?? [];
+        if (reports.Count == 0)
+            return [];
+        static string Named(string id) => GameContent.Current.Weapons.TryGet(id, out var def) ? def.Name : id;
+        static string Runs(ServiceReport report) => $"{Named(report.WeaponId)} {report.RunsWorked}/{report.Runs}";
+
+        var worked = reports.Where(report => !report.Stalled).Select(Runs).ToList();
+        var stalled = reports.Where(report => report.Stalled).Select(Runs).ToList();
+        string head = result.ServiceTick
+            ? $"[Enchanter] Run counted: worked {(worked.Count > 0 ? string.Join(", ", worked) : "nothing")}"
+            : "[Enchanter] Run not counted: nothing worked";
+        var lines = new List<string> { stalled.Count > 0 ? $"{head}; stalled {string.Join(", ", stalled)}" : head };
+        foreach (var report in reports.Where(report => report.Finished))
+            lines.Add($"[Enchanter] {Named(report.WeaponId)} finished: "
+                + (report.Service, report.EnchantmentId) switch
+                {
+                    (Service.Enchant, { } id) => $"attached {id}",
+                    (Service.Transfer, { } soul) => report.SourceId is { } source
+                        ? $"{soul} moved on at T{report.Tier} from {Named(source)}"
+                        : $"{soul} moved to the end at T{report.Tier}",
+                    _ => "refined",
+                }
+                + RollSaid(report));
+        return lines;
+    }
+
+    /// <summary>What a finished service's improvement roll was and did, as its log line ends: the draw against its odds, and what it did — or that nothing was rolled.</summary>
+    private static string RollSaid(ServiceReport report)
+    {
+        if (report.Roll is not { } roll)
+            return "; no wear, no roll";
+        string did = report.Improved switch
+        {
+            { Kind: ImprovementKind.Graft } graft => $"grafted {graft.Modifier}",
+            { } deepen => $"deepened {deepen.Modifier}",
+            null when roll.Landed => "landed, nothing to deepen or graft",
+            null => "no change",
+        };
+        return $"; improvement roll {roll.Draw} of {roll.Denominator} against {roll.Numerator}: {did}";
+    }
 
     /// <summary>
     /// The first run's map seed: <paramref name="requested"/> — the
@@ -744,11 +844,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     public void RunOver() => ShowBetweenRuns();
 
     /// <summary>
-    /// The playing scene asks for a save (1f): a player turn has started, or the
-    /// party has arrived on a floor. Only asked for here — it arrives inside the
-    /// turn system's raise that began the turn — and written at the end of the
-    /// frame (<see cref="WriteRequestedSave"/>), once the campaign stands at a
-    /// safe point.
+    /// A scene asks for a save: the playing scene's (1f,
+    /// <see cref="IRunHost.RequestSave"/>) — a player turn has started, or the
+    /// party has arrived on a floor — or the screen between runs'
+    /// (<see cref="IBetweenRunsHost.RequestSave"/>, PHASE 6a DECISION 10), after a
+    /// change the hub made to the campaign. Only asked for here — the dungeon's
+    /// arrives inside the turn system's raise that began the turn — and written at
+    /// the end of the frame (<see cref="WriteRequestedSave"/>), once the campaign
+    /// stands at a safe point, which between runs it always does; a failure between
+    /// runs is said on the hub at once (<see cref="BetweenRunsScene.SaveFailed"/>).
     /// </summary>
     public void RequestSave() => _saveRequested = true;
 
@@ -942,17 +1046,26 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             return;   // an automatic request waits for the next safe point
         }
         _saveRequested = false;   // cleared once, past the _resuming read, before the write
-        var (failed, setAside) = Save(campaign, slot, When(campaign, byHand), campaign.Visit is null ? null : PlayingScene(campaign)?.View, byHand);
+        string when = When(campaign, byHand, _runsEndAsked);
+        _runsEndAsked = false;
+        var (failed, setAside) = Save(campaign, slot, when, campaign.Visit is null ? null : PlayingScene(campaign)?.View, byHand);
         if (byHand)
             AnswerHandSave(CampaignBoot.SaveAnswer(slot, failed, setAside));
     }
 
-    /// <summary>What a save's log line says of it: where the campaign stands — mid-run, the dungeon, floor and turn; between runs, the run's end the game's own save follows — and whether it is saved by hand.</summary>
-    private static string When(CampaignState campaign, bool byHand)
+    /// <summary>
+    /// What a save's log line says of it: where the campaign stands — mid-run, the
+    /// dungeon, floor and turn; between runs, who asked for the game's own save,
+    /// the run's end (<paramref name="runsEnd"/>) or a change on the hub — and
+    /// whether it is saved by hand.
+    /// </summary>
+    private static string When(CampaignState campaign, bool byHand, bool runsEnd)
     {
         string where = campaign.Visit is { } visit
             ? $"mid-run in {visit.Def.Name}, floor {visit.FloorIndex + 1}, turn {visit.Turn}"
-            : byHand ? "between runs" : "at the run's end";
+            : byHand ? "between runs"
+            : runsEnd ? "at the run's end"
+            : "between runs, after a change on the hub";
         return byHand ? $"by hand, {where}" : where;
     }
 
@@ -960,12 +1073,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// Write the campaign (<see cref="CampaignBoot.Save"/>), which never throws,
     /// stamped with the clock's time: every line to the log. A write that fails is
     /// said at once over the floor being played, when a run is
-    /// (<see cref="DungeonScene.SaveFailed"/>), and on the next screen the game
-    /// shows — there once, however many times it failed, and only until a later
-    /// save goes through, which takes it back (<see cref="TakeBackFailedSaves"/>) —
-    /// this door's, or the quit's (<see cref="SaveOnQuit"/>). A file of the slot the
-    /// write set aside first, since no save could be read from it, is said the same
-    /// way — at once, and on the next screen — and never taken back: it is a fact
+    /// (<see cref="DungeonScene.SaveFailed"/>, for its notice's life), or under the
+    /// hub's title between runs (<see cref="BetweenRunsScene.SaveFailed"/>), and on
+    /// the next screen the game shows — there once, however many times it failed,
+    /// and only until a later save goes through, which takes it back from the next
+    /// screen (<see cref="TakeBackFailedSaves"/>) and from the hub up
+    /// (<see cref="BetweenRunsScene.SaveWentThrough"/>) — this door's, or the
+    /// quit's (<see cref="SaveOnQuit"/>). A file of the slot the write set aside
+    /// first, since no save could be read from it, is said the same way — at
+    /// once, and on the next screen — and never taken back: it is a fact
     /// about a file, whatever the saves after it do. The save on the disk is kept
     /// whatever happens. A save by hand (<paramref name="byHand"/>) restamps a save
     /// that holds the campaign already, rather than write nothing.
@@ -979,8 +1095,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         var setAside = said.ToList();
         foreach (string notice in setAside)
             Log.Warn($"[Save] {notice}");
+        var hub = HubScene(campaign);
         if (failed is null)
         {
+            hub?.SaveWentThrough(_failedSaves);   // taken back on the hub up too, before the list is forgotten
             TakeBackFailedSaves();
         }
         else
@@ -994,11 +1112,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
             return (failed, setAside);
 
         // Led for the next screen, and shown at once over the floor being played,
-        // each whole ahead of what is up — so the first said is laid last, on top.
+        // or on the hub between runs, each whole ahead of what is up — so the first
+        // said is laid last, on top.
         _notices.Lead(said);
         var scene = PlayingScene(campaign);
         for (int i = said.Count - 1; i >= 0; i--)
+        {
             scene?.SaveFailed(said[i]);
+            hub?.SaveFailed(said[i]);
+        }
         return (failed, setAside);
     }
 
@@ -1028,6 +1150,15 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
         => SceneManager.Instance.CurrentScene is DungeonScene scene && campaign.Visit is { } visit && ReferenceEquals(scene.Visit, visit)
             ? scene
             : null;
+
+    /// <summary>
+    /// The screen between runs, when it is the scene up now and the campaign is
+    /// between runs — where a save of the hub's changes that failed is said at once
+    /// (PHASE 6a DECISION 10), and taken back once a later one goes through — or
+    /// null: mid-run, or on any other screen.
+    /// </summary>
+    private static BetweenRunsScene? HubScene(CampaignState campaign)
+        => SceneManager.Instance.CurrentScene is BetweenRunsScene hub && campaign.Visit is null ? hub : null;
 
     /// <summary>
     /// The window is closing — the close button from anywhere, the title's QUIT or
@@ -1105,7 +1236,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// Escape goes to the scene being played. In a dungeon it closes a menu or
     /// opens the pause menu, whose QUIT TO TITLE is how play is left, and it does
     /// nothing on a run's summary, where ENTER is the one way on. On the screen
-    /// between runs it opens and closes the same menu, always consumed. On the
+    /// between runs it puts a weapon taken up back, or opens and closes the same
+    /// menu, always consumed. On the
     /// title it says no to an ask or closes the load list, and on the options it is
     /// not consumed, so the game closes, as QUIT does, with nothing to save — as it
     /// quits from the screen a broken content file stops the game on, which has no

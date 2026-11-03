@@ -149,7 +149,8 @@ public sealed record XpClawback(string MemberId, string Pool, int Before, int Af
 
 /// <summary>
 /// How a run ended, and everything it carried out to the campaign (§4.4, §4.5,
-/// §6.3): what <see cref="CampaignState.EndRun"/> returns and
+/// §6.3), what the enchanter did on its end among it (§6.2): what
+/// <see cref="CampaignState.EndRun"/> returns and
 /// <see cref="CampaignState.RunEnded"/> raises, and what the run's summary
 /// reads. Nothing in it is dungeon state — the visit is gone by the time
 /// anyone reads it — except the one number §4.3 lets out once it is known,
@@ -168,6 +169,56 @@ public sealed record XpClawback(string MemberId, string Pool, int Before, int Af
 /// <param name="SpoilsKept">This run's pickups carried home: the ones still in a bag on the way out.</param>
 /// <param name="SpoilsLost">This run's pickups a wipe took out of the bags.</param>
 /// <param name="Clawbacks">What a wipe took back from each pool; empty on any other ending.</param>
+/// <param name="Services">
+/// What the run's end did at the enchanter (§6.2, §6.3; Phase 6a.3a): a report for
+/// every deposit that was in the shop as the run ended, in deposit order — each
+/// worked a run on, the ones that finished among them, or left stalled — or null
+/// when the shop was empty, which is what a save writes and reads back. Appended,
+/// with its default, so a result built without it reads as one with an empty shop.
+/// </param>
 public sealed record RunResult(string DungeonId, RunOutcome Outcome, bool BossDefeated, int DeepestFloor, int? BossFloorRevealed,
     bool ServiceTick, bool MercyTick, int RunCounter, int? LockedUntilRun, bool Retired,
-    IReadOnlyList<Weapon> SpoilsKept, IReadOnlyList<Weapon> SpoilsLost, IReadOnlyList<XpClawback> Clawbacks);
+    IReadOnlyList<Weapon> SpoilsKept, IReadOnlyList<Weapon> SpoilsLost, IReadOnlyList<XpClawback> Clawbacks,
+    IReadOnlyList<ServiceReport>? Services = null);
+
+/// <summary>
+/// What one run's end did with one deposit at the enchanter (§6.2, §6.3; Phase
+/// 6a.3a): the weapon by its catalogue id, the service, how many of its runs are
+/// worked and how many it takes, and the enchantment an Enchant attaches — or the
+/// soul a Transfer moves, its source by id, and on finishing the tier it landed
+/// at (Phase 6a.6). A run that counted <em>worked</em> the newest few a run on
+/// (<see cref="Tuning.EnchanterWorksOn"/>) — <c>1 ≤ RunsWorked ≤ Runs</c>, the
+/// service finished when they meet, its weapon back in the stable — and left the
+/// rest <see cref="Stalled"/>; a run that did not count worked nothing, and
+/// reports every entry stalled with its runs as they were, a fresh deposit's at 0.
+/// So a stalled report has <c>0 ≤ RunsWorked ≤ Runs − 1</c>. A finished one says
+/// what its improvement roll did (Phase 6a.4). The summary reads these, after a
+/// load too, since the save keeps them with the result — all but the roll as it
+/// was drawn, which is the log's. Nothing ties a report to a deposit in the shop:
+/// it outlives the entry it speaks of.
+/// </summary>
+/// <param name="WeaponId">The weapon serviced, by its catalogue id: what the summary names it by.</param>
+/// <param name="Service">What the deposit bought.</param>
+/// <param name="RunsWorked">The runs of its service worked by the end of this run.</param>
+/// <param name="Runs">The runs its service takes, fixed at deposit.</param>
+/// <param name="Stalled">Whether this run left it unworked: an older deposit behind the newest, or any deposit on a run that did not count.</param>
+/// <param name="EnchantmentId">The enchantment an Enchant attaches (on finishing, attached), or the soul a Transfer moves (on finishing, moved); null for a refinement.</param>
+/// <param name="Improved">
+/// On a finished service, what its improvement roll did to the weapon — a modifier
+/// deepened or grafted (<see cref="Enchanter.Improve"/>) — or null: the roll did
+/// not land, found nothing to improve, or was never made (no wear cashed). Null on
+/// every service not finished.
+/// </param>
+/// <param name="Tier">On a finished Transfer, the tier its soul landed at, a tier down, 1 the floor (Phase 6a.6); null on every other report.</param>
+/// <param name="SourceId">On a Transfer, the weapon its soul comes off, by its catalogue id — back in the stable beside the weapon once it finishes — or null for a reorder of the weapon's own, and for any other service.</param>
+/// <param name="Roll">
+/// On a finished service, its improvement roll as it was drawn, for the log that
+/// the run's end writes (Logic never logs), or null when nothing was rolled. Never
+/// saved: a report a load brings back has none.
+/// </param>
+public sealed record ServiceReport(string WeaponId, Service Service, int RunsWorked, int Runs, bool Stalled = false, string? EnchantmentId = null,
+    Improvement? Improved = null, int? Tier = null, string? SourceId = null, ImproveRoll? Roll = null)
+{
+    /// <summary>Whether this run finished the service: worked, its last run done, its weapon back in the stable.</summary>
+    public bool Finished => !Stalled && RunsWorked == Runs;
+}

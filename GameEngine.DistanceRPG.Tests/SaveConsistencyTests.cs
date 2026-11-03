@@ -39,6 +39,10 @@ public sealed class SaveConsistencyTests : IDisposable
     /// <summary>Why the run counter stops below <see cref="ContentBounds.MostRuns"/>: what its refusal says after the value and the ceiling.</summary>
     private const string RunsWhy = "at the end of a run the counter, and the lock a clear writes on it, would pass the largest whole number - and no player counts two billion runs";
 
+    /// <summary>Why a weapon's wear stops where it does: what its refusal says after the value and the ceiling.</summary>
+    private static readonly string WearWhy =
+        $"a weapon banks no more wear than its capacity, which opens on the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), and grows {ContentBounds.MostCapacityPerBar} at most (WearCapacityPerBar at its most) for every full bar cashed, each bar one wear or more";
+
     private static string FixtureText(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", name));
 
     private static CampaignState NewCampaign() => CampaignState.Start(GameContent.Current);
@@ -97,6 +101,10 @@ public sealed class SaveConsistencyTests : IDisposable
     private static JsonObject MemberNode(JsonObject tree, int member) => tree["campaign"]!["party"]![member]!.AsObject();
 
     private static JsonObject WeaponNode(JsonObject tree, int member, int slot) => MemberNode(tree, member)["inventory"]![slot]!.AsObject();
+
+    private static JsonObject DepositNode(JsonObject tree, int index) => tree["campaign"]!["enchanter"]![index]!.AsObject();
+
+    private static JsonObject ReportNode(JsonObject tree, int index) => Last(tree)["services"]![index]!.AsObject();
 
     /// <summary>The list index of the boss's row among the enemies of <paramref name="floor"/> in <paramref name="text"/>'s visit.</summary>
     private static int BossRow(string text, int floor)
@@ -171,6 +179,14 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.Equal((RunOutcome.Death, true, true), (result.Outcome, result.BossDefeated, result.ServiceTick));
         Assert.NotNull(result.LockedUntilRun);
         return result;
+    }
+
+    /// <summary><paramref name="hits"/> hits' wear on <paramref name="weapon"/>, through the one door a landed hit banks it through (<see cref="Wear.Accrue"/>).</summary>
+    private static Weapon Worn(Weapon weapon, int hits)
+    {
+        for (int i = 0; i < hits; i++)
+            Wear.Accrue(weapon);
+        return weapon;
     }
 
     // ── What play writes ─────────────────────────────────────────────────────
@@ -259,6 +275,102 @@ public sealed class SaveConsistencyTests : IDisposable
             script.Open();
             script.EndTurn();
             Loads(early, "the early offer a turn in");
+        }
+
+        // Wear (Phase 6a.1): a weapon the party wields keeps what it has banked
+        // wherever it goes — in a hand, full, in a bag, a spoil kept or lost, a
+        // weapon put down on a floor — and a capacity a tuning lowered below it
+        // since: each is what play writes, and each loads.
+        var worn = NewCampaign();
+        CampaignRuns.Clear(worn, "tutorial", GoldenSeed);
+        Worn(worn.Party[0].Inventory[0]!, 12);
+        Assert.True(Worn(worn.Party[1].Inventory[0]!, 40).WornFull);
+        Loads(worn, "worn weapons in hand, one full");
+
+        var visit = worn.Enter("spear_hall", FiveDeep);
+        visit.OpenTurns(worn.Party, CampaignRuns.Ten);
+        var gear = Worn(worn.Party[3].Inventory[1]!, 7);   // D's second staff, cast with before it went back in the bag
+        Assert.Same(gear, visit.Current.Leave(worn.Party[3], 1).Weapon);
+        Loads(worn, "a worn weapon put down on a floor, mid-run");
+        var kept = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.NotEqual(Pickup.BagFull, Pickup.Take(worn, visit.Current.Enemies[0], kept, worn.Party[2], visit));
+        Worn(kept.Weapon, 5);
+        var exited = CampaignRuns.Exit(worn);
+        Assert.Equal(5, Assert.Single(exited.SpoilsKept).Wear);
+        Loads(worn, "a worn spoil kept");
+
+        var wiping = worn.Enter("knife_warrens", FiveDeep);
+        var wipeTurns = wiping.OpenTurns(worn.Party, CampaignRuns.Ten);
+        var lost = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
+        Assert.NotEqual(Pickup.BagFull, Pickup.Take(worn, wiping.Current.Enemies[0], lost, worn.Party[1], wiping));
+        Worn(lost.Weapon, 3);
+        var wiped = CampaignRuns.Wipe(worn, wipeTurns);
+        Assert.Equal(3, Assert.Single(wiped.SpoilsLost).Wear);
+        Loads(worn, "a worn spoil lost to a wipe");
+
+        using (TestContent.UsePremise(tuning: t => t with { StartingPool = 20 }))
+        {
+            Assert.True(worn.Party[1].Inventory[0]!.Wear > worn.Party[1].Inventory[0]!.WearCapacity);
+            Loads(worn, "wear over a capacity a tuning lowered since");
+        }
+
+        // The enchanter (Phase 6a.3a), on the ruling's numbers: a shop with a worked
+        // deposit, a fresh one and an unworn Refine, and a last run that worked two;
+        // then a run that did not count, reporting every deposit stalled — a fresh
+        // one at 0 runs worked; then more deposits than the enchanter works on, so a
+        // run that counts leaves the oldest stalled, a fresh one among them at 0; and
+        // a finished service back in the stable.
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+        {
+            var shop = TestShop.Shop();
+            Assert.Equal(0, shop.AtTheEnchanter[0].WearAtDeposit);   // an unworn Refine
+            Loads(shop, "a shop working two, with an unworn refine and a fresh deposit");
+
+            var idle = TestShop.NotCounted(shop);
+            Assert.Equal([(true, 1), (true, 1), (true, 0)], idle.Services!.Select(report => (report.Stalled, report.RunsWorked)));
+            Loads(shop, "a run that did not count, with deposits in the shop");
+
+            TestShop.Give(shop, "D", 2, TestShop.Worn("tower_guard", wear: 30));
+            TestShop.Give(shop, "D", 3, TestShop.Worn("tower_guard", wear: 30));
+            Enchanter.Deposit(shop, new WeaponPlace("D", 2), Service.Refine);
+            Enchanter.Deposit(shop, new WeaponPlace("D", 3), Service.Enchant, "cold");
+            Loads(shop, "five in the shop");
+            var worked = TestShop.Counted(shop);
+            Assert.Equal([(true, 1), (true, 1), (true, 0), (false, 1), (false, 1)], worked.Services!.Select(report => (report.Stalled, report.RunsWorked)));
+            Assert.Equal(2, worked.Services!.Count(report => report.Finished));
+            Loads(shop, "a run that counted, a fresh deposit stalled at 0 and two finished");
+        }
+
+        // And a dungeons.json beside the game that moves retiresOnClear, since the
+        // deposits were made, onto a dungeon not beaten: the shop play filled once
+        // the tutorial retired still loads (check 30 asks the retired list, not
+        // which dungeon today's content retires), and its services still finish.
+        string filled;
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+            filled = Save(TestShop.Shop());
+        using (TestContent.UsePremise(tuning: TestShop.Ruled, dungeons: TestShop.TutorialMoved))
+        {
+            var moved = Restores(filled, "a shop, retiresOnClear moved since onto a dungeon not beaten").Campaign;
+            Assert.False(moved.IsRetired(GameContent.Current.Dungeons.Tutorial.Id));
+            Assert.Equal(3, moved.AtTheEnchanter.Count);
+            Loads(moved, "a shop, retiresOnClear moved since, saved again");
+            TestShop.Counted(moved);
+            Loads(moved, "a shop worked after retiresOnClear moved");
+        }
+
+        // Transfers (Phase 6a.6): a move and a reorder in the shop, the source held
+        // there with its wear, and a finished move reported — and the same after a
+        // run that did not count, and after one that finished them.
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+        {
+            var moves = TestShop.Transfers();
+            Loads(moves, "a transfer and a reorder in the shop, a finished transfer reported");
+            Restores(Edited(Save(moves), tree => DepositNode(tree, 0)["source"]!["wear"] = 12), "a transfer's source holding its wear in the shop");
+            TestShop.NotCounted(moves);
+            Loads(moves, "a run that did not count, with transfers in the shop");
+            TestShop.Counted(moves);
+            TestShop.Counted(moves);
+            Loads(moves, "a transfer and a reorder finished and reported");
         }
     }
 
@@ -546,6 +658,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         int deepestForge = ContentBounds.DeepestForge, mostAcquired = ContentBounds.MostAcquired, deepestStack = ContentBounds.DeepestStack;
         int deepestTier = ContentBounds.DeepestTier, mostEnchantments = ContentBounds.MostEnchantments, bar = ContentBounds.Bar;
+        int perBar = ContentBounds.MostCapacityPerBar;
         int mostRuns = ContentBounds.MostRuns - 1;
         void Runs(JsonObject tree, int counter, int summary, int summaryLock, int campaignLock)
         {
@@ -601,6 +714,16 @@ public sealed class SaveConsistencyTests : IDisposable
                 tree => Runs(tree, mostRuns, mostRuns, mostRuns, mostRuns),
                 tree => Runs(tree, mostRuns, mostRuns + 1, mostRuns, mostRuns),
                 "campaign.lastResult.runCounter", $"{mostRuns + 1} is above {mostRuns}: {RunsWhy}"),
+            // 0i. A weapon's wear: no capacity any tuning in range gives it, the largest
+            // bar plus the most a bar adds for each wear cashed (Phase 6a.1).
+            ("a weapon's wear", hall,
+                tree => WeaponNode(tree, 0, 0)["wear"] = bar,
+                tree => WeaponNode(tree, 0, 0)["wear"] = bar + 1,
+                "campaign.party[0].inventory[0].wear", $"{bar + 1} is above {bar}: {WearWhy}"),
+            ("a weapon's wear, a bar cashed", hall,
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = 30; WeaponNode(tree, 0, 0)["wear"] = bar + 30 * perBar; },
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = 30; WeaponNode(tree, 0, 0)["wear"] = bar + 30 * perBar + 1; },
+                "campaign.party[0].inventory[0].wear", $"{bar + 30 * perBar + 1} is above {bar + 30 * perBar}: {WearWhy}"),
             // 0h. A member's hit points: the largest bar plus a point for each HP XP.
             ("a member's hit points", hall,
                 tree => MemberNode(tree, 2)["body"]!["hp"] = bar + hpXp,
@@ -652,6 +775,9 @@ public sealed class SaveConsistencyTests : IDisposable
         Assert.Equal(int.MaxValue / (Top(nameof(Tuning.ApplyPercent)) * Top(nameof(Tuning.ArcanePotency))), ContentBounds.DeepestTier);
         Assert.Equal(int.MaxValue - Top(nameof(Tuning.BossFloorMax)) * Top(nameof(Tuning.CooldownRunsPerFloor)), ContentBounds.MostRuns);
         Assert.Equal(Top(nameof(Tuning.EnchantmentSlots)), ContentBounds.MostEnchantments);
+        Assert.Equal(Top(nameof(Tuning.EnchantmentSlots)) + 1, ContentBounds.MostServiceRuns);
+        Assert.Equal(Top(nameof(Tuning.EnchanterWorksOn)), ContentBounds.MostWorked);
+        Assert.Equal(Top(nameof(Tuning.WearCapacityPerBar)), ContentBounds.MostCapacityPerBar);
         Assert.Equal(int.MaxValue / (2 * Top(nameof(Tuning.EffectPerLevel))), ContentBounds.MostLevels);
         Assert.Equal(Top(nameof(Tuning.Offset)) + Top(nameof(Tuning.PerStack)) * ContentBounds.DeepestStack, ContentBounds.MostHeldShots);
     }
@@ -699,6 +825,19 @@ public sealed class SaveConsistencyTests : IDisposable
                 tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most,
                 tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most + 1,
                 "campaign.party[3].inventory[0].enchantments[0].xp", $"{most + 1} is above {most}: {countWhy}"),
+            // Wear cashed grows a deposit at a time, and wear a hit at a time (Phase 6a.1):
+            // counts, each at the sanity bound, the wear with enough cashed that its
+            // own capacity ceiling is no nearer.
+            ("wear cashed", hall,
+                tree => WeaponNode(tree, 0, 0)["wearCashed"] = most,
+                tree => WeaponNode(tree, 0, 0)["wearCashed"] = most + 1,
+                "campaign.party[0].inventory[0].wearCashed", $"{most + 1} is above {most}: {countWhy}"),
+            ("wear", hall,
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = most; WeaponNode(tree, 0, 0)["wear"] = most; },
+                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = most; WeaponNode(tree, 0, 0)["wear"] = most + 1; },
+                "campaign.party[0].inventory[0].wear", $"{most + 1} is above {most}: {countWhy}"),
+            ("negative wear", hall, tree => { }, tree => WeaponNode(tree, 0, 0)["wear"] = -1,
+                "campaign.party[0].inventory[0].wear", "-1 is below 0"),
             ("mana", hall, tree => MemberNode(tree, 3)["body"]!["mana"] = most, tree => MemberNode(tree, 3)["body"]!["mana"] = most + 1,
                 "campaign.party[3].body.mana", $"{most + 1} is above {most}: {countWhy}"),
             ("a held shot", hall,
@@ -746,6 +885,555 @@ public sealed class SaveConsistencyTests : IDisposable
             Restores(Edited(text, atCeiling), $"{what} at its ceiling");
             RefusedAt(Edited(text, past), where, problem);
         }
+
+        // The enchanter's counts (Phase 6a.3a): the deposits made and what a deposit
+        // cashed are counts play grows a deposit at a time, the latter with its
+        // weapon's cash beside it — and at the most a weapon's cash can be, what a
+        // deposit cashed is held below the count's own ceiling by check 28, so that
+        // its take-back gives back a weapon that loads; the runs a service takes are
+        // the count plus one, no more than a weapon holding the most takes, a
+        // deposit's and a report's alike; a report's runs worked no more than its
+        // runs; and an ordinal and the runs worked are never below 0.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        string shop = Save(TestShop.Shop());
+        int cashedAtMost = (int)((ContentBounds.Bar + (long)ContentBounds.MostCapacityPerBar * most) / (ContentBounds.MostCapacityPerBar + 1));
+        int runs = ContentBounds.MostServiceRuns;
+        string runsWhy = $"a service takes the count of the weapon plus one runs, and no weapon holds more than {ContentBounds.MostEnchantments} (EnchantmentSlots at its most)";
+        var ids = new[] { "vampiric", "cold", "flaming" };
+        void Held(JsonObject tree, int deposit, int count, int serviceRuns)
+        {
+            DepositNode(tree, deposit)["weapon"]!["enchantments"] = new JsonArray(Enumerable.Range(0, count)
+                .Select(i => (JsonNode?)JsonNode.Parse($$"""{ "id": "{{ids[i % ids.Length]}}", "tier": 1, "xp": 0 }""")).ToArray());
+            DepositNode(tree, deposit)["weapon"]!["forgedEnchantments"] = 0;
+            DepositNode(tree, deposit)["runs"] = serviceRuns;
+        }
+        (string What, Action<JsonObject> AtCeiling, Action<JsonObject> Past, string Where, string Problem)[] shopCeilings =
+        [
+            ("the deposits made", tree => CampaignNode(tree)["depositsMade"] = most, tree => CampaignNode(tree)["depositsMade"] = most + 1,
+                "campaign.depositsMade", $"{most + 1} is above {most}: {countWhy}"),
+            ("what a deposit cashed",
+                tree => { DepositNode(tree, 2)["weapon"]!["wearCashed"] = most; DepositNode(tree, 2)["wearAtDeposit"] = cashedAtMost; },
+                tree => { DepositNode(tree, 2)["weapon"]!["wearCashed"] = most; DepositNode(tree, 2)["wearAtDeposit"] = most + 1; },
+                "campaign.enchanter[2].wearAtDeposit", $"{most + 1} is above {most}: {countWhy}"),
+            ("a deposit's runs", tree => Held(tree, 2, runs - 1, runs), tree => Held(tree, 2, runs - 1, runs + 1),
+                "campaign.enchanter[2].runs", $"{runs + 1} is above {runs}: {runsWhy}"),
+            ("a report's runs", tree => ReportNode(tree, 0)["runs"] = runs, tree => ReportNode(tree, 0)["runs"] = runs + 1,
+                "campaign.lastResult.services[0].runs", $"{runs + 1} is above {runs}: {runsWhy}"),
+            ("a report's runs worked", tree => ReportNode(tree, 0)["runsWorked"] = 2, tree => ReportNode(tree, 0)["runsWorked"] = 3,
+                "campaign.lastResult.services[0].runsWorked", "3 is above 2: a service works no more runs than it takes (runs)"),
+            ("a negative ordinal", tree => { }, tree => DepositNode(tree, 0)["ordinal"] = -1, "campaign.enchanter[0].ordinal", "-1 is below 0"),
+            ("negative runs worked", tree => { }, tree => DepositNode(tree, 0)["runsWorked"] = -1, "campaign.enchanter[0].runsWorked", "-1 is below 0"),
+        ];
+        foreach (var (what, atCeiling, past, where, problem) in shopCeilings)
+        {
+            Restores(Edited(shop, atCeiling), $"{what} at its ceiling");
+            RefusedAt(Edited(shop, past), where, problem);
+        }
+
+        // A transfer's (Phase 6a.6): the tier a report's soul landed at, 1 to the
+        // deepest a tier stays whole at, as a weapon row's entry; and a soul's place,
+        // never below 0.
+        string moves = Save(TestShop.Transfers());
+        int deepestTier = ContentBounds.DeepestTier;
+        (string What, Action<JsonObject> AtCeiling, Action<JsonObject> Past, string Where, string Problem)[] moveCeilings =
+        [
+            ("a report's tier", tree => ReportNode(tree, 0)["tier"] = deepestTier, tree => ReportNode(tree, 0)["tier"] = deepestTier + 1,
+                "campaign.lastResult.services[0].tier",
+                $"{deepestTier + 1} is above {deepestTier}: tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number"),
+            ("a report's least tier", tree => ReportNode(tree, 0)["tier"] = 1, tree => ReportNode(tree, 0)["tier"] = 0,
+                "campaign.lastResult.services[0].tier", "0 is no tier: a soul lands at tier 1 or deeper"),
+            ("a negative soul's place", tree => { }, tree => DepositNode(tree, 0)["sourceIndex"] = -1, "campaign.enchanter[0].sourceIndex", "-1 is below 0"),
+        ];
+        foreach (var (what, atCeiling, past, where, problem) in moveCeilings)
+        {
+            Restores(Edited(moves, atCeiling), $"{what} at its ceiling");
+            RefusedAt(Edited(moves, past), where, problem);
+        }
+
+        // What a deposit cashed at the most check 28 lets it, taken back: the weapon
+        // it gives back holds that as its wear, under what it had cashed before, and
+        // loads. One more, and it would not: refused at the deposit.
+        var atMost = Restores(Edited(shop, tree => { DepositNode(tree, 2)["weapon"]!["wearCashed"] = most; DepositNode(tree, 2)["wearAtDeposit"] = cashedAtMost; }), "what a deposit cashed at its most").Campaign;
+        var guard = atMost.AtTheEnchanter[2];
+        Enchanter.TakeBack(atMost, guard);
+        Assert.Equal((cashedAtMost, most - cashedAtMost), (guard.Weapon.Wear, guard.Weapon.WearCashed));
+        Loads(atMost, "the weapon a deposit at its most gives back");
+        Assert.Equal("campaign.enchanter[2].wearAtDeposit",
+            Refused(Edited(shop, tree => { DepositNode(tree, 2)["weapon"]!["wearCashed"] = most; DepositNode(tree, 2)["wearAtDeposit"] = cashedAtMost + 1; })).Where);
+    }
+
+    [Fact]
+    public void AQueueThatContradictsItselfIsRefused()
+    {
+        // Checks 21–25, 27 and 28 (Phase 6a.3a): a shop and a last run's reports each
+        // of whose fields could be true while together they could not. A deposit takes
+        // the next ordinal and cashes the whole pool, which a take-back gives back as
+        // a weapon that loads; its runs are the count plus one, and the tick that
+        // works the last brings it back; an Enchant names an enchantment the campaign
+        // has met, and a refinement none, in the shop and in a report of it; a
+        // stalled report is short of its last run, and a worked one was worked, on a
+        // run that counted, which works the newest and one at least, no more of them
+        // than the enchanter works on; and no more reports than deposits made. The
+        // shop: A's staff refined
+        // unworn (0, a run worked of 2), B's staff enchanted Vampiric (1, a run worked
+        // of 2), C's Tower Guard refined (2, fresh); the last run worked 0 and 1.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        string shop = Save(TestShop.Shop());
+        Restores(shop, "the shop");
+
+        (Action<JsonObject> Edit, string Where, string Problem)[] contradictions =
+        [
+            // 21. The next ordinal, each its own, below the count.
+            (tree => DepositNode(tree, 1)["ordinal"] = 0, "campaign.enchanter[1].ordinal",
+                "0 follows 0: the shop is in deposit order, and each deposit takes the next ordinal, never one reused"),
+            (tree => CampaignNode(tree)["depositsMade"] = 2, "campaign.enchanter[2].ordinal",
+                "2 is not below the deposits made, 2: a deposit takes the next ordinal, and the count moves past it"),
+            // 22. The whole pool cashed, and nothing worn in the shop.
+            (tree => DepositNode(tree, 0)["weapon"]!["wear"] = 3, "campaign.enchanter[0].weapon.wear",
+                "3 worn in the shop: the deposit cashed it all, and nothing wears a weapon there"),
+            // 23. The last run worked brings it back.
+            (tree => DepositNode(tree, 0)["runsWorked"] = 2, "campaign.enchanter[0].runsWorked",
+                "2 of 2 runs worked in the shop: the tick that works the last run brings the weapon back"),
+            // 24. The count plus one.
+            (tree => DepositNode(tree, 2)["runs"] = 2, "campaign.enchanter[2].runs",
+                "2 for a weapon holding 0 enchantments: a service takes the count plus one runs, and the count does not move in the shop"),
+            // 25. What an Enchant buys, and what a refinement does not.
+            (tree => DepositNode(tree, 1)["enchantment"] = null, "campaign.enchanter[1].enchantment",
+                "missing on an Enchant: a deposit to enchant names the enchantment it buys"),
+            (tree => DepositNode(tree, 1)["enchantment"] = "shocking", "campaign.enchanter[1].enchantment",
+                "shocking is not among the seen: the enchanter offers only what the campaign has met"),
+            (tree => DepositNode(tree, 0)["enchantment"] = "vampiric", "campaign.enchanter[0].enchantment",
+                "vampiric named on a Refine: a refinement attaches nothing"),
+            // 27. The reports.
+            (tree => { ReportNode(tree, 0)["stalled"] = true; ReportNode(tree, 0)["runsWorked"] = 2; }, "campaign.lastResult.services[0].runsWorked",
+                "2 of 2 runs on a stalled report: a stalled deposit is still in the shop, short of its last run"),
+            (tree => ReportNode(tree, 0)["runsWorked"] = 0, "campaign.lastResult.services[0].runsWorked",
+                "0 of 2 runs on a worked report: the run worked it a run at least"),
+            (tree => { Last(tree)["serviceTick"] = false; Last(tree)["mercyTick"] = false; }, "campaign.lastResult.services[0].stalled",
+                "false on a run that did not count: a run that did not count works nothing, and reports every deposit stalled"),
+            (tree => Last(tree)["services"] = new JsonArray(Enumerable.Range(0, ContentBounds.MostWorked + 1).Select(_ => ReportNode(tree, 0).DeepClone()).ToArray()),
+                "campaign.lastResult.services", $"{ContentBounds.MostWorked + 1} worked, more than the {ContentBounds.MostWorked} the enchanter works on at most (EnchanterWorksOn at its most)"),
+            // 27. A report says what its deposit bought, as the deposit does (25).
+            (tree => ReportNode(tree, 1)["enchantment"] = null, "campaign.lastResult.services[1].enchantment",
+                "missing on an Enchant: a report says what its deposit bought, and a deposit to enchant names its enchantment"),
+            (tree => ReportNode(tree, 1)["enchantment"] = "shocking", "campaign.lastResult.services[1].enchantment",
+                "shocking is not among the seen: its deposit bought what the campaign had met, and the campaign forgets nothing it has met"),
+            (tree => ReportNode(tree, 0)["enchantment"] = "vampiric", "campaign.lastResult.services[0].enchantment",
+                "vampiric named on a Refine: a refinement attaches nothing"),
+            // 27. A run that counted works the newest, one at least, in deposit order.
+            (tree => ReportNode(tree, 1)["stalled"] = true, "campaign.lastResult.services[1].stalled",
+                "true on the newest deposit, on a run that counted: a run that counts works the newest, and one at least"),
+            (tree => Last(tree)["services"]!.AsArray().Insert(1, Stalled(ReportNode(tree, 0))), "campaign.lastResult.services[1].stalled",
+                "true after a worked report, on a run that counted: a run that counts works the newest, and the reports are in deposit order"),
+            // 27. No more reports than deposits made.
+            (tree => { Last(tree)["services"]!.AsArray().Insert(0, Stalled(ReportNode(tree, 0))); Last(tree)["services"]!.AsArray().Insert(0, Stalled(ReportNode(tree, 0))); },
+                "campaign.lastResult.services", "4 reports and 3 deposits made: a report speaks of a deposit, and each deposit is its own"),
+            // 28. What the deposit cashed, the weapon has cashed — and a take-back of it gives back a weapon that loads.
+            (tree => DepositNode(tree, 1)["wearAtDeposit"] = 196, "campaign.enchanter[1].wearAtDeposit",
+                "196 is above what the weapon has ever cashed, 195: the deposit cashed it"),
+            (tree => { DepositNode(tree, 1)["weapon"]!["wearCashed"] = 20_000; DepositNode(tree, 1)["wearAtDeposit"] = 20_000; }, "campaign.enchanter[1].wearAtDeposit",
+                $"20000 is above {ContentBounds.Bar}, the most a weapon that had cashed 0 banks: the deposit cashed what the weapon banked, and a take-back puts it back"),
+        ];
+        foreach (var (edit, where, problem) in contradictions)
+            RefusedAt(Edited(shop, edit), where, problem);
+
+        // At their edges the same fields load: a stalled report one run short, a
+        // worked one finished, a deposit cashing all the weapon ever cashed — and
+        // one cashing the most a weapon that had cashed nothing banks, whose
+        // take-back gives back a weapon that loads.
+        Restores(Edited(shop, tree => { ReportNode(tree, 0)["stalled"] = true; ReportNode(tree, 0)["runsWorked"] = 1; }), "a stalled report a run short");
+        Restores(Edited(shop, tree => ReportNode(tree, 0)["runsWorked"] = 2), "a worked report finished");
+        Restores(Edited(shop, tree => DepositNode(tree, 1)["wearAtDeposit"] = 195), "a deposit of all the wear ever cashed");
+        int bar = ContentBounds.Bar;
+        var full = Restores(Edited(shop, tree => { DepositNode(tree, 1)["weapon"]!["wearCashed"] = bar; DepositNode(tree, 1)["wearAtDeposit"] = bar; }), "a deposit of the largest bar").Campaign;
+        var staff = full.AtTheEnchanter[1];
+        Enchanter.TakeBack(full, staff);
+        Assert.Equal((bar, 0), (staff.Weapon.Wear, staff.Weapon.WearCashed));
+        Loads(full, "the weapon a deposit of the largest bar gives back");
+
+        static JsonNode Stalled(JsonObject report)
+        {
+            var stalled = report.DeepClone().AsObject();
+            stalled["stalled"] = true;
+            return stalled;
+        }
+    }
+
+    [Fact]
+    public void AnEnchantThatWouldCompleteIntoAnUnloadableWeaponIsRefused()
+    {
+        // Check 29 (Phase 6a.3a): what an Enchant attaches as it finishes is the
+        // weapon's next entry, and must load — so an Enchant on a weapon already
+        // holding the most a weapon can is none play queued (its own gate and the
+        // ceiling on attaching refuse it). A refinement of the same weapon attaches
+        // nothing, and loads.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        string shop = Save(TestShop.Shop());
+        int most = ContentBounds.MostEnchantments;
+        var ids = new[] { "vampiric", "cold", "flaming" };
+        JsonArray Entries() => new(Enumerable.Range(0, most).Select(i => (JsonNode?)JsonNode.Parse($$"""{ "id": "{{ids[i % ids.Length]}}", "tier": 1, "xp": 0 }""")).ToArray());
+        void Full(JsonObject tree, int index)
+        {
+            DepositNode(tree, index)["weapon"]!["enchantments"] = Entries();
+            DepositNode(tree, index)["weapon"]!["forgedEnchantments"] = 0;
+            DepositNode(tree, index)["runs"] = most + 1;
+        }
+        RefusedAt(Edited(shop, tree => Full(tree, 1)), "campaign.enchanter[1].weapon.enchantments",
+            $"{most} entries on a deposit to enchant: the one it attaches would be more than the {most} a weapon can hold");
+        Restores(Edited(shop, tree => Full(tree, 2)), "a refinement of a weapon holding the most");
+    }
+
+    [Fact]
+    public void ATransferThatContradictsItselfIsRefused()
+    {
+        // Checks 24, 25, 26, 27 and 29's transfer half (Phase 6a.6): a transfer names
+        // the soul it moves by where it lies — on its source, or on the weapon for a
+        // reorder — and no enchantment, and the soul lies there, a reorder's short of
+        // the weapon's last entry (Phase 6a.7's review); it takes the runs of
+        // attaching it, the count plus one from another weapon and the count for a
+        // reorder; only a transfer holds a source or names a soul's place; a report of
+        // one names its soul, its source only if it had one, and the tier it landed at
+        // exactly as it came back; and a weapon that takes a soul from another has room
+        // for it. The shop: B's Riposte Blade took Vampiric off the Nameless Knife and
+        // came back (reported); D's Tower Guard takes the knife's Serrated (0, the
+        // knife held with it), and an Arming Sword moves its Flaming to its end (1).
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        string moves = Save(TestShop.Transfers());
+        Restores(moves, "the transfers");
+
+        (Action<JsonObject> Edit, string Where, string Problem)[] contradictions =
+        [
+            // 24. The runs of attaching the soul: the count plus one, or the count for a reorder.
+            (tree => DepositNode(tree, 0)["runs"] = 2, "campaign.enchanter[0].runs",
+                "2 for a weapon holding 0 enchantments: a service takes the count plus one runs, and the count does not move in the shop"),
+            (tree => DepositNode(tree, 1)["runs"] = 3, "campaign.enchanter[1].runs",
+                "3 for a reorder on a weapon holding 2 enchantments: a reorder takes the count, and the count does not move in the shop"),
+            // 25. Only a transfer holds a source, or names a soul's place.
+            (tree => DepositNode(tree, 0)["service"] = "Refine", "campaign.enchanter[0].source",
+                "a source held on a Refine: only a transfer takes a second weapon into the shop"),
+            (tree => { DepositNode(tree, 0)["service"] = "Refine"; DepositNode(tree, 0)["source"] = null; }, "campaign.enchanter[0].sourceIndex",
+                "0 named on a Refine: only a transfer moves a soul"),
+            (tree => { DepositNode(tree, 0)["service"] = "Enchant"; DepositNode(tree, 0)["enchantment"] = "cold"; DepositNode(tree, 0)["source"] = null; },
+                "campaign.enchanter[0].sourceIndex", "0 named on an Enchant: only a transfer moves a soul"),
+            // 26. A transfer names its soul by where it lies, and buys no enchantment.
+            (tree => DepositNode(tree, 0)["enchantment"] = "vampiric", "campaign.enchanter[0].enchantment",
+                "vampiric named on a Transfer: a transfer moves a soul the party owns, named by where it lies, and buys none"),
+            (tree => DepositNode(tree, 0)["sourceIndex"] = null, "campaign.enchanter[0].sourceIndex",
+                "missing on a Transfer: a transfer names the soul it moves by its place"),
+            (tree => DepositNode(tree, 0)["sourceIndex"] = 2, "campaign.enchanter[0].sourceIndex",
+                "2 on a source holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
+            (tree => DepositNode(tree, 1)["sourceIndex"] = 2, "campaign.enchanter[1].sourceIndex",
+                "2 on a weapon holding 2 enchantments: the soul a transfer moves lies where it names, and nothing changes a weapon in the shop"),
+            // A reorder of the entry already last, which the enchanter refuses (IT IS
+            // LAST ALREADY, PHASE 6a DECISION 11) and which would complete as a move
+            // of nothing but its tier — on two souls, and on a weapon with one.
+            (tree => DepositNode(tree, 1)["sourceIndex"] = 1, "campaign.enchanter[1].sourceIndex",
+                "1 names the last enchantment on the weapon: a reorder moves a soul to the end of the weapon, so the one it names is not last already, and nothing changes a weapon in the shop"),
+            (tree => { DepositNode(tree, 1)["weapon"]!["enchantments"]!.AsArray().RemoveAt(1); DepositNode(tree, 1)["runs"] = 1; },
+                "campaign.enchanter[1].sourceIndex",
+                "0 names the last enchantment on the weapon: a reorder moves a soul to the end of the weapon, so the one it names is not last already, and nothing changes a weapon in the shop"),
+            // The mapper's: a transfer pays the price of attaching its soul, 1 at the least.
+            (tree => DepositNode(tree, 0)["wearAtDeposit"] = 0, "campaign.enchanter[0].wearAtDeposit",
+                "0 is below 1: a transfer pays the price of attaching its soul, FirstEnchantmentWear or more, and no tuning prices one below 1"),
+            // 27. A report of a transfer: its soul, its source, and the tier it landed at as it came back.
+            (tree => ReportNode(tree, 0)["enchantment"] = null, "campaign.lastResult.services[0].enchantment",
+                "missing on a Transfer: a report of a transfer names the soul it moves"),
+            (tree => ReportNode(tree, 0)["tier"] = null, "campaign.lastResult.services[0].tier",
+                "missing on a Transfer that came back: its soul landed at a tier, which its report says"),
+            (tree => { ReportNode(tree, 0)["stalled"] = true; ReportNode(tree, 0)["runsWorked"] = 0; }, "campaign.lastResult.services[0].tier",
+                "2 on a transfer stalled: a soul lands as its service comes back, its last run worked"),
+            (tree => { ReportNode(tree, 0)["service"] = "Enchant"; ReportNode(tree, 0)["tier"] = null; }, "campaign.lastResult.services[0].sourceId",
+                "flensing_knife_unique named on an Enchant: only a transfer takes a soul from another weapon"),
+            (tree => { ReportNode(tree, 0)["service"] = "Refine"; ReportNode(tree, 0)["enchantment"] = null; ReportNode(tree, 0)["sourceId"] = null; },
+                "campaign.lastResult.services[0].tier", "2 on a Refine: only a transfer lands a soul at a tier"),
+        ];
+        foreach (var (edit, where, problem) in contradictions)
+            RefusedAt(Edited(moves, edit), where, problem);
+
+        // 29's transfer half: a weapon taking a soul from another has room for it; a
+        // reorder's count does not move, so a weapon holding the most reorders.
+        int most = ContentBounds.MostEnchantments;
+        var ids = new[] { "vampiric", "cold", "flaming" };
+        JsonArray Entries() => new(Enumerable.Range(0, most).Select(i => (JsonNode?)JsonNode.Parse($$"""{ "id": "{{ids[i % ids.Length]}}", "tier": 1, "xp": 0 }""")).ToArray());
+        void Full(JsonObject tree, int index, int runs)
+        {
+            DepositNode(tree, index)["weapon"]!["enchantments"] = Entries();
+            DepositNode(tree, index)["weapon"]!["forgedEnchantments"] = 0;
+            DepositNode(tree, index)["runs"] = runs;
+        }
+        RefusedAt(Edited(moves, tree => Full(tree, 0, most + 1)), "campaign.enchanter[0].weapon.enchantments",
+            $"{most} entries on a deposit to take a soul: the one it attaches would be more than the {most} a weapon can hold");
+        Restores(Edited(moves, tree => Full(tree, 1, most)), "a reorder on a weapon holding the most");
+
+        // A report's soul a unique carries, of a kind that does nothing yet, and not
+        // among the seen: the party's own weapon's, and it loads (the mapper asks only
+        // that the content has it). A report's source the content has not: refused.
+        Restores(Edited(moves, tree => ReportNode(tree, 0)["enchantment"] = "momentum"), "a transfer's report of a soul that does nothing yet");
+        Assert.Equal("campaign.lastResult.services[0].sourceId", Refused(Edited(moves, tree => ReportNode(tree, 0)["sourceId"] = "no_such_weapon")).Where);   // as its weaponId is (AReportNamingNoWeaponIsRefused)
+        Assert.Equal("campaign.enchanter[0].source.id", Refused(Edited(moves, tree => DepositNode(tree, 0)["source"]!["id"] = "no_such_weapon")).Where);
+    }
+
+    [Fact]
+    public void AQueueBeforeTheTutorialIsRetiredIsRefused()
+    {
+        // Check 30: the enchanter opens when the tutorial is beaten (§6.3), which
+        // retires it, and retired is never undone — so a shop holding anything, a
+        // run's end reporting on one, or a deposit ever made, with no dungeon
+        // retired, is none play wrote, each refused at its own path. Asked of the
+        // retired list alone, with no content: a dungeons.json that moves
+        // retiresOnClear since refuses nothing play wrote (WhatPlayCanWriteAlwaysLoads).
+        // Nothing at the enchanter and nothing ever deposited, before then, is every
+        // new campaign's.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        string shop = Save(TestShop.Shop());
+        const string why = "the enchanter opens once the tutorial is beaten, which retires it, and takes nothing before";
+        static void Standing(JsonObject tree) => CampaignNode(tree)["retired"] = new JsonArray();
+        (Action<JsonObject> Edit, string Where, string Problem)[] refusals =
+        [
+            (Standing, "campaign.enchanter", $"3 in the shop and no dungeon is retired: {why}"),
+            (tree => { Standing(tree); CampaignNode(tree)["enchanter"] = null; }, "campaign.lastResult.services", $"2 reported at the enchanter and no dungeon is retired: {why}"),
+            (tree => { Standing(tree); CampaignNode(tree)["enchanter"] = null; Last(tree)["services"] = null; }, "campaign.depositsMade", $"3 made and no dungeon is retired: {why}"),
+        ];
+        foreach (var (edit, where, problem) in refusals)
+            RefusedAt(Edited(shop, edit), where, problem);
+        Restores(Edited(shop, tree => { Standing(tree); CampaignNode(tree)["enchanter"] = null; Last(tree)["services"] = null; CampaignNode(tree)["depositsMade"] = 0; }),
+            "nothing at the enchanter and nothing deposited, the tutorial standing");
+    }
+
+    [Fact]
+    public void AReportNamingNoWeaponIsRefused()
+    {
+        // A report names its weapon and its enchantment by id, and the summary names
+        // them every frame, on the hub and at a run's end: each must be the
+        // content's, refused at its own path, so drawing never throws. So must a
+        // deposit's weapon and enchantment, and each service be one by name. The runs
+        // a report says are held where they are read.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        string shop = Save(TestShop.Shop());
+        (Action<JsonObject> Edit, string Where)[] refusals =
+        [
+            (tree => ReportNode(tree, 0)["weaponId"] = "no_such_weapon", "campaign.lastResult.services[0].weaponId"),
+            (tree => ReportNode(tree, 1)["enchantment"] = "no_such_enchantment", "campaign.lastResult.services[1].enchantment"),
+            (tree => ReportNode(tree, 1)["service"] = "Polish", "campaign.lastResult.services[1].service"),
+            (tree => ReportNode(tree, 0)["runs"] = 0, "campaign.lastResult.services[0].runs"),
+            (tree => ReportNode(tree, 0)["runsWorked"] = -1, "campaign.lastResult.services[0].runsWorked"),
+            (tree => Last(tree)["services"]!.AsArray().Insert(0, null), "campaign.lastResult.services[0]"),
+            (tree => DepositNode(tree, 0)["weapon"]!["id"] = "no_such_weapon", "campaign.enchanter[0].weapon.id"),
+            (tree => DepositNode(tree, 1)["enchantment"] = "no_such_enchantment", "campaign.enchanter[1].enchantment"),
+            (tree => DepositNode(tree, 2)["service"] = "Polish", "campaign.enchanter[2].service"),
+            (tree => DepositNode(tree, 2)["runs"] = 0, "campaign.enchanter[2].runs"),
+            (tree => DepositNode(tree, 1)["wearAtDeposit"] = 0, "campaign.enchanter[1].wearAtDeposit"),
+            (tree => CampaignNode(tree)["enchanter"]!.AsArray().Insert(1, null), "campaign.enchanter[1]"),
+        ];
+        foreach (var (edit, where) in refusals)
+            Assert.Equal(where, Refused(Edited(shop, edit)).Where);
+        Assert.Equal("0 is below 1: an enchantment is bought with a deposit of FirstEnchantmentWear or more, and no tuning prices one below 1",
+            Refused(Edited(shop, tree => DepositNode(tree, 1)["wearAtDeposit"] = 0)).Problem);
+    }
+
+    [Fact]
+    public void AQueuedEnchantmentTheRelationsNowRefuseStillLoads()
+    {
+        // "The item was legal when it was made" (settled.md, R3(b)): a deposit queued
+        // under one restricted.json loads under another that now lists its
+        // enchantment among the never-rolled, or excludes it beside what the weapon
+        // carries — the file beside the game is JSON-master data an edit may move —
+        // and its service finishes as it was bought.
+        string shop;
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+            shop = Save(TestShop.Shop());
+        var restricted = ShippedContent.Restricted;
+        foreach (var edited in new[]
+                 {
+                     restricted with { NeverRolled = [.. restricted.NeverRolled, "vampiric"] },
+                     restricted with { Excludes = [.. restricted.Excludes, ["vampiric", "regeneration"]] },
+                 })
+        {
+            using (TestContent.UsePremise(tuning: TestShop.Ruled, restricted: edited))
+            {
+                var loaded = Restores(shop, "a queued enchantment the relations now refuse").Campaign;
+                TestShop.Counted(loaded);
+                var back = loaded.Stable.Single(weapon => weapon.Enchantments.Count == 2);
+                Assert.Equal(["regeneration", "vampiric"], back.Enchantments.Select(entry => entry.Id));
+            }
+        }
+    }
+
+    [Fact]
+    public void AQueuedInertKindIsRefused()
+    {
+        // Phase 6a.3b: the enchanter never offers an enchantment of a kind declared
+        // and inert (LootTable.IsInert) — and whether a kind does anything is the
+        // code's, which no file beside the game edits — so no deposit play made can
+        // name one, nor any run's report of a deposit (the 6a.3b review). A shop whose
+        // Enchant names Echoing, met, is refused at the deposit's enchantment, and a
+        // last run's report of one at the report's; the same shop naming an element
+        // it met, in either place, loads. (What restricted.json says of a queued id
+        // is not asked: the case above.)
+        string shop;
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+            shop = Save(TestShop.Shop());
+        Assert.Equal("vampiric", JsonNode.Parse(shop)!["campaign"]!["enchanter"]![1]!["enchantment"]!.GetValue<string>());
+        Assert.Equal("vampiric", JsonNode.Parse(shop)!["campaign"]!["lastResult"]!["services"]![1]!["enchantment"]!.GetValue<string>());
+
+        string Naming(string id, Action<JsonObject, string> put) => Edited(shop, tree =>
+        {
+            var seen = CampaignNode(tree)["seen"]!.AsArray().Select(node => node!.GetValue<string>()).Append(id).Distinct().Order(StringComparer.Ordinal);
+            CampaignNode(tree)["seen"] = new JsonArray(seen.Select(met => (JsonNode)JsonValue.Create(met)!).ToArray());
+            put(tree, id);
+        });
+        string Buying(string id) => Naming(id, (tree, named) => CampaignNode(tree)["enchanter"]![1]!["enchantment"] = named);
+        string Reporting(string id) => Naming(id, (tree, named) => ReportNode(tree, 1)["enchantment"] = named);
+        const string Inert = "echoing is an enchantment that does nothing yet, which the enchanter never offers, so no deposit could have bought it";
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+        {
+            Assert.True(LootTable.IsInert(GameContent.Current.Enchantments["echoing"]));
+            RefusedAt(Buying("echoing"), "campaign.enchanter[1].enchantment", Inert);
+            RefusedAt(Reporting("echoing"), "campaign.lastResult.services[1].enchantment", Inert);
+            Restores(Buying("flaming"), "a queued element the campaign met");
+            Restores(Reporting("flaming"), "a reported element the campaign met");
+        }
+    }
+
+    [Fact]
+    public void AnImprovementComesWithAFinishedServiceOnly()
+    {
+        // Phase 6a.4: a run's report of a service it brought back says what the
+        // improvement roll did — an outcome by name and the modifier it gave a stack
+        // of, together (check 27) — and only a finished service's does, since the
+        // roll is made as a service comes back. The modifier is one some weapon can
+        // stack: which members have behaviour is the code's, so no roll lands on
+        // Momentum or OnHitPoison. What play writes loads: TestShop's shop worked
+        // home at odds that land every time, both finished reports improved.
+        string back, shop;
+        using (TestContent.UsePremise(tuning: TestShop.Landing))
+        {
+            var campaign = TestShop.Shop();
+            shop = Save(campaign);
+            TestShop.Counted(campaign);
+            back = Save(campaign);
+            Loads(campaign, "a shop worked home, each service improving its weapon");
+        }
+        var report = ReportNode(JsonNode.Parse(back)!.AsObject(), 2);
+        Assert.Equal(("Refine", 1, 1), (report["service"]!.GetValue<string>(), report["runsWorked"]!.GetValue<int>(), report["runs"]!.GetValue<int>()));
+        string improved = report["improved"]!.GetValue<string>(), modifier = report["modifier"]!.GetValue<string>();
+
+        string Reporting(int index, Action<JsonObject> edit, string text) => Edited(text, tree => edit(ReportNode(tree, index)));
+        const string Together = "an improvement is an outcome and the modifier it gave a stack of, together";
+        using (TestContent.UsePremise(tuning: TestShop.Ruled))
+        {
+            RefusedAt(Reporting(2, row => row["modifier"] = null, back), "campaign.lastResult.services[2].modifier",
+                $"missing beside the outcome {improved}: {Together}");
+            RefusedAt(Reporting(2, row => row["improved"] = null, back), "campaign.lastResult.services[2].improved",
+                $"missing beside the modifier {modifier}: {Together}");
+
+            // A stalled report, and one worked short of its last run, never carry one.
+            const string AsItComesBack = "the improvement roll is made as a service comes back, its last run worked";
+            RefusedAt(Reporting(0, row => { row["improved"] = "Deepen"; row["modifier"] = "Resonant"; }, back), "campaign.lastResult.services[0].improved",
+                $"Deepen on a service stalled: {AsItComesBack}");
+            RefusedAt(Reporting(1, row => { row["improved"] = "Graft"; row["modifier"] = "Block"; }, shop), "campaign.lastResult.services[1].improved",
+                $"Graft on a service at 1 of 2 runs: {AsItComesBack}");
+
+            // Each is read on its own first: a name its enum has, and a modifier some
+            // weapon stacks.
+            Assert.Equal("campaign.lastResult.services[2].improved", Refused(Reporting(2, row => row["improved"] = "Sideways", back)).Where);
+            Assert.Equal("campaign.lastResult.services[2].modifier", Refused(Reporting(2, row => row["modifier"] = "Blok", back)).Where);
+            RefusedAt(Reporting(2, row => row["modifier"] = "Momentum", back), "campaign.lastResult.services[2].modifier",
+                "Momentum is a modifier no weapon stacks, so no improvement lands on it");
+
+            // A report from before the roll — a Phase 6a.3a save's, naming neither —
+            // loads, and says the weapon came back as it went.
+            var before = Restores(Reporting(2, row => { row.Remove("improved"); row.Remove("modifier"); }, back), "a finished report naming no improvement");
+            Assert.Null(before.Campaign.LastResult!.Services![2].Improved);
+        }
+    }
+
+    [Fact]
+    public void AnEnemyOrADropCarryingWearIsRefused()
+    {
+        // Check 20 (Phase 6a.1): no enemy's weapon ever wears — its wear feed does
+        // nothing — and a drop is made when it is rolled, so neither has banked
+        // wear or cashed any. A save that says otherwise is none play wrote. The
+        // Flagship: a halberd standing on floor 4, and a corpse on floor 4 lying on
+        // its drop; and a weapon the party put down there, which is the party's and
+        // keeps its wear.
+        string text = Save(VisitSaveTests.Flagship().Campaign);
+        Restores(text, "the Flagship");
+        const string EnemyWhy = "no enemy weapon is ever one the party wields, so it never wears";
+        const string DropWhy = "a drop is made when it is rolled, and nothing has wielded it since";
+        RefusedAt(Edited(text, tree => FloorNode(tree, 3)["enemies"]![0]!["weapon"]!["wear"] = 1),
+            "campaign.visit.floors[3].enemies[0].weapon.wear", $"1 worn: {EnemyWhy}");
+        RefusedAt(Edited(text, tree => FloorNode(tree, 3)["enemies"]![0]!["weapon"]!["wearCashed"] = 30),
+            "campaign.visit.floors[3].enemies[0].weapon.wearCashed", $"30 cashed: {EnemyWhy}");
+
+        var floors = VisitNode(JsonNode.Parse(text)!.AsObject())["floors"]!.AsArray();
+        var (f, k) = Enumerable.Range(0, floors.Count)
+            .SelectMany(n => Enumerable.Range(0, floors[n]!["enemies"]!.AsArray().Count).Select(row => (n, row)))
+            .First(at => floors[at.n]!["enemies"]![at.row]!["groundItem"] is JsonObject);
+        RefusedAt(Edited(text, tree => FloorNode(tree, f)["enemies"]![k]!["groundItem"]!["weapon"]!["wear"] = 4),
+            $"campaign.visit.floors[{f}].enemies[{k}].groundItem.weapon.wear", $"4 worn: {DropWhy}");
+        RefusedAt(Edited(text, tree => FloorNode(tree, f)["enemies"]![k]!["groundItem"]!["weapon"]!["wearCashed"] = 1),
+            $"campaign.visit.floors[{f}].enemies[{k}].groundItem.weapon.wearCashed", $"1 cashed: {DropWhy}");
+
+        // The boss's row is an enemy's like any other: the Spear Hall's bottom floor, reached.
+        var bottom = VisitScript.Enter(NewCampaign(), "spear_hall", FiveDeep);
+        while (bottom.Floor.DownStairs is not null)
+            bottom.Down();
+        string lair = Save(bottom.Campaign);
+        int deepest = bottom.Visit.BossFloor - 1, boss = BossRow(lair, deepest);
+        RefusedAt(Edited(lair, tree => FloorNode(tree, deepest)["enemies"]![boss]!["weapon"]!["wear"] = 2),
+            $"campaign.visit.floors[{deepest}].enemies[{boss}].weapon.wear", $"2 worn: {EnemyWhy}");
+
+        // What the party put down is the party's, and keeps what it banked.
+        Assert.NotEmpty(FloorNode(JsonNode.Parse(text)!.AsObject(), 3)["looseItems"]!.AsArray());
+        Restores(Edited(text, tree =>
+        {
+            var weapon = FloorNode(tree, 3)["looseItems"]![0]!["weapon"]!;
+            weapon["wear"] = 9;
+            weapon["wearCashed"] = 30;
+        }), "a worn weapon put down");
+    }
+
+    [Fact]
+    public void AWeaponWornPastAnyCapacityIsRefused()
+    {
+        // A weapon's wear has a ceiling no tuning in range can move (Phase 6a.1), as
+        // a member's hit points do: its capacity opens on a bar no larger than Bar
+        // and grows at most MostCapacityPerBar a full bar, each bar one wear cashed
+        // or more, and accrual never banks past capacity — so wear is at most Bar
+        // plus MostCapacityPerBar for each wear cashed. At it the save loads, one
+        // past it is refused at the wear's own path. A fresh weapon — nothing
+        // cashed — carrying 900 000 is refused so.
+        string hall = Save(HallCleared());
+        int bar = ContentBounds.Bar, perBar = ContentBounds.MostCapacityPerBar;
+        string Wearing(int wear, int cashed) => Edited(hall, tree =>
+        {
+            WeaponNode(tree, 0, 0)["wear"] = wear;
+            WeaponNode(tree, 0, 0)["wearCashed"] = cashed;
+        });
+        foreach (int cashed in new[] { 0, 1, 7, 1335 })
+        {
+            long ceiling = bar + (long)perBar * cashed;
+            var loaded = Restores(Wearing((int)ceiling, cashed), $"wear at its ceiling with {cashed} cashed").Campaign.Party[0].Inventory[0]!;
+            Assert.Equal(((int)ceiling, cashed), (loaded.Wear, loaded.WearCashed));
+            RefusedAt(Wearing((int)ceiling + 1, cashed), "campaign.party[0].inventory[0].wear", $"{ceiling + 1} is above {ceiling}: {WearWhy}");
+        }
+        RefusedAt(Wearing(900_000, 0), "campaign.party[0].inventory[0].wear", $"900000 is above {bar}: {WearWhy}");
+
+        // Summed as a long: wear cashed at its own ceiling cannot wrap the wear's,
+        // and the weapon it loads replays its capacity from the most a count holds.
+        var most = Restores(Wearing(ContentBounds.MostCount, ContentBounds.MostCount), "the most wear, the most cashed").Campaign.Party[0].Inventory[0]!;
+        Assert.Equal(Wear.Capacity(ContentBounds.MostCount).Max, most.WearCapacity);
+        Assert.True(most.WornFull);
+
+        // And no tuning in range gives a capacity past the ceiling: at each end of
+        // StartingPool's and WearCapacityPerBar's clamps, whatever was cashed.
+        foreach (int start in new[] { 1, 30, bar })
+            foreach (int growth in new[] { 0, 1, perBar })
+                using (TestContent.UsePremise(tuning: t => t with { StartingPool = start, WearCapacityPerBar = growth }))
+                    foreach (int cashed in new[] { 0, 1, 29, 30, 1335, 1_000_000 })
+                        Assert.True(Wear.Capacity(cashed).Max <= bar + (long)perBar * cashed,
+                            $"StartingPool {start}, WearCapacityPerBar {growth}, {cashed} cashed: capacity {Wear.Capacity(cashed).Max}");
     }
 
     [Fact]

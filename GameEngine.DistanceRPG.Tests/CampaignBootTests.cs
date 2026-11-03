@@ -1195,6 +1195,53 @@ public sealed class CampaignBootTests : IDisposable
     }
 
     [Fact]
+    public void TheNumbersChangedLineHashesAtTheSavesVersion()
+    {
+        InTempFolder(folder =>
+        {
+            // PHASE 6a DECISION 9: a save is compared on the keys of the version its
+            // hash is of, and the log's numbers-changed line prints the game's hash
+            // on those same keys, naming the version — two hashes over one key set,
+            // never a version-1 save's hash beside the current version's. A campaign
+            // saved as a version-1 document would be: its hash on version 1's keys.
+            var store = new SaveStore(folder);
+            var campaign = NewCampaign();
+            CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
+            var played = GameContent.Current.Tuning;
+            var tree = JsonNode.Parse(Text(campaign))!.AsObject();
+            tree["tuningHash"] = TuningJson.Hash(played, version: 1);
+            tree["tuningHashVersion"] = 1;
+            Directory.CreateDirectory(store.Folder);
+            File.WriteAllText(store.SavePath, tree.ToJsonString());
+
+            // Under a tuning that moved only what version 2 began to play, nothing
+            // it was played under moved: it resumes with nothing to say.
+            var wearOnly = played with { WearPerHit = played.WearPerHit + 1 };
+            using (TestContent.UsePremise(tuning: _ => wearOnly))
+            {
+                var log = new List<string>();
+                Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 1"], Load(store, log: log).Notices);
+                Assert.DoesNotContain(log, line => line.Contains("the numbers have changed", StringComparison.Ordinal));
+                store.ClearResuming();
+            }
+
+            // Under one that moved a number it was played under, it says so, and the
+            // log names both hashes on version 1's keys, and the version.
+            var tuned = played with { MovementBudget = 200 };
+            using (TestContent.UsePremise(tuning: _ => tuned))
+            {
+                var log = new List<string>();
+                Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 1", CampaignBoot.TuningChanged], Load(store, log: log).Notices);
+                string line = Assert.Single(log, line => line.Contains("the numbers have changed", StringComparison.Ordinal));
+                Assert.Contains($"was saved under tuning {TuningJson.Hash(played, version: 1)} (version 1's keys) and the game plays under {TuningJson.Hash(tuned, version: 1)} on them", line, StringComparison.Ordinal);
+                Assert.DoesNotContain(TuningJson.Hash(tuned), line, StringComparison.Ordinal);
+                Assert.NotEqual(TuningJson.Hash(tuned), TuningJson.Hash(tuned, version: 1));
+                store.ClearResuming();
+            }
+        });
+    }
+
+    [Fact]
     public void TheSavesWordIsOnScreenWhole_TheNumbersAheadOfWhatWasSetAside()
     {
         InTempFolder(folder =>

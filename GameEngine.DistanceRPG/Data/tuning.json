@@ -253,21 +253,28 @@
   /* How near the stairs, in whole tiles, every living member must stand for the party to take them. */
   "StairGatherTiles": 3,
 
-  /* ---- Enchanter - Phase 6a: WearPerHit, GraftBaseChance ---- */
-  /* What a deposit costs at the enchanter, as the user ruled on 2026-09-25: a weapon's wear
-     capacity opens on StartingPool and grows as full bars of wear are cashed, its enchantment slots
-     open along that capacity, and attaching each enchantment needs a deposit of its own size. The
-     user keeps a number they may revisit in this file, so the six keys below are here before the
-     Phase 6a enchanter that reads them, and nothing reads them until then: each is read, clamped
-     and warned like every other key, and a save's hash leaves them out, so turning one never says
-     the numbers have changed. WearPerHit and GraftBaseChance are not keys yet: they arrive with
-     the Phase 6a code that reads them. */
+  /* ---- Enchanter ---- */
+  /* What a hit wears, what a deposit costs at the enchanter, as the user ruled on 2026-09-25, how
+     many deposits the enchanter works on, and the roll a finished service makes to improve the
+     weapon anyway: a weapon's wear capacity opens on StartingPool and grows as full bars of wear
+     are cashed, its enchantment slots open along that capacity, and attaching each enchantment
+     needs a deposit of its own size. The user keeps a number they may revisit in this file, so the
+     ruling's six keys were here before the Phase 6a enchanter that reads them. Every key here plays
+     now, and turning one says the numbers have changed when a campaign saved under the other number
+     resumes - never to a save from before Phase 6a, whose record of its numbers covers only the
+     keys played then. */
+
+  /* The wear a weapon banks for every hit it lands - each body a swing, a cleave, a shot or a
+     wand's cast strikes, and each landed cast of a staff - up to its capacity. A deposit at the
+     enchanter spends it all. 0 means no weapon ever wears, so none can be enchanted. */
+  "WearPerHit": 1,
 
   /* The capacity a full bar's worth of cashed wear adds, the bar being the capacity at the time:
      cashing 30 lifts a fresh 30 to 31, then 31 more lifts it to 32, with no top. The progress
      carries - a deposit short of a full bar still counts toward the next point, and what one cashes
      past a bar starts the next - and it grows alike whichever service the deposit bought. 0 freezes
-     capacity. */
+     capacity. A weapon's capacity is worked out afresh from the wear it has ever cashed, so a change
+     here moves every weapon's capacity at once. */
   "WearCapacityPerBar": 1,
 
   /* The capacity a weapon's first enchantment slot opens at: slot n opens at FirstSlotCapacity +
@@ -293,6 +300,28 @@
   /* How much more wear each later enchantment needs than the one before, above. 0 prices every one
      as the first. */
   "EnchantmentWearStep": 5,
+
+  /* How many deposited weapons the enchanter works on at once: the newest. A run that counts works
+     each of them a run on; a deposit past them stalls the oldest until one of the newest comes
+     back. A transfer is one deposit, its two weapons together. At least 1, and at most 10, the
+     most enchantments a weapon holds. */
+  "EnchanterWorksOn": 2,
+
+  /* The chance, as a percentage, that a service improves the weapon anyway as it comes back: flat
+     when it enchants or moves an enchantment onto it, and times 1 + the wear cashed / StartingPool
+     when it refines - 6 on a fresh full bar, 7 at capacity 40, 9 at capacity 60. A deposit that
+     cashes no wear rolls nothing. */
+  "GraftBaseChance": 3,
+
+  /* Provisional: of the services that improve, the percentage that graft a modifier the weapon
+     never carried. The rest deepen one it carries. A weapon with nothing to graft deepens, and one
+     with nothing to deepen grafts (open-questions.md, PHASE 6a DECISION 5). */
+  "GraftSharePercent": 25,
+
+  /* Provisional: how many times likelier a deepen lands on the class signature than on any other
+     modifier the weapon carries. 1 is no bias, and a staff or a wand, which has no signature, has
+     none (open-questions.md, PHASE 6a DECISION 5). */
+  "DeepenSignatureWeight": 3,
 
   /* ---- Inventory ---- */
 

@@ -41,11 +41,14 @@ recent save and resumes it where it was left: on the screen between runs, with
 `CAMPAIGN RESUMED FROM SLOT 2` (or `FROM THE OLD AUTOSAVE`) under the title, or
 back in the dungeon mid-run, with `RESUMED` over the floor banner (see
 [Saves](#saves)); with no save yet it reads `CONTINUE - NO SAVE YET`, dimmed, and
-is passed over. The screen between runs is the dungeon list, with the last run's
-summary above it once a run has ended; until the tutorial's golem is beaten it
-lists the tutorial alone. In play — in a dungeon or between runs — Esc opens the
-menu, where the campaign is saved by hand into its own slot, the one it saves
-into all the time, and play is left for the title.
+is passed over. The screen between runs is two pages, Tab going from one to the
+other: DUNGEONS, the dungeon list, with the last run's summary above it once a run
+has ended — until the tutorial's golem is beaten it lists the tutorial alone — and
+WEAPONS, every member's hand and bag, the stable and the enchanter's shop, where
+weapons are moved between them and deposited at the enchanter (below). In play —
+in a dungeon or between runs — Esc opens the menu, where the campaign is saved by
+hand into its own slot, the one it saves into all the time, and play is left for
+the title.
 
 | Title | Action |
 | --- | --- |
@@ -68,11 +71,44 @@ into all the time, and play is left for the title.
 | Enter | Begin in the chosen slot, the same way |
 | Esc | Back to the options (on a question, no) |
 
-| Between runs | Action |
+| Between runs: DUNGEONS | Action |
 | --- | --- |
 | W/S / arrows | Choose a dungeon (a locked one shows its countdown and is skipped) |
 | Enter | Descend into the chosen dungeon |
+| Tab | The WEAPONS page |
 | Esc | Open the menu, over the hub (below) |
+
+| Between runs: WEAPONS | Action |
+| --- | --- |
+| W/S / arrows | Choose a weapon, a room — a member's empty hand, the room left in its bag, the stable's end — or a weapon in the enchanter's shop (a heading or a member's name is skipped). The window scrolls with the choice, and the chosen weapon is said whole on the right: its readouts, its wear, and its capacity and how far the wear it has cashed has come toward the next point |
+| Enter | Take the chosen weapon up. Nothing moves yet: the keys line reads `CARRYING THE ...` |
+| D | Deposit the chosen weapon at the enchanter: the deposit panel (below). Before the tutorial is beaten it says `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN`, over the keys, and opens nothing |
+| T | On a weapon in the shop (`WORKING` or `STALLED`), or a transfer's source held there (`HELD`): ask whether to take it back (below) — a transfer's two weapons together |
+| Tab | The DUNGEONS page |
+| Esc | Open the menu, over the hub |
+
+| Between runs: the deposit panel (D) | Action |
+| --- | --- |
+| 1 | `1  ENCHANT - A CHOSEN ENCHANTMENT - 3 IN 100 TO IMPROVE`: the offer list. Dimmed with its reason — `NO FREE SLOT - SLOT 2 OPENS AT CAPACITY 35 - IT IS 31`, `ENCHANTMENT 1 NEEDS A DEPOSIT OF 30 WEAR - IT CARRIES 0`, `ALL 5 SLOTS ARE FILLED`, `[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST` — the key says the reason over the keys, and picks nothing |
+| 2 | `2  REFINE - NOTHING ATTACHED - 6.6 IN 100 TO IMPROVE`: the confirm. An unworn weapon's is not refused: it says `NOTHING TO REPAIR - IT WILL COME BACK AS IT WENT` |
+| 3 | `3  MOVE AN ENCHANTMENT ONTO IT - ONE TIER LOST - 3 IN 100 TO IMPROVE`: the source list, every soul on the party's other weapons and then the weapon's own. Dimmed with its reason as ENCHANT is, or `NOTHING TO MOVE - NO ENCHANTMENT THE PARTY OWNS CAN GO ON IT` |
+| W/S / arrows | On the offer list, choose an enchantment the campaign has met: `FLAMING - LOCK 20`, `REGENERATION - LOCK 15 - NEVER FIRES ON A SWORD`. On the source list, choose a soul, the weapon it is on and whose hand or bag that is, or the stable: `VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T2 - 2 RUNS`, or on a sword carrying Flaming and Vampiric `FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS`; a soul that does nothing yet moves all the same, noted `DOES NOTHING YET`. A refused one is listed dimmed with its reason (`COLD - CANNOT SIT WITH FLAMING`, `FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT`, `POISON T3 ON THE ROTWOOD IN THE STABLE - THE ROTWOOD WOULD CAST NOTHING`), and chosen a line at a time like the rest, so every line of a long list comes into view. Each list opens on the first that can be chosen and scrolls with the choice |
+| Enter | On either list, choose it: the confirm — or, on a refused one, say why over the keys and choose nothing. On the confirm — `DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS SPENT`, `DEPOSIT THE ARMING SWORD TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT` — deposit it: the weapon goes into the shop, a transfer's source with it, a hand either empties takes up the first weapon in its bag, and the campaign is saved at once |
+| Esc | Back a step: from the confirm to the list it came from (or the services), from either list to the services, from the services out of the panel. Nothing is deposited until the confirm's Enter |
+| Tab, D, T | Nothing |
+
+| Between runs: the take-back ask (T) | Action |
+| --- | --- |
+| Enter | `TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK`: the weapon goes to the end of the stable, its wear and its capacity as they were before it went in, and the campaign is saved at once. A transfer's — `TAKE BACK THE ARMING SWORD AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 36 WEAR COMES BACK` — returns both, the source's souls and wear as they went in |
+| Esc | No: it stays in the shop |
+| Tab, D, T | Nothing |
+
+| Between runs: WEAPONS, carrying a weapon | Action |
+| --- | --- |
+| W/S / arrows | Choose where it goes: a weapon, a room, or the stable's end |
+| Enter | Put it down there: onto a weapon it swaps with it — onto a hand, that is equipping it — and into a room where none lies, the stable closing up behind a weapon taken from it; the campaign is saved at once. On its own place, it is put back. A member's last weapon cannot be put away: `EACH MEMBER KEEPS A WEAPON - [A] WOULD CARRY NONE`, over the keys, and it stays taken up |
+| Tab | Nothing |
+| Esc | Put it back: nothing has moved |
 
 | The menu (Esc, in a dungeon or between runs) | Action |
 | --- | --- |
@@ -105,6 +141,155 @@ bag.
 | Scroll wheel | Zoom |
 | Esc | Close the open menu (at the way out's prompt, that is no), otherwise open/close the menu above — `1  CLOSE`, `2  SAVE GAME`, `3  QUIT TO TITLE` — which says the run also saves itself at every turn, and into which slot. Does nothing on a run's summary |
 | Enter (run's summary) | Back to the screen between runs |
+
+**Wear** (Phase 6a): every weapon banks wear as it is used — `WearPerHit`
+(1) for every hit it lands: each body a swing, a cleave, a shot or a wand's cast
+strikes, each counter and each brace, and each landed cast of a staff, a heal or
+a curse alike — up to its capacity, 30 on every new weapon (`StartingPool`). The
+weapon line at the top of the screen, and each weapon in the bag, reads its wear
+over its capacity after the statline, `WEAR 12/30`, in the line's own colour —
+each wrapping between its entries onto lines under it where it would run off the
+window, as a weapon carrying several enchantments does, the top line to its first
+alone while a menu or a notice is up; a
+full weapon reads `WEAR 30/30 FULL` in green — on the yellow line of the weapon
+in hand as on a white one — banks nothing more, and plays exactly as it did —
+wear is a resource the enchanter spends between runs, never damage, and a full
+weapon is not broken. Nothing else wears a weapon: a status ticking, a hit on the
+dead, the enemies' own weapons. A wipe keeps the party's wear (what counts as a
+hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
+`docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
+`[Wear] A's Weakspot Stiletto is full: wear 30 of 30`. The enchanter spends it
+and grows a weapon's capacity (below).
+
+**The stable** (Phase 6a): the weapons the party owns and is not carrying,
+kept with the campaign in the order they were put there, as many as you like. The
+WEAPONS page between runs lists every member — `[A]`, its `HAND` and each weapon
+in its `BAG`, with `- ROOM FOR 4 MORE -` while its bag has room — then `THE
+STABLE - 3 WEAPONS` and its `- ROOM -`, each weapon with its wear (`WEAR 12/30`,
+green once `FULL`). A staff or wand that casts nothing — only a hand-edited save
+holds one — says `CASTS NOTHING - ITS FIRST ENCHANTMENT IS ITS CAST` in its
+detail. Take a weapon up with Enter and put it down elsewhere with Enter: into
+another member's hand (equipping it) or bag, into the stable, or back out of it.
+Taking up moves nothing — Esc puts it back — and only the put-down changes the
+campaign, which is saved at once, into its own slot (PHASE 6a DECISION 10 in
+`docs/roadmap/open-questions.md`); a save that fails says so at once under the
+title, until a later save goes through. No move leaves a member carrying no
+weapon, and a hand a move empties takes up the first weapon in its bag, as it
+would before a dungeon (PHASE 6a DECISION 7) — so a hand's weapon put down in its
+own bag ahead of every weapon there would come straight back, and is refused as
+changing nothing: `AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - [A] WOULD TAKE
+IT STRAIGHT BACK`. The log says each move: `[Hub] Moved Staff of Renewal from A's
+bag slot 2 to the stable's end`. On screen a name is drawn without its apostrophe,
+which the font lacks: `SKIRMISHERS PIKE`.
+
+**The enchanter** (Phase 6a): the WEAPONS page ends with the enchanter's
+shop — `THE ENCHANTER OPENS WHEN THE TUTORIAL IS BEATEN` until the tutorial is
+beaten, and then `THE ENCHANTER - WORKS ON THE 2 NEWEST` over each weapon in it,
+the newest first: `WORKING  ROTWOOD - 0 OF 2 RUNS` in cyan for the two the next
+run that counts works (`EnchanterWorksOn`), `STALLED  RIPOSTE BLADE - 0 OF 1 RUN`
+in yellow for the rest — or `THE ENCHANTER - NOTHING IN THE SHOP`; chosen, a row
+keeps its colour, marked `> <`. A weapon in the
+shop is chosen to be read, never taken up; its detail says what its deposit bought
+and its runs (`ENCHANT VAMPIRIC - 1 OF 2 RUNS`, `REFINE - 0 OF 1 RUN`), and when it
+comes back (`WORKING - BACK AFTER 1 MORE RUN THAT COUNTS`) or what it waits on
+(`STALLED - 2 NEWER DEPOSITS ARE AHEAD OF IT`). Every other weapon's detail says
+its slots and what its next enchantment costs — `ENCHANTMENTS 1 - SLOTS OPEN 1 OF 5
+- SLOT 2 OPENS AT CAPACITY 35`, `THE NEXT NEEDS A DEPOSIT OF 35 WEAR - 2 RUNS IN THE
+SHOP` — as the user ruled (R4): slot n opens at capacity 30 + 5(n − 1), what a weapon
+arrives with filling its slots from the first, and attaching enchantment n needs a
+free slot and a deposit of 30 + 5(n − 1) wear. A deposit cashes the weapon's whole
+pool — its capacity growing on it, a point a full bar, whatever it bought — and puts
+it in the shop for its enchantment count plus one runs that count (PHASE 6a DECISION
+6). D on a weapon deposits it: the panel says the weapon's wear, its enchantments,
+the slots its capacity has opened and its runs in the shop — `WEAR 36 OF 36 -
+ENCHANTMENTS 1 OF 5 - SLOTS OPEN 2 - 2 RUNS IN THE SHOP` — and offers ENCHANT,
+REFINE and MOVE (moving an enchantment, below), each with the odds its return
+improves the weapon anyway (below), a refused one dimmed with the enchanter's
+reason, and an unworn weapon's refinement noted as coming back as it went; then
+the confirm, which names the wear it spends. What an Enchant may buy is any
+enchantment the campaign has met, less what `restricted.json` never copies (the unique souls) and what does nothing yet
+(`echoing`): one the relations refuse on the weapon (`COLD - CANNOT SIT WITH
+FLAMING`, `BURNING - NEEDS FLAMING AHEAD OF IT`), a status onto a wand
+(`REGENERATION - A WAND CASTS NO STATUS`) or a status a staff would cast on the
+wrong side (`MIRE - THIS STAFF WOULD CAST IT ON AN ALLY`) is refused, and one that
+never fires on the weapon attaches all the same, noted `NEVER FIRES ON A SWORD` — on
+a staff, anything that rides a strike or a kill, since a staff never strikes (PHASE
+6a DECISION 12); with nothing left to choose the Enchant says `NOTHING TO OFFER - NO
+ENCHANTMENT MET YET CAN GO ON IT`, and refining is left. ENCHANT lists the offer, a
+refused one dimmed with its reason and never hidden. A run that counts works the two
+newest a run on, and a service whose last run it works comes back to the end of the
+stable, an Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION
+3); a run that does not count works nothing. A service coming back may improve the
+weapon anyway: enchanting at `GraftBaseChance` in 100 (3), flat, and refining at
+that times 1 + the wear cashed ÷ `StartingPool` — 6 in 100 on a fresh
+full bar, 7 at capacity 40, 9 at capacity 60 — and a deposit that cashed no wear
+rolls nothing. A roll that lands deepens a modifier the weapon carries by a stack,
+three times likelier on its class's signature, or, a quarter of the time, grafts
+one it never carried, which caps at 5; each falls through to the other when it has
+nothing to take, and the relations bind both, so `Charges` is never grafted (PHASE
+6a DECISION 5). The roll is keyed to the run's map seed and the deposit's ordinal,
+both saved, so a reload never rerolls it. The run's summary says so after whether
+the run counted — `WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC -
+NO CHANGE`, `TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED - DEEPENED BLOCK`,
+`… - GRAFTED RIPOSTE` on a green line, `THE ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS`,
+`STALLED AT THE ENCHANTER: RIPOSTE BLADE`, or `THE ENCHANTER WORKED NOTHING - THE
+RUN DID NOT COUNT` — and past three lines of services on the screen between runs
+(two over the floor, a transfer's two lines told together),
+`AND 2 MORE AT THE ENCHANTER - TAB WEAPONS`. The log says it too:
+`[Enchanter] Run counted: worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte
+Blade 0/1`, then `[Enchanter] Wand of the Cone finished: attached vampiric;
+improvement roll 1073 of 3000 against 90: no change` — the draw, out of 100 ×
+`StartingPool`, against the odds (`… : grafted Block`, `… : deepened Push`, or `;
+no wear, no roll`). A weapon taken back early (T on its row in the shop, and Enter
+on the ask) comes back to the end of the stable with its wear and its capacity as they
+were before it went in, its service lost (PHASE 6a DECISION 8). A deposit and a
+take-back are each saved at once (PHASE 6a DECISION 10), and logged: `[Enchanter]
+Deposited Tower Guard (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
+(capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of Renewal
+from the bag` — the deposit's number, with the run's map seed, is what a finished
+service's improvement roll is keyed by — and `[Enchanter] Took back Tower Guard
+(tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run worked
+lost, 30 wear returned (capacity 31 -> 30), deposit #0`.
+
+**Moving an enchantment** (Phase 6a): 3 on the deposit panel lists every soul on
+the party's other weapons out of the shop — each member's, then the stable's — and
+last the weapon's own, each with where it lies, the tier it arrives at and its runs.
+A move is the Enchant service with the soul brought from a weapon the party owns
+rather than from the offer: the weapon needs the free slot and the deposit of
+attaching it as its next, its whole pool is cashed, it takes that attachment's runs
+and it has enchanting's odds of improving (PHASE 6a DECISION 13). Any soul may move —
+a staff's forged effect, a unique's soul — and it comes back a tier down, the new
+tier from no XP; one at tier 1, and every unique soul, moves intact with its XP. It
+lands last, acquired: the forged mark stays with the weapon forged with it. Both
+weapons wait in the shop as one deposit, one of the two the enchanter works on, the
+source's wear left in its pool: the WEAPONS page lists the source `HELD     NAMELESS
+KNIFE` under `WORKING  RIPOSTE BLADE - 0 OF 1 RUN`, its detail `HELD - GIVING
+VAMPIRIC TO THE RIPOSTE BLADE` (a full one's wear `WEAR 40 OF 40 - FULL - THE MOVE
+LEAVES IT UNSPENT`), and T on either takes both back. The summary says
+`RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE` and,
+under it, `NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF`. Moving a
+weapon's own soul to its end is a reorder: it takes the weapon's count in runs
+rather than the count plus one, and it is allowed with every slot filled — `ALL 5
+SLOTS ARE FILLED - A REORDER NEEDS A DEPOSIT OF 50 WEAR` — but not for the entry
+already last, so it needs two souls and takes 2 runs at the least. A weapon forged
+whole keeps every forged mark through a reorder; one forged in part loses the moved
+soul's, since a forged entry cannot stand behind an acquired one (PHASE 6a DECISION
+11). The enchanter refuses a move that would leave a member carrying no weapon,
+asked with both weapons gone (`[B] WOULD CARRY NO WEAPON - …`); one the relations
+refuse on the weapon, as ENCHANT's offer does; one that would strand an entry behind
+it on the weapon it leaves (`BURNING NEEDS FLAMING AHEAD OF IT`); and one that would
+leave a staff or a wand casting nothing (`THE ROTWOOD WOULD CAST NOTHING`: a staff's
+first enchantment is its cast and must apply a status, a wand's must be an element —
+so a staff gives its effect away once it has a second status to cast). A staff whose
+first enchantment a move changes must be left casting a status a staff casts — never
+Serrated, whose Bleeding rides a strike — and landing each status it keeps on the
+side it landed it before (`THE STAFF OF RENEWAL WOULD CAST WARD ON AN ENEMY`; PHASE
+6a DECISION 12). A lock the new wielder cannot pay is no refusal: the soul sleeps
+there. The log names both: `[Enchanter] Deposited Riposte Blade
+(riposte_blade) from B's bag slot 3: Transfer vampiric (T3) from Nameless Knife
+(flensing_knife_unique) in B's bag slot 4, 30 wear cashed (capacity 30 -> 31), 1
+run, deposit #0`, and `[Enchanter] Riposte Blade finished: vampiric moved on at T2
+from Nameless Knife; improvement roll …`.
 
 Outside combat the rest of the party marches behind the active character in a
 single-file line, the group paces itself to the member with the least movement
@@ -202,11 +387,14 @@ back to it, and the game quits from it.
   Mid-run the game saves when a run is entered, at the start of every one of your
   turns, and every time the party arrives on a floor; it saves at a run's end
   (the summary with it), when NEW CAMPAIGN on the title or `--new-campaign` begins
-  one, and whenever play is left — the menu's `3  QUIT TO TITLE`, or the window's
-  close button. A save is never taken while the enemies are moving: a quit during
-  their turn (the menu can be opened then, and the close button pressed any time)
-  plays their turn out to your next one first — at the game's fixed logic step,
-  so exactly as it would have played — and saves that. If the enemies wipe the
+  one, after every change made on the screen between runs — a weapon moved
+  between the bags and the stable, a deposit at the enchanter, a weapon taken
+  back from it (PHASE 6a DECISION 10) — and whenever play is left — the menu's
+  `3  QUIT TO TITLE`, or the window's close button. A save is never taken while
+  the enemies are moving: a quit during their turn (the menu can be opened then,
+  and the close button pressed any time) plays their turn out to your next one
+  first — at the game's fixed logic step, so exactly as it would have played —
+  and saves that. If the enemies wipe the
   party on the way, the run ends and the campaign is saved between runs with its
   summary.
 - **Saving by hand**: `2  SAVE GAME` on the menu Esc opens — in a dungeon on
@@ -263,13 +451,62 @@ back to it, and the game quits from it.
   asks nothing: LOAD GAME's keys line says it, `PLAY SAVES INTO THE SLOT YOU
   LOAD`. A slot you kept as a checkpoint is played forward from its first load,
   its save before one save deep as the backup, then gone.
+- **The format is version 2** (Phase 6a): every weapon in a save carries its
+  wear (`"wear"`) and the wear it has ever cashed at the enchanter
+  (`"wearCashed"` — its capacity is worked out afresh from that under the
+  `tuning.json` loaded now, never stored), and the save names which version's
+  numbers its record of the tuning covers (`"tuningHashVersion"`). The campaign
+  holds its stable (`"stable"`, each weapon whole in its order, and `null` while
+  it is empty), each weapon in it read as every weapon in a save is; and the
+  enchanter's shop (`"enchanter"`, each deposit with its weapon whole, in deposit
+  order, `null` while it is empty) and how many deposits it has made
+  (`"depositsMade"`), with the last run's word on the shop in its result
+  (`"services"`, `null` for an empty shop), a service it brought back saying what
+  its improvement roll did (`"improved"` and `"modifier"`, by name — the roll as
+  it was drawn is the log's, never the save's). A transfer in the shop holds its
+  source whole (`"source"`, `null` for a reorder) and its soul's place there
+  (`"sourceIndex"`), and a run's report of one its source (`"sourceId"`) and,
+  once it came back, the tier its soul landed at (`"tier"`). A save whose shop
+  contradicts itself — a weapon in it worn, a service past its last run, an
+  enchantment the campaign never met or one that does nothing yet (in a deposit
+  or in a run's report of one), a deposit before the tutorial is
+  beaten, a run's report of the shop that says what no run's end says (an
+  improvement on a service not back yet, an outcome without its modifier, a
+  modifier no weapon stacks, a landed tier on a transfer not back yet), a deposit
+  whose take-back would give back a weapon no load reads, a transfer whose soul is
+  not where it names, a reorder of the enchantment already last, or a source on
+  any other deposit — is refused as one that
+  cannot be read, naming where. A save an earlier build wrote —
+  version 1, Phase 5's, the slots' included — loads as ever: it is lifted to
+  version 2 as it is read, every weapon unworn at 0 of 30 and nothing in the stable
+  or the shop, and saved as version 2 from then on. It says `THE NUMBERS HAVE
+  CHANGED` only if a number it was played under moved: the ones Phase 6a began to
+  play (the Enchanter group's) are none it was played under (PHASE 6a DECISION 9).
+  **Do not open a slot this build has saved with an older checkout.** A Phase 5
+  checkout reads version 2 as a newer build's save and sets it aside, kept and
+  never deleted (renamed back to `campaign.json`, it loads again here), and loads
+  nothing in its place. An earlier Phase 6a step's build does worse: every 6a step
+  reads version 2 as its own, so it loads a save a later step wrote, passes over
+  what it does not know of (the stable, the enchanter's queue), and its next save —
+  from Phase 6a.2 on, the first weapon moved between runs — drops those, and the
+  weapons in them: a 6a.1 or 6a.2 build loses every weapon in a 6a.3a save's shop
+  (PHASE 6a DECISION 14). A 6a.3a, 6a.4 or 6a.5 build refuses a save with a
+  transfer in its shop or its last run's report (`Transfer` is no service it knows)
+  and sets it aside, kept and never deleted, as it does any it cannot read; a 6a.1
+  or 6a.2 build loses both of the transfer's weapons, as it loses the rest of the
+  shop.
+  While Phase 6a is being built, one more thing of the steps between: a save an
+  earlier step wrote may say `THE NUMBERS HAVE CHANGED` once when a later step
+  loads it, though no number moved, since each step adds the numbers it plays to
+  version 2's record. A released version 2 never does.
 - **`campaign.bak.json`** is the save before the last one. Every write goes to a
   temp file first and then replaces the save in one step, the old save becoming
   the backup, so a write that fails — a full disk, a locked file, a folder with
   no rights — costs nothing: the save on the disk is the last good one, the log
   says why, and the game says `SLOT 2 COULD NOT BE SAVED` (or `THE OLD AUTOSAVE
-  COULD NOT BE SAVED`) at once, over the floor you are playing, and again on the
-  next screen — the screen between runs, or the title after QUIT TO TITLE —
+  COULD NOT BE SAVED`) at once, over the floor you are playing or under the
+  title between runs (there until a later save goes through, which takes it
+  back), and again on the next screen — the screen between runs, or the title after QUIT TO TITLE —
   once, however many saves failed, and not at all if a later save has gone
   through by then, the quit's own included. It never saves into another slot
   instead. A quit that cannot save leaves `campaign.unsaved` beside the save of
@@ -341,11 +578,17 @@ back to it, and the game quits from it.
   writes it and, where a larger one would break the game's arithmetic, no larger
   than play can reach: a forged stack past 3, a live one past its forged count
   plus 50, an enchantment's tier past 2147, more than 10 on a weapon, a run
-  counter in the billions, hit points past the largest bar plus what was earned
-  — and then against the rest: a retired dungeon never cleared, a last run's
-  summary that disagrees with the campaign (its run count, its lock, the dungeon
-  it cleared), a run in progress in a dungeon the list could not have offered,
-  a boss standing that the run has down. A save that fails any of it is set
+  counter in the billions, hit points past the largest bar plus what was earned,
+  a weapon's wear past any capacity any `tuning.json` could give it (10000 plus
+  1000 for each wear it has cashed), a service at the enchanter taking more than
+  11 runs, a run's end working more than 10 of them — and then against the rest:
+  a retired dungeon never cleared, a last run's summary that disagrees with the
+  campaign (its run count, its lock, the dungeon it cleared), a run in progress
+  in a dungeon the list could not have offered, a boss standing that the run has
+  down, an enemy's weapon or a drop carrying wear, a shop that contradicts itself
+  (above). Wear above the capacity today's
+  `tuning.json` gives is no fault: lower `StartingPool` and a full weapon keeps
+  its wear, reading `WEAR 30/20 FULL`. A save that fails any of it is set
   aside as one that cannot be read, the notice naming the field and what is
   wrong there: edit `"retired": ["tutorial"]` while `"cleared": []` and loading
   it says `CAMPAIGN.JSON COULD NOT BE READ (CAMPAIGN.RETIRED[0]: TUTORIAL IS
@@ -451,20 +694,38 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   movement budget and the cast costs, and turning `MovementBudget` leaves it
   where it was — so a longer budget also banks more mana a turn. Its comment
   gives the formula to re-derive it by hand.
-- **The Enchanter's keys play nothing yet**: `WearCapacityPerBar`,
-  `FirstSlotCapacity`, `SlotCapacityStep`, `EnchantmentSlots`,
-  `FirstEnchantmentWear` and `EnchantmentWearStep` are what a deposit at the
-  enchanter costs, as the user ruled on 2026-09-25 — how a weapon's wear
-  capacity grows, where its enchantment slots open, and the wear attaching each
-  enchantment needs (`docs/roadmap/phase-6-between-runs.md` §6.1, §6.2). The
-  enchanter arrives in Phase 6a, and until then turning one changes nothing in
-  play. Each is still checked like every key — `"EnchantmentSlots": 0` is
-  taken as 3 and says `TUNING.JSON: ENCHANTMENTSLOTS 0 IS BELOW 3 - USING 3` —
-  and the log lists it among the numbers the file changed; but a save's record
-  of the numbers it was played under leaves them out, so turning one never says
-  `THE NUMBERS HAVE CHANGED` when a campaign resumes. The docs' older
-  `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming
-  either is told which key took its place.
+- **The Enchanter's keys** are what a hit wears, what a deposit at the
+  enchanter costs, as the user ruled on 2026-09-25
+  (`docs/roadmap/phase-6-between-runs.md` §6.1, §6.2), how many deposits the
+  enchanter works on, and the odds its services improve a weapon. **All of them
+  play**, since Phase 6a: `WearPerHit`, the wear a weapon banks for every hit it
+  lands (0 wears nothing, so nothing could be enchanted); `WearCapacityPerBar`,
+  what a full bar of wear cashed adds to a weapon's capacity — worked out afresh
+  from the wear the weapon has ever cashed, so a change moves every weapon's
+  capacity at once; `FirstSlotCapacity` and `SlotCapacityStep`, where a weapon's
+  enchantment slots open
+  (slot n at `FirstSlotCapacity + SlotCapacityStep x (n - 1)`);
+  `EnchantmentSlots`, the most enchantments a weapon holds
+  (`"EnchantmentSlots": 0` is taken as 3 and says
+  `TUNING.JSON: ENCHANTMENTSLOTS 0 IS BELOW 3 - USING 3`); `FirstEnchantmentWear`
+  and `EnchantmentWearStep`, the deposit attaching enchantment n needs
+  (`FirstEnchantmentWear + EnchantmentWearStep x (n - 1)`); `EnchanterWorksOn`,
+  how many of the newest deposits a run that counts works (1 to 10; the doc's 2)
+  — a transfer is one deposit, its two weapons together; and the improvement
+  roll's:
+  `GraftBaseChance`, the chance in 100 a service improves the weapon anyway (0 to
+  100; flat when it enchants or moves an enchantment onto it, times 1 + wear ÷
+  `StartingPool` when it refines), and two provisional numbers,
+  `GraftSharePercent`, how many of the rolls that land graft (0 to 100; 25), and
+  `DeepenSignatureWeight`, how many times likelier a deepen lands on the class's
+  signature (1, no bias, to 1000; 3) — PHASE 6a DECISION 5. Turning any says
+  `THE NUMBERS HAVE CHANGED` when a campaign saved under the other number resumes —
+  but never to a save from before Phase 6a, whose record of its numbers covers
+  only the keys played then; while Phase 6a is being built, a save an earlier
+  step's build wrote says it once, though no number moved, since each step added
+  the numbers it plays to version 2's record. The docs' older
+  `WearCapacityLadder` and `EnchantmentWearCost` are no keys: a file naming either
+  is told which key took its place.
 - **`SaveSlots`** is how many save slots there are, each holding one campaign
   that saves only there (see [Saves](#saves)) — the user ruled it a key, "so that
   we don't need to fix the code every time I change my mind". At least 1 and at
@@ -472,8 +733,8 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   SAVESLOTS 12 IS ABOVE 9 - USING 9`. Lowering it deletes nothing: a slot above
   the count keeps its save, which LOAD GAME lists as `BEYOND THE 1 SLOT`, and
   loaded, it goes on saving the campaign played from it; NEW CAMPAIGN never
-  offers it. The launcher reads it and no rule of play does, so, like the
-  Enchanter's keys, turning it never says `THE NUMBERS HAVE CHANGED`.
+  offers it. The launcher reads it and no rule of play does, so turning it never
+  says `THE NUMBERS HAVE CHANGED`.
 - **To reset** the copy, delete it (the built-in numbers play, and the screen
   says the file is missing), or write the built-in copies back:
   `dotnet run --project GameEngine.DistanceRPG/GameEngine.DistanceRPG.csproj -- --write-data <exe folder>`
@@ -495,8 +756,17 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `MovementBudgetTests.TheBudgetIsTheTuningsKey` by name, and the doc and the
   derived key move with them; and `FriendlyFireEnabled` turned on fails
   `WandTests.FriendlyFire_OffByDefault_HalfWhenOn`, since the same doc ships
-  wands with friendly fire off until the wand placement scorer exists. Every
-  other number in it fails nothing: the tests read it from the master, or stand
+  wands with friendly fire off until the wand placement scorer exists; and
+  `StartingPool` 30 and `WearCapacityPerBar` 1 fail
+  `WearTests.ACapacityReplaysFullBars_TheRulingsNumbers`, since the user's ruling
+  on what a deposit costs states them and the capacities they give; and so do
+  the rest of that ruling's numbers — `FirstSlotCapacity` 30, `SlotCapacityStep`
+  5, `EnchantmentSlots` 5, `FirstEnchantmentWear` 30 and `EnchantmentWearStep` 5
+  — and `EnchanterWorksOn` 2, §6.2's "the two most recently deposited", which
+  fail `EnchanterTests.TheRulingsClimb_WearDepositsAndRuns`, the ruling's worked
+  climb; and `GraftBaseChance` 3, §6.4's, which fails
+  `ImprovementRollTests.TheOddsAreTheRulings`, the 6, 7 and 9 in 100 the ruling
+  works out from it. Every other number in it fails nothing: the tests read it from the master, or stand
   on numbers of their own (`Premise`, in the test project: the numbers the
   worked examples were written against, which most scenario suites play instead
   of the master's) — give `PerStack`'s `Block` 4, rebuild and run the suite, and
@@ -519,8 +789,14 @@ everything in them is named by a stable string id.
   `forgedOnly` are for modifiers only, and `neverRolled` for enchantments only:
   the wrong sort of id in one stops the game. `neverRolled` is this file's alone —
   the catalogue's unique flag only pins a soul's tier — so put `vampiric` in it
-  and it stops dropping; take a soul out and it may be copied (no drop carries a
-  soul either way).
+  and it stops dropping, and the enchanter stops offering it; take a soul out and
+  it may be copied: the enchanter offers it once the campaign has met it (no drop
+  carries a soul either way). The enchanter asks `excludes` and `requires` too: it
+  attaches nothing a group pairs with an entry the weapon carries, nor anything
+  whose requirement is not on the weapon ahead of it — and a move is
+  asked the same of the weapon it lands on, and `requires` of the weapon it leaves:
+  it strands nothing behind it. A deposit already in the shop when the file
+  changes is served as it was bought.
   A relation is an edit here, never a rebuild: take the crit riders' group
   (`["CritWeaken", "CritSunder"]`) out and restart, and a dagger may hold both.
 - **The enchantment catalogue and the unique souls are code**
@@ -590,7 +866,10 @@ everything in them is named by a stable string id.
 - **`dungeons.json`** holds the dungeons the screen between runs lists: `theme`,
   `attunement` (a damage type, or `null`), `bossFloorMin`/`bossFloorMax` (`null`
   plays `tuning.json`'s range), the `boss` (its statline and `innate` modifiers)
-  and `retiresOnClear`, the tutorial's alone. There is no drop table: what a boss
+  and `retiresOnClear`, the tutorial's alone. Moved onto another dungeon once a
+  campaign has deposits at the enchanter, it refuses no save and hides nothing in
+  the shop: the enchanter takes no new deposit until that dungeon is beaten, and
+  what is in the shop is listed and worked as ever. There is no drop table: what a boss
   drops is computed from its theme and `restricted.json`, so taking `Brace` out
   of `["Brace", "Opportunist", "Overwatch"]` puts axes in the Spear Hall's drops
   with no edit to this file.

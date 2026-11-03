@@ -7,7 +7,7 @@ Lands last, once the state model above is final.
 | Group | Contents |
 | --- | --- |
 | Run | Map seed, current floor index, turn count, **party XP snapshot taken at dungeon entry** (§4.4 — on a party wipe, each pool rolls back `DeathXpLossPercent` of its gain since this snapshot; discarded untouched on any other exit) |
-| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity`), active status effects, the hidden `Overheal` remainder, carried consumables |
+| Party | Position, HP, mana, innate stats, all three XP pools, inventory (each weapon carrying **both** its forged and its live modifier sets, plus enchantments, wear and `WearCapacity` — built in Phase 6a as `wear` and `wearCashed`, the wear ever cashed, from which the capacity and its progress are replayed as HP is from its XP: settled.md's Phase 6a pass, PHASE 6a DECISION 2), active status effects, the hidden `Overheal` remainder, carried consumables |
 | Per visited floor | Enemy states (position, HP, alive, `DefeatedAtTurn`, `DefeatCount`, **accumulated revival damage and HP bonuses**, weapon, enchantments, status effects) and the explored fog grid |
 
 Maps are **never serialized** — they regenerate from `floorSeed(n)`. This is
@@ -19,7 +19,11 @@ restore saved states afterwards.
 
 `System.Text.Json` with an explicit version field and a DTO layer in
 `Logic/Save/` — the gameplay types must not carry serialization attributes, or
-`Logic/` stops being clean.
+`Logic/` stops being clean. Version 1 was Phase 5's; **version 2 is Phase 6a's**
+(a weapon's `wear` and `wearCashed`, and the root's `tuningHashVersion`, the
+version whose played keys the tuning hash covers: PHASE 6a DECISION 9), and a
+version-1 document is lifted to it as it is read — every weapon unworn, its hash
+of version 1's keys — by the one migration step the codec ships.
 
 Where the saves live, how many there are, when one is taken and how a player
 gets back to one is settled.md's (the user's rulings of 2026-09-25 on the save

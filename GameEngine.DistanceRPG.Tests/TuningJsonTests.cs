@@ -144,8 +144,8 @@ public class TuningJsonTests
         Ignored("""{ "movementBudget": 200 }""", "movementBudget is not a key", "did you mean MovementBudget?");   // a key's case is part of its name
         Ignored("""{ "Wibble": 1 }""", "Wibble is not a key - ignored");
 
-        // One of §5.3's keys still to come says which phase brings it.
-        Ignored("""{ "GraftBaseChance": 3 }""", "GraftBaseChance is not a key yet", "Phase 6a");
+        // One of §5.3's keys still to come says which phase brings it (the
+        // Consumables': GraftBaseChance, the Enchanter's last, is a key since 6a.4).
         Ignored("""{ "HealthPotionPercent": 20 }""", "HealthPotionPercent is not a key yet", "Phase 6b");
     }
 
@@ -529,7 +529,7 @@ public class TuningJsonTests
         Assert.Equal(
             ["Economy", "Statuses", "Appliers", "Modifiers", "Farming", "Uniques", "Dungeon", "Enchanter", "Inventory", "Consumables", "Progression", "Combat", "Drops", "Saves"],
             Enum.GetNames<TuningGroup>());
-        Assert.Contains("/* ---- Enchanter - Phase 6a: WearPerHit, GraftBaseChance ---- */", headings);
+        Assert.Contains("/* ---- Enchanter ---- */", headings);   // its last key to come plays since Phase 6a.4
         Assert.Contains("/* ---- Consumables - Phase 6b: PotionUseCost, HealthPotionPercent, ManaPotionPercent, FarmYieldPerClear ---- */", headings);
         var at = headings.Select(heading => text.IndexOf(heading, StringComparison.Ordinal)).ToArray();
         Assert.All(at, index => Assert.True(index >= 0));
@@ -559,10 +559,15 @@ public class TuningJsonTests
         Assert.Contains("forged + AcquiredHeadroom", comments[nameof(Tuning.AcquiredHeadroom)]);
         Assert.Contains("Searing burns for its level, then loses one", comments[nameof(Tuning.EffectPerLevel)]);
 
-        // A provisional figure says so, and only a provisional one: the four keys,
-        // and serrated's percentage, whose note sits above its member.
+        // A provisional figure says so, and only a provisional one: the six keys —
+        // the improvement roll's graft share and signature weight among them, PHASE
+        // 6a DECISION 5's (Phase 6a.4) — and serrated's percentage, whose note sits
+        // above its member.
         string[] provisional =
-            [nameof(Tuning.ReviveStepPercent), nameof(Tuning.DeathXpLossPercent), nameof(Tuning.DropEnchantChancePercent), nameof(Tuning.ArcanePotency)];
+        [
+            nameof(Tuning.ReviveStepPercent), nameof(Tuning.DeathXpLossPercent), nameof(Tuning.DropEnchantChancePercent), nameof(Tuning.ArcanePotency),
+            nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
+        ];
         Assert.Equal(provisional.Order(StringComparer.Ordinal),
             comments.Where(c => c.Value.StartsWith("Provisional:", StringComparison.Ordinal)).Select(c => c.Key).Order(StringComparer.Ordinal));
         int serrated = text.IndexOf("\n    \"serrated\":", StringComparison.Ordinal) + 1;
@@ -690,9 +695,9 @@ public class TuningJsonTests
     [Fact]
     public void AKeyNoRulePlaysNeverMovesTheHash()
     {
-        // A key declared ahead of its reader (Played false: what a deposit costs,
-        // the user's ruling of 2026-09-25, until Phase 6a builds the enchanter) is
-        // no number a campaign was played under. A file turning one to either end
+        // A key no rule of play reads (Played false: SaveSlots, the launcher's
+        // count; and before Phase 6a built the enchanter, what a deposit costs,
+        // declared ahead of its reader) is no number a campaign was played under. A file turning one to either end
         // of its clamp leaves the tuning's hash where it was — read alone, and as
         // the game loads it beside the shipped content — while the log's overrides
         // still name it, since the file changed it all the same.
@@ -734,6 +739,65 @@ public class TuningJsonTests
             Assert.False(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
         using (TestContent.Use(tuning: turned.Tuning with { MovementBudget = Step(BuiltIn.MovementBudget, 10000) }))
             Assert.True(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
+    }
+
+    [Fact]
+    public void AVersion1SaveIsHashedOnVersion1sKeys()
+    {
+        // PHASE 6a DECISION 9: a save's hash is of the keys played at the version
+        // that wrote it. A key a rule began to play with version 2 — what a hit
+        // wears and the capacity a bar adds, from Phase 6a.1, the slots, the price
+        // and the enchanter's worked few, from 6a.3a, and the improvement roll's
+        // three, from 6a.4 — is in version 2's hash and not in version 1's: moving
+        // it moves the one and leaves the other where it was, while a key played
+        // since version 1 moves both. The current version's is the default, the one
+        // a capture writes.
+        var v2Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 2).Select(k => k.Name).ToArray();
+        Assert.Equal([nameof(Tuning.WearPerHit), nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
+            nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep), nameof(Tuning.EnchanterWorksOn),
+            nameof(Tuning.GraftBaseChance), nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight)], v2Keys);
+        Assert.Equal(TuningJson.Hash(BuiltIn, SaveCodec.CurrentVersion), TuningJson.Hash(BuiltIn));
+        string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2);
+        Assert.NotEqual(one, two);
+        Assert.Matches("^[0-9a-f]{16}$", one);
+        foreach (string name in v2Keys)
+        {
+            var k = Assert.IsType<IntKey>(TuningSchema.Find(name));
+            int value = k.Get(BuiltIn);
+            var moved = k.Set(BuiltIn, value < k.Max ? value + 1 : value - 1);
+            Assert.Equal(one, TuningJson.Hash(moved, version: 1));
+            Assert.NotEqual(two, TuningJson.Hash(moved, version: 2));
+        }
+        var budget = BuiltIn with { MovementBudget = Step(BuiltIn.MovementBudget, 10000) };
+        Assert.NotEqual(one, TuningJson.Hash(budget, version: 1));
+        Assert.NotEqual(two, TuningJson.Hash(budget, version: 2));
+
+        // So a campaign saved at version 1 — its hash of version 1's keys, as the
+        // step that lifts it says (tuningHashVersion 1) — resumes under a tuning
+        // that moved only what version 2 began to play with nothing to say, and
+        // says it the moment a number it was played under moves. Saved again, its
+        // hash is of version 2's keys, and a version-2 key moved says so.
+        SaveFile saved;
+        using (TestContent.Use())
+        {
+            var current = SaveGame.Capture(CampaignState.Start(GameContent.Current));
+            saved = current with { TuningHash = TuningJson.Hash(GameContent.Current.Tuning, version: 1), TuningHashVersion = 1 };
+        }
+        var wearMoved = BuiltIn with { WearPerHit = Step(BuiltIn.WearPerHit, 1000), WearCapacityPerBar = Step(BuiltIn.WearCapacityPerBar, 1000) };
+        using (TestContent.Use(tuning: wearMoved))
+        {
+            var loaded = SaveGame.Restore(saved, GameContent.Current);
+            Assert.False(loaded.TuningChanged);
+            var again = SaveGame.Capture(loaded.Campaign);
+            Assert.Equal((SaveCodec.CurrentVersion, TuningJson.Hash(GameContent.Current.Tuning)), (again.TuningHashVersion, again.TuningHash));
+        }
+        using (TestContent.Use(tuning: wearMoved with { MovementBudget = Step(BuiltIn.MovementBudget, 10000) }))
+            Assert.True(SaveGame.Restore(saved, GameContent.Current).TuningChanged);
+        var ofVersion2 = saved with { TuningHash = TuningJson.Hash(BuiltIn), TuningHashVersion = 2 };
+        using (TestContent.Use())
+            Assert.False(SaveGame.Restore(ofVersion2, GameContent.Current).TuningChanged);
+        using (TestContent.Use(tuning: wearMoved))
+            Assert.True(SaveGame.Restore(ofVersion2, GameContent.Current).TuningChanged);
     }
 
     [Fact]

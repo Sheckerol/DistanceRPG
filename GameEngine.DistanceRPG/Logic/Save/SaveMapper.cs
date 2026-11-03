@@ -33,8 +33,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// ruling of 2026-09-25, R3(b)). Every field is read on its own first — every
 /// count from its floor, and every count whose larger value would wrap the
 /// arithmetic that reads it up to a ceiling, beside its floor: a forged stack,
-/// a live one, a member's innate, an entry's tier, a weapon's entries, the run
-/// counter, a body's hit points, the boss floor, a status's levels, a hold, and
+/// a live one, a member's innate, an entry's tier, a weapon's entries and its
+/// wear, the run counter, a body's hit points, the boss floor, a status's levels,
+/// a hold, the runs a service at the enchanter takes, and
 /// every count play grows a step at a time (<see cref="Count"/>). A float is
 /// finite, a body stands on the map, and a member's movement budgets nest as a
 /// turn leaves them. A lock wraps nothing, so it
@@ -52,7 +53,13 @@ internal static class SaveMapper
 {
     // ── Capture ──────────────────────────────────────────────────────────────
 
-    /// <summary>The campaign, as the document's <c>campaign</c>: between runs, or with the visit in progress inside it.</summary>
+    /// <summary>
+    /// The campaign, as the document's <c>campaign</c>: between runs, or with the
+    /// visit in progress inside it. The stable and the enchanter's queue are
+    /// written in their order, and each as null when it is empty, as no visit is
+    /// between runs — so a document from before them, restored and captured
+    /// again, is the same document.
+    /// </summary>
     internal static CampaignDto Capture(CampaignState campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
@@ -64,8 +71,16 @@ internal static class SaveMapper
             campaign.ClearedInOrder,
             campaign.RetiredInOrder,
             campaign.LastResult is { } result ? Result(result) : null,
-            campaign.Visit is { } visit ? Visit(visit, campaign.Party) : null);
+            campaign.Visit is { } visit ? Visit(visit, campaign.Party) : null,
+            campaign.Stable.Count > 0 ? campaign.Stable.Select(Weapon).ToArray() : null,
+            campaign.AtTheEnchanter.Count > 0 ? campaign.AtTheEnchanter.Select(DepositOf).ToArray() : null,
+            campaign.DepositsMade);
     }
+
+    /// <summary>A deposit in the shop: its ordinal, its service by name, its weapon whole, what it cashed, its runs taken and worked, and its enchantment by id — or a transfer's source whole and its soul's place.</summary>
+    private static DepositDto DepositOf(Deposit deposit)
+        => new(deposit.Ordinal, Name(deposit.Service), Weapon(deposit.Weapon), deposit.WearAtDeposit, deposit.Runs, deposit.RunsWorked, deposit.EnchantmentId,
+            deposit.Source is { } source ? Weapon(source) : null, deposit.SourceIndex);
 
     /// <summary>
     /// The visit in progress (§5.1's Run group): the values a load uses as they
@@ -279,7 +294,9 @@ internal static class SaveMapper
         Table(weapon.Forged.Entries),
         Table(weapon.Modifiers.Entries),
         weapon.Enchantments.Select(entry => new EnchantmentDto(entry.Id, entry.Tier, entry.Xp)).ToArray(),
-        weapon.ForgedEnchantmentCount);
+        weapon.ForgedEnchantmentCount,
+        weapon.Wear,
+        weapon.WearCashed);
 
     internal static RunResultDto Result(RunResult result) => new(
         result.DungeonId,
@@ -294,7 +311,11 @@ internal static class SaveMapper
         result.Retired,
         result.SpoilsKept.Select(Weapon).ToArray(),
         result.SpoilsLost.Select(Weapon).ToArray(),
-        result.Clawbacks.Select(c => new ClawbackDto(c.MemberId, c.Pool, c.Before, c.After)).ToArray());
+        result.Clawbacks.Select(c => new ClawbackDto(c.MemberId, c.Pool, c.Before, c.After)).ToArray(),
+        result.Services is { Count: > 0 } services   // null for an empty shop, as the queue is
+            ? services.Select(r => new ServiceDto(r.WeaponId, Name(r.Service), r.RunsWorked, r.Runs, r.Stalled, r.EnchantmentId,
+                r.Improved is { } improved ? Name(improved.Kind) : null, r.Improved is { } on ? Name(on.Modifier) : null, r.Tier, r.SourceId)).ToArray()   // the roll as drawn is the log's
+            : null);
 
     /// <summary>An enum-keyed count table by member name, in the enum's order — the order its entries come in.</summary>
     private static OrderedDictionary<string, int> Table<T>(IEnumerable<(T Key, int Count)> entries) where T : struct, Enum
@@ -334,12 +355,183 @@ internal static class SaveMapper
         var retired = Ids(campaign.Retired, $"{at}.retired", "dungeon", id => content.Dungeons.TryGet(id, out _));
         var lastResult = campaign.LastResult is { } result ? Result(result, content, party, $"{at}.lastResult") : null;
         var visit = campaign.Visit is { } saved ? Visit(saved, content, party, $"{at}.visit") : null;
+        Weapon[] stable = campaign.Stable is { } kept ? Stable(kept, content, $"{at}.stable") : [];   // null and [] alike: empty
+        Deposit[] enchanter = campaign.Enchanter is { } queued ? Queue(queued, content, $"{at}.enchanter") : [];   // likewise
+        Count(campaign.DepositsMade, $"{at}.depositsMade");
 
         // Every field has been read on its own, so a refusal of one keeps its own
-        // path; now the fields against each other (R3(b)).
+        // path; now the fields against each other (R3(b)) — with no content: that
+        // nothing is at the enchanter before the tutorial is beaten is asked of the
+        // retired list alone (check 30), since dungeons.json beside the game may
+        // move which dungeon retires on its clear.
         SaveConsistency.Check(campaign);
 
-        return CampaignState.Restore(party, seen, campaign.RunCounter, locks, cleared, retired, lastResult, visit);
+        return CampaignState.Restore(party, seen, campaign.RunCounter, locks, cleared, retired, lastResult, visit, stable, enchanter, campaign.DepositsMade);
+    }
+
+    /// <summary>
+    /// The enchanter's queue, in its order: every row a deposit, its weapon read as
+    /// every weapon is (<see cref="Weapon(WeaponDto, GameContent, string)"/>), and
+    /// its numbers each on its own — the ordinal and the runs worked counts; the
+    /// service a <see cref="Service"/>'s name; the wear it cashed a count, and for an
+    /// Enchant or a Transfer one at least, since no tuning prices an enchantment
+    /// below 1; the runs it takes one to <see cref="ContentBounds.MostServiceRuns"/>;
+    /// its enchantment one the content has, of a kind that does something
+    /// (<see cref="BoughtEnchantmentId"/>); and a transfer's source read as every
+    /// weapon is, and its soul's place a count (Phase 6a.6). Whether an Enchant names
+    /// one the campaign has met, where a transfer's soul lies, and the rest of what a
+    /// deposit says of itself, are the checks' (<see cref="SaveConsistency"/>). What
+    /// <c>restricted.json</c> says of the enchantment now is not asked, nor what it
+    /// says of a transfer's soul on either weapon: the deposit was legal when it was
+    /// made, and the file beside the game may say otherwise since (settled.md, R3(b)).
+    /// </summary>
+    private static Deposit[] Queue(IReadOnlyList<DepositDto> dtos, GameContent content, string at)
+    {
+        var rows = Rows(dtos, at, "deposit");
+        var queue = new Deposit[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var row = rows[i];
+            int ordinal = Count(row.Ordinal, $"{where}.ordinal");
+            var service = EnumOf<Service>(row.Service, $"{where}.service", "service");
+            var weapon = Weapon(Required(row.Weapon, $"{where}.weapon"), content, $"{where}.weapon");
+            int wearAtDeposit = Count(row.WearAtDeposit, $"{where}.wearAtDeposit");
+            if (service is Service.Enchant or Service.Transfer && wearAtDeposit < 1)
+                throw new SaveFormatException($"{where}.wearAtDeposit", $"{wearAtDeposit} is below 1: {(service == Service.Transfer ? TransferWearWhy : EnchantWearWhy)}");
+            int runs = ServiceRuns(row.Runs, $"{where}.runs");
+            int runsWorked = Count(row.RunsWorked, $"{where}.runsWorked");
+            string? enchantment = row.Enchantment is { } id ? BoughtEnchantmentId(id, content, $"{where}.enchantment") : null;
+            var source = row.Source is { } giver ? Weapon(giver, content, $"{where}.source") : null;
+            int? sourceIndex = row.SourceIndex is { } index ? Count(index, $"{where}.sourceIndex") : null;
+            queue[i] = new Deposit(ordinal, weapon, service, wearAtDeposit, runs, enchantment, source, sourceIndex) { RunsWorked = runsWorked };
+        }
+        return queue;
+    }
+
+    /// <summary>
+    /// A run's end's reports at the enchanter, as the summary reads them: each names
+    /// a weapon and an enchantment the content has — the summary names them every
+    /// frame, and a bad id must never throw while it draws — an Enchant's enchantment
+    /// of a kind that does something, as its deposit's is (<see cref="BoughtEnchantmentId"/>),
+    /// a service by name, the runs it takes one to
+    /// <see cref="ContentBounds.MostServiceRuns"/>, and the runs worked 0 to those:
+    /// play writes a stalled report at 0, a deposit the run left unworked. What a
+    /// finished one's improvement roll did (Phase 6a.4) is an outcome by name and a
+    /// modifier by name, one some weapon can stack (<see cref="ImprovedModifier"/>).
+    /// A transfer's (Phase 6a.6) names its soul, which a weapon the party owns
+    /// carried — so of any kind the content gives a weapon, a unique's that does
+    /// nothing yet included (<see cref="CarriedEnchantmentId"/>) — its source, a
+    /// weapon the content has, and the tier its soul landed at, one to the deepest a
+    /// tier stays whole at (<see cref="LandedTier"/>). Which of those a report may
+    /// be, and that the two come together, are check 27's.
+    /// </summary>
+    private static ServiceReport[] Services(IReadOnlyList<ServiceDto> dtos, GameContent content, string at)
+    {
+        var rows = Rows(dtos, at, "service report");
+        var reports = new ServiceReport[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var row = rows[i];
+            if (!content.Weapons.TryGet(row.WeaponId, out _))
+                throw new SaveFormatException($"{where}.weaponId", $"'{row.WeaponId}' is no weapon in the content");
+            var service = EnumOf<Service>(row.Service, $"{where}.service", "service");
+            int runs = ServiceRuns(row.Runs, $"{where}.runs");
+            int runsWorked = AtMost(NotNegative(row.RunsWorked, $"{where}.runsWorked"), runs, $"{where}.runsWorked",
+                "a service works no more runs than it takes (runs)");
+            string? enchantment = row.Enchantment is not { } id ? null
+                : service == Service.Transfer ? CarriedEnchantmentId(id, content, $"{where}.enchantment")
+                : BoughtEnchantmentId(id, content, $"{where}.enchantment");
+            ImprovementKind? kind = row.Improved is { } how ? EnumOf<ImprovementKind>(how, $"{where}.improved", "improvement") : null;
+            ModifierType? modifier = row.Modifier is { } which ? ImprovedModifier(which, $"{where}.modifier") : null;
+            var improved = kind is { } k && modifier is { } m ? new Improvement(k, m) : null;   // one without the other is check 27's
+            int? tier = row.Tier is { } landed ? LandedTier(landed, $"{where}.tier") : null;
+            if (row.SourceId is { } sourceId && !content.Weapons.TryGet(sourceId, out _))
+                throw new SaveFormatException($"{where}.sourceId", $"'{sourceId}' is no weapon in the content");
+            reports[i] = new ServiceReport(row.WeaponId, service, runsWorked, runs, row.Stalled, enchantment, improved, tier, row.SourceId);
+        }
+        return reports;
+    }
+
+    /// <summary>
+    /// The modifier a run's report says a service's improvement roll gave a stack
+    /// of (Phase 6a.4): a modifier by name, and not one no weapon ever stacks
+    /// (<see cref="ModifierRules.NeverStacked"/>) — which members have behaviour to
+    /// stack is the code's, which no file beside the game edits, so no roll play made
+    /// could land on one. What the relations say of it now is not asked: a report
+    /// outlives its weapon's shape, and <c>restricted.json</c> beside the game may
+    /// have moved since.
+    /// </summary>
+    private static ModifierType ImprovedModifier(string name, string at)
+    {
+        var modifier = EnumOf<ModifierType>(name, at, "modifier");
+        if (ModifierRules.NeverStacked.Contains(modifier))
+            throw new SaveFormatException(at, $"{name} is a modifier no weapon stacks, so no improvement lands on it");
+        return modifier;
+    }
+
+    /// <summary>The tier a transfer's soul landed at, as a run's report says it: 1 at least, and no deeper than any entry's tier stays whole at (<see cref="ContentBounds.DeepestTier"/>), as a weapon row's entry is held.</summary>
+    private static int LandedTier(int value, string at)
+    {
+        if (value < 1)
+            throw new SaveFormatException(at, $"{value} is no tier: a soul lands at tier 1 or deeper");
+        return AtMost(value, ContentBounds.DeepestTier, at, DeepestTierWhy);
+    }
+
+    /// <summary>The runs a service takes: one at least, and no more than a weapon holding the most enchantments takes (<see cref="ContentBounds.MostServiceRuns"/>).</summary>
+    private static int ServiceRuns(int value, string at)
+    {
+        if (value < 1)
+            throw new SaveFormatException(at, $"{value} is below 1: every service takes a run at least");
+        return AtMost(value, ContentBounds.MostServiceRuns, at, ServiceRunsWhy);
+    }
+
+    /// <summary>
+    /// An enchantment by the id a deposit in the shop names, or a run's report of
+    /// one: one the content has, and not of a kind declared and inert
+    /// (<see cref="LootTable.IsInert"/>). The enchanter never offers one, and whether
+    /// a kind does anything is the code's, which no file beside the game edits, so
+    /// no deposit play made could name one (Phase 6a.3b), nor any report of a
+    /// deposit (Phase 6a.3b's review). What <c>restricted.json</c> says of the id is not asked,
+    /// its <c>neverRolled</c> included: the deposit was legal when it was made. The
+    /// id is named bare, as <see cref="SaveConsistency"/> names one: the notice of a
+    /// save set aside shows this clause, and the HUD's font has no apostrophe.
+    /// </summary>
+    private static string BoughtEnchantmentId(string id, GameContent content, string at)
+        => LootTable.IsInert(ContentEnchantment(id, content, at))
+            ? throw new SaveFormatException(at, $"{id} is an enchantment that does nothing yet, which the enchanter never offers, so no deposit could have bought it")
+            : id;
+
+    /// <summary>
+    /// The soul a run's report of a transfer names (Phase 6a.6): one a weapon the
+    /// party owns carried, so one the content has, of any kind — a unique may carry
+    /// a kind that does nothing yet, and the enchanter moves what it never offers.
+    /// Named bare, as <see cref="BoughtEnchantmentId"/> names one.
+    /// </summary>
+    private static string CarriedEnchantmentId(string id, GameContent content, string at)
+    {
+        ContentEnchantment(id, content, at);
+        return id;
+    }
+
+    /// <summary>The content's enchantment by <paramref name="id"/>, or the refusal naming it at <paramref name="at"/>.</summary>
+    private static EnchantmentDef ContentEnchantment(string id, GameContent content, string at)
+        => content.Enchantments.TryGet(id, out var def) ? def : throw new SaveFormatException(at, $"'{id}' is no enchantment in the content");
+
+    /// <summary>
+    /// The stable, in its order: every row a weapon, read as every weapon is
+    /// (<see cref="Weapon(WeaponDto, GameContent, string)"/>), and none of them null. Its
+    /// length has no ceiling: the stable is unbounded (PHASE 6a DECISION 7), and
+    /// nothing reads its count but an index.
+    /// </summary>
+    private static Weapon[] Stable(IReadOnlyList<WeaponDto> dtos, GameContent content, string at)
+    {
+        var rows = Rows(dtos, at, "weapon");
+        var stable = new Weapon[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+            stable[i] = Weapon(rows[i], content, $"{at}[{i}]");
+        return stable;
     }
 
     /// <summary>The party, in the document's order: exactly a party's size, each id once.</summary>
@@ -460,11 +652,12 @@ internal static class SaveMapper
 
     /// <summary>
     /// A weapon as saved: the row by id, both spreads by name, the entries by id
-    /// at their tiers, in attachment order. A forged stack is no deeper than any
-    /// forge goes, a live one no deeper than its forged count plus the most
-    /// headroom any tuning gives, an entry's tier no deeper than its arithmetic
-    /// stays whole at, and the entries no more than a weapon holds
-    /// (<see cref="ContentBounds"/>).
+    /// at their tiers, in attachment order, and its wear. A forged stack is no
+    /// deeper than any forge goes, a live one no deeper than its forged count plus
+    /// the most headroom any tuning gives, an entry's tier no deeper than its
+    /// arithmetic stays whole at, the entries no more than a weapon holds, the wear
+    /// cashed a count, and the wear no more than any tuning's capacity for what was
+    /// cashed (<see cref="ContentBounds"/>).
     /// </summary>
     private static Weapon Weapon(WeaponDto row, GameContent content, string at)
     {
@@ -500,7 +693,17 @@ internal static class SaveMapper
             throw new SaveFormatException($"{at}.forgedEnchantments",
                 $"{row.ForgedEnchantments} of {entries.Length} entries: the forged ones are a prefix of the list");
 
-        return new Weapon(def, forged, live, entries, row.ForgedEnchantments);
+        // The wear banked is held to a ceiling no tuning in range can move, as a
+        // member's hit points are (Body): a capacity opens on a bar no larger than
+        // Bar and grows at most MostCapacityPerBar a point, each point costing a
+        // bar of one wear cashed or more, and accrual never banks past capacity.
+        // Summed as a long, so wear cashed at its own ceiling cannot wrap it. Wear
+        // over today's capacity is not refused: capacity is today's tuning's.
+        int wear = Count(row.Wear, $"{at}.wear");
+        int wearCashed = Count(row.WearCashed, $"{at}.wearCashed");
+        AtMost(wear, ContentBounds.Bar + (long)ContentBounds.MostCapacityPerBar * wearCashed, $"{at}.wear", WearWhy);
+
+        return new Weapon(def, forged, live, entries, row.ForgedEnchantments, wear, wearCashed);
     }
 
     /// <summary>
@@ -557,7 +760,8 @@ internal static class SaveMapper
     /// <summary>
     /// How the last run ended, as its summary reads it: the dungeon and the
     /// members it names are the content's and the party's, its floors and its
-    /// counts in the range play writes them, its spoils weapons like any other.
+    /// counts in the range play writes them, its spoils weapons like any other, and
+    /// its reports at the enchanter each read on its own (<see cref="Services"/>).
     /// </summary>
     private static RunResult Result(RunResultDto row, GameContent content, IReadOnlyList<PartyMemberState> party, string at)
     {
@@ -595,8 +799,12 @@ internal static class SaveMapper
             taken[i] = new XpClawback(clawback.MemberId, clawback.Pool, Count(clawback.Before, $"{where}.before"), NotNegative(clawback.After, $"{where}.after"));
         }
 
+        // What the enchanter did on the run's end: null and [] alike, read as none.
+        var services = row.Services is { Count: > 0 } reports ? Services(reports, content, $"{at}.services") : null;
+
         return new RunResult(row.DungeonId, outcome, row.BossDefeated, deepest, bossFloor, row.ServiceTick, row.MercyTick,
-            runCounter, lockedUntil, row.Retired, Spoils(row.SpoilsKept, $"{at}.spoilsKept"), Spoils(row.SpoilsLost, $"{at}.spoilsLost"), taken);
+            runCounter, lockedUntil, row.Retired, Spoils(row.SpoilsKept, $"{at}.spoilsKept"), Spoils(row.SpoilsLost, $"{at}.spoilsLost"), taken,
+            services);
     }
 
     // ── Restore: the visit in progress ───────────────────────────────────────
@@ -1053,11 +1261,21 @@ internal static class SaveMapper
 
     private const string DeepestTierWhy = "tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number";
 
+    private const string EnchantWearWhy = "an enchantment is bought with a deposit of FirstEnchantmentWear or more, and no tuning prices one below 1";
+
+    private const string TransferWearWhy = "a transfer pays the price of attaching its soul, FirstEnchantmentWear or more, and no tuning prices one below 1";
+
+    private static readonly string ServiceRunsWhy =
+        $"a service takes the count of the weapon plus one runs, and no weapon holds more than {ContentBounds.MostEnchantments} (EnchantmentSlots at its most)";
+
     private static readonly string MemberHpWhy =
         $"a member holds no more hit points than the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), plus a point for each HP XP";
 
     private static readonly string RowHpWhy =
         $"a row holds no more hit points than the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), plus what its revivals added";
+
+    private static readonly string WearWhy =
+        $"a weapon banks no more wear than its capacity, which opens on the largest bar a pool opens on, {ContentBounds.Bar} (StartingPool at its most), and grows {ContentBounds.MostCapacityPerBar} at most (WearCapacityPerBar at its most) for every full bar cashed, each bar one wear or more";
 
     /// <summary>Why a live stack stops at its forged count plus the most headroom any tuning gives.</summary>
     private static string AcquiredWhy(int forged)

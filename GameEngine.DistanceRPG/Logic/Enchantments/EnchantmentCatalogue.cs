@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
@@ -11,8 +13,10 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <c>restricted.json</c> keeps for enchantments (§5.5):
 /// <see cref="NeverRolled"/>, the ids no roll grants — the unique souls, as the
 /// shipped file has it, and whatever the file says, since the relation is its
-/// alone — and the enchantment-keyed <c>requires</c> rows
-/// (<see cref="Prerequisites"/>), a lingering element's element. Phase 1 shipped the eight innates — the four
+/// alone — the enchantment-keyed <c>requires</c> rows
+/// (<see cref="Prerequisites"/>), a lingering element's element, and the
+/// exclusion groups that name enchantments (<see cref="Excludes"/>), the opposed
+/// elements. Phase 1 shipped the eight innates — the four
 /// staff effects and the four wand elements — Vampiric, and the nine unique
 /// souls; Phase 3 completed §3.3's starting set with Arcane, Shattering, the
 /// shielding entry and Echoing, the last declared with its behaviour open.
@@ -22,6 +26,7 @@ public sealed class EnchantmentCatalogue
     private readonly Dictionary<string, EnchantmentDef> _byId = new(StringComparer.Ordinal);
     private readonly Dictionary<DamageType, EnchantmentDef> _elements = new();
     private readonly Dictionary<string, string[]> _requires = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, HashSet<string>> _excludes = new(StringComparer.Ordinal);
     private readonly IReadOnlyDictionary<DamageType, DamageType> _opposed;
 
     /// <exception cref="ContentException">An entry is malformed (<see cref="ContentValidator.ValidateEnchantments"/>), a number it leaves to the tuning is not there (<see cref="ContentValidator.ValidateDials"/>), the chart is broken (<see cref="ContentValidator.ValidateOpposition"/>) or <c>neverRolled</c> names something that is no enchantment of the catalogue (<see cref="ContentValidator.ValidateNeverRolled"/>).</exception>
@@ -68,6 +73,17 @@ public sealed class EnchantmentCatalogue
         foreach (var (id, needs) in restricted.Requires)
             if (_byId.ContainsKey(id))
                 _requires[id] = needs.ToArray();
+
+        // And the exclusion groups that name enchantments, expanded both ways as a
+        // group means: a group names modifiers or enchantments, never both
+        // (ContentValidator.ValidateModifierRelations), and no id twice.
+        foreach (var group in restricted.Excludes)
+            foreach (var a in group.Where(_byId.ContainsKey))
+            {
+                if (!_excludes.TryGetValue(a, out var excluded))
+                    _excludes[a] = excluded = new HashSet<string>(StringComparer.Ordinal);
+                excluded.UnionWith(group.Where(b => b != a && _byId.ContainsKey(b)));
+            }
     }
 
     /// <summary>Every entry, in the catalogue's order.</summary>
@@ -98,11 +114,13 @@ public sealed class EnchantmentCatalogue
     /// of those live here — <c>echoing</c> fires nothing at all, <c>aegis</c>
     /// fires only as a compiled step on a defender — and the shipped
     /// <see cref="NeverRolled"/> lists neither: it is an economy rule about souls,
-    /// not a list of what cannot fire. So §6.4's enchanter must apply that same
-    /// live-behaviour test rather than <see cref="NeverRolled"/> alone, or it will
-    /// offer an entry that can only reserve a lock; docs/roadmap/open-questions.md
-    /// carries that, beside the note that <c>aegis</c> has no source at all until
-    /// the enchanter exists.
+    /// not a list of what cannot fire. So the enchanter's offer
+    /// (<see cref="Enchanter.Offers"/>, Phase 6a.3b) applies the inert half of that
+    /// test beside <see cref="NeverRolled"/> (<see cref="LootTable.IsInert"/>), and
+    /// never offers an entry that can only reserve a lock. <c>aegis</c> passes it —
+    /// a defender's step fires on any weapon — but nothing puts it among what a
+    /// campaign has met: no drop rolls it and no shipped weapon carries it
+    /// (docs/roadmap/open-questions.md, PHASE 6a DECISION 4).
     /// </para>
     /// </summary>
     public IReadOnlyList<EnchantmentDef> Rollable { get; }
@@ -115,6 +133,37 @@ public sealed class EnchantmentCatalogue
     /// <summary>The ids <paramref name="id"/> cannot exist without — the relations' enchantment-keyed <c>requires</c> row — or none.</summary>
     public IReadOnlyList<string> Prerequisites(string id)
         => _requires.TryGetValue(id, out var needs) ? needs : Array.Empty<string>();
+
+    /// <summary>
+    /// Whether <paramref name="id"/>, attached behind the entries
+    /// <paramref name="ahead"/> (their ids, in attachment order), lacks a
+    /// prerequisite ahead of it (<see cref="Prerequisites"/>), and the first it
+    /// lacks in its <c>requires</c> row's order. A dependency is met on the weapon
+    /// itself, ahead of the dependent: the loop fires in attachment order (§1.7),
+    /// and a lingering element reads the element that fired before it.
+    /// <para>
+    /// <strong>The one question</strong> content validation asks of every entry a
+    /// weapon lists (<see cref="ContentValidator.RuleEnchantmentDependency"/>) and
+    /// the enchanter asks of an entry it would attach last
+    /// (<see cref="Enchanter.Offers"/>), so the two can never part.
+    /// </para>
+    /// </summary>
+    public bool LacksPrerequisiteAhead(string id, IEnumerable<string> ahead, [NotNullWhen(true)] out string? missing)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentNullException.ThrowIfNull(ahead);
+        foreach (var need in Prerequisites(id))
+            if (!ahead.Contains(need, StringComparer.Ordinal))
+            {
+                missing = need;
+                return true;
+            }
+        missing = null;
+        return false;
+    }
+
+    /// <summary>Whether <c>restricted.json</c>'s <c>excludes</c> keep <paramref name="a"/> and <paramref name="b"/> off one weapon — two enchantments one group names, as the opposed elements are — both ways, as a group means.</summary>
+    public bool Excludes(string a, string b) => _excludes.TryGetValue(a, out var excluded) && excluded.Contains(b);
 
     /// <summary>The innate a wand of <paramref name="element"/> carries: the entry whose hit is typed with it.</summary>
     public EnchantmentDef InnateFor(DamageType element)

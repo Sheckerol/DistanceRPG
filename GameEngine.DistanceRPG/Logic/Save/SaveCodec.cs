@@ -41,11 +41,36 @@ public sealed record SaveMigration(int From, Func<JsonObject, JsonObject> Apply)
 /// </summary>
 public static class SaveCodec
 {
-    /// <summary>The version this build writes, and the newest it reads.</summary>
-    public const int CurrentVersion = 1;
+    /// <summary>
+    /// The version this build writes, and the newest it reads. 2 since Phase 6a
+    /// (a weapon's wear, and the version its tuning hash is of); a version-1
+    /// document is lifted to it (<see cref="LiftToVersion2"/>).
+    /// </summary>
+    public const int CurrentVersion = 2;
 
     /// <summary>The member every version of the document carries its version in.</summary>
     internal const string VersionMember = "version";
+
+    /// <summary>The root member naming the save version whose keys the tuning hash is of (<see cref="SaveFile.TuningHashVersion"/>): version 2's.</summary>
+    internal const string TuningHashVersionMember = "tuningHashVersion";
+
+    /// <summary>A weapon row's wear banked (<see cref="WeaponDto.Wear"/>): version 2's.</summary>
+    internal const string WearMember = "wear";
+
+    /// <summary>A weapon row's wear ever cashed (<see cref="WeaponDto.WearCashed"/>): version 2's.</summary>
+    internal const string WearCashedMember = "wearCashed";
+
+    /// <summary>The campaign's stable (<see cref="CampaignDto.Stable"/>): version 2's, from Phase 6a.2.</summary>
+    internal const string StableMember = "stable";
+
+    /// <summary>The campaign's enchanter's queue (<see cref="CampaignDto.Enchanter"/>): version 2's, from Phase 6a.3a.</summary>
+    internal const string EnchanterMember = "enchanter";
+
+    /// <summary>The campaign's count of deposits made (<see cref="CampaignDto.DepositsMade"/>): version 2's, from Phase 6a.3a.</summary>
+    internal const string DepositsMadeMember = "depositsMade";
+
+    /// <summary>A run's end's service reports (<see cref="RunResultDto.Services"/>), in the campaign's last result: version 2's, from Phase 6a.3a.</summary>
+    internal const string ServicesMember = "services";
 
     /// <summary>The root member a save's time is written in (<see cref="SaveFile.SavedAt"/>): the document's last.</summary>
     internal const string SavedAtMember = "savedAt";
@@ -57,11 +82,105 @@ public static class SaveCodec
     private static readonly Regex TimeLine = new("""\A,\n  "savedAt": (?:null|"(?:[^"\\\r\n]|\\[^\r\n])*")\n}\n?\z""", RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// The migrations this build ships, one per version it can lift: none at
-    /// version 1, which is the first. The table exists so the step that lifts
-    /// version 1 to 2 is an entry here, not a new mechanism.
+    /// The migrations this build ships, one per version it can lift: version 1,
+    /// the first, to 2 (<see cref="LiftToVersion2"/>), Phase 6a's.
     /// </summary>
-    public static IReadOnlyList<SaveMigration> Migrations { get; } = [];
+    public static IReadOnlyList<SaveMigration> Migrations { get; } = [new SaveMigration(From: 1, LiftToVersion2)];
+
+    /// <summary>
+    /// Version 1 to 2 (Phase 6a.1; the v2 hand-off, settled.md): a weapon wears
+    /// from version 2, and the tuning hash records the version whose keys it is
+    /// of. The step writes what a version-1 document means by both, and by the
+    /// stable it never had, and nothing else — it reads no content and no tuning:
+    /// <list type="bullet">
+    /// <item><strong>Every weapon row</strong> gets <c>"wear": 0</c> and
+    /// <c>"wearCashed": 0</c>: no weapon wore before version 2, and a capacity
+    /// replayed from 0 cashed is <c>StartingPool</c>'s. The rows are found where
+    /// <see cref="WeaponDto"/> sits — a member's bag, the last run's spoils kept
+    /// and lost, a visited floor's enemy rows, the drop a corpse lies on, and the
+    /// weapons put down on a floor — each walked by name, never by shape.</item>
+    /// <item><strong>The root</strong> gets <c>"tuningHashVersion": 1</c>: a
+    /// version-1 document's hash was taken on version 1's keys
+    /// (<see cref="TuningKey.HashedFrom"/>, PHASE 6a DECISION 9).</item>
+    /// <item><strong>The campaign's stable</strong>, a member version 1 never had,
+    /// is removed if a hand put one there: the version-1 reader ignored it, so to
+    /// version 1 it meant no stable, and read at version 2 it would be weapons the
+    /// campaign never owned — or a refusal of a save version 1 loaded. Where there
+    /// is none the step writes none, and the reader takes the member's default,
+    /// an empty stable (Phase 6a.2's review). So are <strong>the enchanter's queue
+    /// and its count</strong>, and <strong>the last result's service
+    /// reports</strong> (Phase 6a.3a), for the same reason: to version 1 they were
+    /// nothing, an empty shop.</item>
+    /// </list>
+    /// <strong>It never throws on a hand-edited document.</strong> It writes by
+    /// the indexer, so a stray <c>wear</c> a version-1 row already carried (the
+    /// reader ignored it) is overwritten with version 1's meaning, 0, and a stray
+    /// root <c>tuningHashVersion</c> with 1; a stray <c>stable</c>,
+    /// <c>enchanter</c>, <c>depositsMade</c> or <c>services</c> is removed, whatever
+    /// kind of thing it is. And a member that is missing, null or
+    /// the wrong kind of thing — a party that is a number, a bag that is a table,
+    /// a weapon row that is a string — is passed over, so the reader then refuses
+    /// the document where it is wrong, by its path
+    /// (<see cref="SaveFormatException.Where"/>), exactly as it would at version 2:
+    /// a step runs outside the reader's own refusals (<see cref="Read"/>), where
+    /// an exception would say nothing of where.
+    /// </summary>
+    internal static JsonObject LiftToVersion2(JsonObject document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        static void Unworn(JsonNode? row)
+        {
+            if (row is not JsonObject weapon)
+                return;
+            weapon[WearMember] = 0;
+            weapon[WearCashedMember] = 0;
+        }
+
+        static IEnumerable<JsonNode?> Items(JsonNode? list) => list is JsonArray rows ? rows : Enumerable.Empty<JsonNode?>();
+
+        document[TuningHashVersionMember] = 1;
+        if (document["campaign"] is not JsonObject campaign)
+            return document;
+        campaign.Remove(StableMember);   // version 1 had none: one a hand put there meant nothing to it
+        campaign.Remove(EnchanterMember);   // nor an enchanter's queue, nor its count
+        campaign.Remove(DepositsMadeMember);
+
+        foreach (var member in Items(campaign["party"]))
+            if (member is JsonObject row)
+                foreach (var carried in Items(row["inventory"]))
+                    Unworn(carried);
+
+        if (campaign["lastResult"] is JsonObject last)
+        {
+            last.Remove(ServicesMember);   // nor a run's end at the enchanter
+            foreach (var spoil in Items(last["spoilsKept"]))
+                Unworn(spoil);
+            foreach (var spoil in Items(last["spoilsLost"]))
+                Unworn(spoil);
+        }
+
+        if (campaign["visit"] is JsonObject visit)
+        {
+            foreach (var floor in Items(visit["floors"]))
+            {
+                if (floor is not JsonObject visited)
+                    continue;
+                foreach (var enemy in Items(visited["enemies"]))
+                {
+                    if (enemy is not JsonObject row)
+                        continue;
+                    Unworn(row["weapon"]);
+                    if (row["groundItem"] is JsonObject lying)
+                        Unworn(lying["weapon"]);
+                }
+                foreach (var item in Items(visited["looseItems"]))
+                    if (item is JsonObject loose)
+                        Unworn(loose["weapon"]);
+            }
+        }
+        return document;
+    }
 
     /// <summary>Comments and trailing commas skipped, as a hand-edited file may carry them; a member named twice refused.</summary>
     private static readonly JsonDocumentOptions DocumentOptions = new()

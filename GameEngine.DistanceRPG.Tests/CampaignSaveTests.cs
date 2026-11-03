@@ -125,13 +125,20 @@ public sealed class CampaignSaveTests : IDisposable
 
     private static LoadedCampaign Load(string text) => SaveGame.Restore(SaveCodec.Read(text), GameContent.Current);
 
-    /// <summary>Capture, write, read, restore — and the restored campaign is the same state and writes the same text.</summary>
+    /// <summary>
+    /// Capture, write, read, restore — and the restored campaign is the same state
+    /// and writes the same text. A run's report's improvement roll as it was drawn
+    /// (<see cref="ServiceReport.Roll"/>) is left out: the save declares it does not
+    /// keep it — it is the log's, written at the run's end (Phase 6a.4) — while what
+    /// the roll did is kept and compared.
+    /// </summary>
     private static CampaignState RoundTrip(CampaignState campaign)
     {
         string text = Save(campaign);
         var loaded = Load(text);
         Assert.False(loaded.TuningChanged);
-        StateAssert.Equivalent(campaign, loaded.Campaign, "campaign");
+        StateAssert.Equivalent(campaign, loaded.Campaign, "campaign",
+            ignore: path => path.StartsWith("campaign.LastResult.Services[", StringComparison.Ordinal) && path.EndsWith("].Roll", StringComparison.Ordinal));
         Assert.Equal(text, Save(loaded.Campaign));
         return loaded.Campaign;
     }
@@ -325,6 +332,159 @@ public sealed class CampaignSaveTests : IDisposable
         Assert.Throws<ArgumentOutOfRangeException>(() => new Weapon(def, drop.Forged, drop.Modifiers, [regeneration], -1));
         var door = new Weapon(def, drop.Forged, drop.Modifiers, [regeneration], 1);
         Assert.Equal((def.Name, def.Damage, 1), (door.Name, door.Damage, door.ForgedEnchantmentCount));   // the statline is the row's
+    }
+
+    [Fact]
+    public void TheQueueRoundTrips_OrdinalsAndRunsWorked()
+    {
+        // §6.7 (Phase 6a.3a): the enchanter's queue is saved with the campaign, in
+        // deposit order, each deposit whole — its ordinal, its service by name, its
+        // weapon, what it cashed, its runs taken and worked, its enchantment by id —
+        // with how many deposits were ever made, and the last run's reports at the
+        // enchanter with its result; and each comes back field for field, captured
+        // again the same text. A take-back leaves a gap in the ordinals, which comes
+        // back as it was.
+        using var ruled = TestContent.UsePremise(tuning: TestShop.Ruled);
+        var campaign = TestShop.Shop();
+        Enchanter.TakeBack(campaign, campaign.AtTheEnchanter[0]);
+        var restored = RoundTrip(campaign);
+        Assert.Equal([(1, 1, 2, "vampiric"), (2, 0, 1, null)],
+            restored.AtTheEnchanter.Select(deposit => (deposit.Ordinal, deposit.RunsWorked, deposit.Runs, deposit.EnchantmentId)));
+        Assert.Equal(3, restored.DepositsMade);
+        Assert.Equal(campaign.AtTheEnchanter.Select(deposit => deposit.Weapon.Id), restored.AtTheEnchanter.Select(deposit => deposit.Weapon.Id));
+        Assert.Equal((35, 0, 195), (restored.AtTheEnchanter[0].WearAtDeposit, restored.AtTheEnchanter[0].Weapon.Wear, restored.AtTheEnchanter[0].Weapon.WearCashed));
+
+        var tree = JsonNode.Parse(Save(campaign))!.AsObject();
+        var queue = tree["campaign"]!["enchanter"]!.AsArray();
+        Assert.Equal(["ordinal", "service", "weapon", "wearAtDeposit", "runs", "runsWorked", "enchantment", "source", "sourceIndex"],   // a transfer's source, Phase 6a.6
+            queue[0]!.AsObject().Select(member => member.Key));
+        Assert.Equal(("Enchant", "vampiric"), (queue[0]!["service"]!.GetValue<string>(), queue[0]!["enchantment"]!.GetValue<string>()));
+        Assert.Equal(3, tree["campaign"]!["depositsMade"]!.GetValue<int>());
+        var reports = tree["campaign"]!["lastResult"]!["services"]!.AsArray();
+        Assert.Equal(2, reports.Count);
+        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment", "improved", "modifier", "tier", "sourceId"],   // the roll's outcome, Phase 6a.4; a transfer's, Phase 6a.6
+            reports[1]!.AsObject().Select(member => member.Key));
+
+        // The restored shop works on as the one saved: the next run that counts
+        // brings both back.
+        TestShop.Counted(restored);
+        Assert.Empty(restored.AtTheEnchanter);
+        Assert.Equal(["regeneration", "vampiric"], restored.Stable.Single(weapon => weapon.Enchantments.Count == 2).Enchantments.Select(entry => entry.Id));
+
+        // An empty shop and a run's end with nothing in it write null, as the stable
+        // does — the count stays — and null and [] read alike, as empty.
+        var empty = TestShop.Opened();
+        Assert.Null(empty.LastResult!.Services);
+        string text = Save(empty);
+        var emptyTree = JsonNode.Parse(text)!.AsObject();
+        Assert.True(emptyTree["campaign"]!.AsObject().ContainsKey("enchanter"));
+        Assert.Null(emptyTree["campaign"]!["enchanter"]);
+        Assert.Equal(0, emptyTree["campaign"]!["depositsMade"]!.GetValue<int>());
+        Assert.True(emptyTree["campaign"]!["lastResult"]!.AsObject().ContainsKey("services"));
+        Assert.Null(emptyTree["campaign"]!["lastResult"]!["services"]);
+        emptyTree["campaign"]!["enchanter"] = new JsonArray();
+        emptyTree["campaign"]!["lastResult"]!["services"] = new JsonArray();
+        var bracketed = Load(emptyTree.ToJsonString()).Campaign;
+        Assert.Empty(bracketed.AtTheEnchanter);
+        Assert.Null(bracketed.LastResult!.Services);
+        Assert.Equal(text, Save(bracketed));
+        Assert.Equal(3, RoundTrip(restored).DepositsMade);
+
+        // And the door a load comes back through refuses what no shop holds: a
+        // deposit out of order, one at or past the count, a weapon in two places.
+        var party = NewCampaign().Party;
+        var guard = TestWeapons.Get("tower_guard");
+        Deposit Of(int ordinal, Weapon weapon) => new(ordinal, weapon, Service.Refine, 0, 1);
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [Of(1, guard), Of(0, TestWeapons.Get("tower_guard"))], 2));
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [Of(2, guard)], 2));
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [guard], [Of(0, guard)], 1));
+        Assert.Throws<ArgumentException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [null!], 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => CampaignState.Restore(party, [], 0, [], [], [], null, null, [], [], -1));
+    }
+
+    [Fact]
+    public void WearAndWhatWasCashedRoundTrip()
+    {
+        // §6.1, §6.7 (Phase 6a.1): a weapon's wear and the wear it has ever cashed
+        // are the item's own, saved with it and brought back — in a hand, in a bag,
+        // on a spoil — and its capacity comes back replayed from what was cashed,
+        // under the tuning loaded now (PHASE 6a DECISION 2): no capacity is in the
+        // document, so a StartingPool or WearCapacityPerBar edit moves it.
+        var campaign = NewCampaign();
+        Clear(campaign, "tutorial");
+        var def = GameContent.Current.Weapons["arming_sword"];
+        var sword = TestWeapons.Get("arming_sword");
+        var serviced = new Weapon(def, sword.Forged, sword.Modifiers, sword.Enchantments, sword.ForgedEnchantmentCount, wear: 17, wearCashed: 195);
+        Assert.Equal((17, 195, 36), (serviced.Wear, serviced.WearCashed, serviced.WearCapacity));
+        campaign.Party[0].Inventory[2] = serviced;
+        var hand = campaign.Party[1].Inventory[0]!;
+        for (int hit = 0; hit < 40; hit++)
+            Wear.Accrue(hand);
+        Assert.Equal((30, true), (hand.Wear, hand.WornFull));
+
+        var restored = RoundTrip(campaign);
+        var back = restored.Party[0].Inventory[2]!;
+        Assert.NotSame(serviced, back);
+        Assert.Equal((17, 195, 36, serviced.WearPool), (back.Wear, back.WearCashed, back.WearCapacity, back.WearPool));
+        Assert.Equal((30, 0, true), (restored.Party[1].Inventory[0]!.Wear, restored.Party[1].Inventory[0]!.WearCashed, restored.Party[1].Inventory[0]!.WornFull));
+
+        // The document holds the two counts and no capacity.
+        var row = Party(JsonNode.Parse(Save(campaign))!.AsObject(), 0)["inventory"]![2]!.AsObject();
+        Assert.Equal((17, 195), (row["wear"]!.GetValue<int>(), row["wearCashed"]!.GetValue<int>()));
+        Assert.DoesNotContain(row, member => member.Key.Contains("capacity", StringComparison.OrdinalIgnoreCase));
+
+        // Under another bar the same save replays another capacity, and the wear
+        // is kept as it was, full or not: the numbers changed, and it says so.
+        string text = Save(campaign);
+        using (TestContent.UsePremise(tuning: t => t with { StartingPool = 40, WearCapacityPerBar = 2 }))
+        {
+            var loaded = Load(text);
+            Assert.True(loaded.TuningChanged);
+            var under = loaded.Campaign.Party[0].Inventory[2]!;
+            Assert.Equal((17, 195, Wear.Capacity(195).Max), (under.Wear, under.WearCashed, under.WearCapacity));
+            Assert.Equal(48, under.WearCapacity);   // bars of 40, 42, 44 and 46 of the 195 cashed: 40 + 2 x 4, and 23 toward the next
+            Assert.False(loaded.Campaign.Party[1].Inventory[0]!.WornFull);
+        }
+
+        // A negative count is none play reaches: the restore door refuses it, whoever calls it.
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Weapon(def, sword.Forged, sword.Modifiers, [], 0, wear: -1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Weapon(def, sword.Forged, sword.Modifiers, [], 0, wearCashed: -1));
+    }
+
+    [Fact]
+    public void ATuningHashVersionOutsideItsDocumentIsRefused()
+    {
+        // PHASE 6a DECISION 9: a save names the version whose keys its tuning hash
+        // is of — the current version from a capture, 1 from the step that lifts a
+        // version-1 document. From 1 to the document's own version: a hash is never
+        // of a key set newer than its document, and version 0 hashed nothing. Raw
+        // text a hand can edit, so anything else is refused, naming the member; and
+        // a version-2 document without it is refused by the reader, as any missing
+        // member is.
+        var campaign = NewCampaign();
+        Clear(campaign, "tutorial");
+        string text = Save(campaign);
+        var file = SaveCodec.Read(text);
+        Assert.Equal(SaveCodec.CurrentVersion, file.TuningHashVersion);
+        Assert.False(SaveGame.Restore(file, GameContent.Current).TuningChanged);
+
+        foreach (int version in new[] { 0, -1, SaveCodec.CurrentVersion + 1, int.MaxValue })
+        {
+            var refused = Assert.Throws<SaveFormatException>(() => SaveGame.Restore(file with { TuningHashVersion = version }, GameContent.Current));
+            Assert.Equal("tuningHashVersion", refused.Where);
+            Assert.StartsWith($"{version} is no version of this document", refused.Problem, StringComparison.Ordinal);
+            Assert.All(NoticeText.Wrap(refused.Message), line => Assert.Matches(@"^[A-Z0-9 .,:\-_!?()/<>\[\]+=#*]+$", line));   // the notice of a save set aside shows it
+        }
+
+        // Version 1's keys, the hash of the same numbers on them: nothing changed.
+        var ofVersion1 = file with { TuningHash = TuningJson.Hash(GameContent.Current.Tuning, version: 1), TuningHashVersion = 1 };
+        Assert.False(SaveGame.Restore(ofVersion1, GameContent.Current).TuningChanged);
+
+        var tree = JsonNode.Parse(text)!.AsObject();
+        Assert.True(tree.Remove("tuningHashVersion"));
+        var missing = Assert.Throws<SaveFormatException>(() => SaveCodec.Read(tree.ToJsonString()));
+        Assert.Equal("$", missing.Where);
+        Assert.Contains("tuningHashVersion", missing.Problem, StringComparison.Ordinal);
     }
 
     [Fact]
