@@ -1,7 +1,8 @@
 # DistanceRPG Roadmap
 
-Planned features beyond the current port. Everything here is a design target,
-not shipped behaviour — see the git history for what exists today.
+Features beyond the original port. Phases 0–6b are built and merged; Phase 7
+is a design target, not shipped behaviour — see the git history for what exists
+today.
 
 **This is a mechanics document, not the lore.** The setting is worked out
 elsewhere and most of it never touches these systems. Lore appears here only
@@ -14,8 +15,9 @@ luck; and mana burning an enchantment's circle deeper into a particular weapon
 narrative that does not decide a mechanic does not belong in these files, and
 nothing here should be treated as the canonical account of the world.
 
-Six phases, in dependency order, shipping as seven PRs off up-to-date `main`
-per the workflow rule in `CLAUDE.md` — Phase 6 splits in two (below).
+Phases 0–6b are shipped (PRs #8–#15). Phase 7 is a new plan on top of them,
+changing rules Phase 4 shipped; every phase lands as its own PR off up-to-date
+`main` per the workflow rule in `CLAUDE.md`.
 
 | Phase | Theme | Depends on |
 | --- | --- | --- |
@@ -27,6 +29,7 @@ per the workflow rule in `CLAUDE.md` — Phase 6 splits in two (below).
 | 5 | Save / load | 0–4 |
 | 6a | Between runs: wear, the enchanter, the two services | 1–5 |
 | 6b | The hub: the farm, the alchemist, consumables | 6a |
+| 7 | Death, revives and the wipe — **planned** | 4, 5 |
 
 ## Where everything lives
 
@@ -46,6 +49,7 @@ use this table to find the file a section lives in.
 | [phase-4-floors](docs/roadmap/phase-4-floors.md) | §4.1–4.5 | Stairs, the boss floor, dungeon themes, fighting your way out |
 | [phase-5-save](docs/roadmap/phase-5-save.md) | §5.1–5.9 | What is stored, in what format, the data files, and what stays code |
 | [phase-6-between-runs](docs/roadmap/phase-6-between-runs.md) | §6.1–6.7 | Wear, the enchanter, enchant-or-refine, grafting, the farm, the hub |
+| [phase-7-death](docs/roadmap/phase-7-death.md) | §7.1–7.7 | A death costs the encounter and half the run's XP; a wipe resets to the entry snapshot |
 | [open-questions](docs/roadmap/open-questions.md) | — | Not yet decided. Append here rather than hedging in place |
 | [settled](docs/roadmap/settled.md) | — | Decided, with the reason. Append here when something stops being open |
 

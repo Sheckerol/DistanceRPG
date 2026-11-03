@@ -505,6 +505,11 @@ happened:
 | **Retreat** (leave alive, boss unfought) | Forfeited | **Kept** | Yes |
 | **Death** (party wipe) | Forfeited | **Clawed back by `DeathXpLossPercent`** | Yes |
 
+> **Phase 7 replaces the death rules** — see [phase-7-death](phase-7-death.md).
+> A member is down for the encounter, not the run; each death costs half their
+> run XP; a wipe resets to the entry snapshot. This section describes what
+> shipped.
+
 Retreating and dying already share the mercy tick (§6.3) — they should not
 also share an XP outcome. A fighting retreat means the party survived, so the
 progression earned along the way is real and stays real; that is the whole
