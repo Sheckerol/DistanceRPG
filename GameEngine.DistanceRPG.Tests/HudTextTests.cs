@@ -10,13 +10,15 @@ namespace GameEngine.DistanceRPG.Tests;
 /// read as resolved values for the weapon in a wielder's hands, weapon plus
 /// innate; a lingering element's status is named by its element; Mire past
 /// the whole budget is paralysis; and the two crit riders carry their flavour
-/// (§1.6). The drawing itself is untested; these are its strings.
+/// (§1.6). The drawing itself is untested — bar the one arithmetic the
+/// inventory panel does, which decides whether what it draws fits the window
+/// it is drawn in (§2.2); these are its strings.
 /// </summary>
 public class HudTextTests
 {
     private static PartyMemberState Holding(string weaponId, DamageType? element = null)
     {
-        var member = new PartyMemberState { Id = "A", ColorIndex = 0 };
+        var member = TestPools.Char("A");
         member.Inventory[0] = TestWeapons.Get(weaponId, element);
         return member;
     }
@@ -134,5 +136,120 @@ public class HudTextTests
         Assert.Contains("N: NOVA AROUND YOU", DungeonHud.HelpLine(Holding("wand_of_the_nova", DamageType.Acidic)));
         Assert.Contains("O: HOLD FIRE", DungeonHud.HelpLine(Holding("crossbow")));
         Assert.DoesNotContain("O: HOLD FIRE", DungeonHud.HelpLine(Holding("longbow")));
+    }
+
+    [Fact]
+    public void PoolRows_ShowTheBarAndItsXp()
+    {
+        // The HP row carries the bar and the XP into its next point; the mana
+        // row carries the XP alone, because the pool itself is already on the
+        // budget line at the top of the screen and no number is printed twice.
+        // A fixture's bars are the suite's 100, and at no innate nature a point
+        // costs a whole bar.
+        var member = Holding("tower_guard");
+        member.HpXp += 4;
+        member.ManaXp += 12;
+        Assert.Equal(new[] { "HP 100/100   XP 4/100", "MANA XP 12/100" }, DungeonHud.PoolRows(member));
+
+        member.Hp -= 8;
+        Assert.Equal("HP 92/100   XP 4/100", DungeonHud.PoolRows(member)[0]);
+    }
+
+    [Fact]
+    public void ProficiencyRows_ShowLevelXpAndTheBonus()
+    {
+        // A class's row is the level, how far into the next, and what the level
+        // pays: +floor(L / 2) damage and -floor(L / 3) movement, each appearing
+        // once it is something. Numbers, not drawn bars - at 5 px a bar is a
+        // three-pixel smear, and a string is what this file can hold to.
+        var member = Holding("weakspot_stiletto");
+        Assert.Equal("DAGGER 1   XP 0/100", Assert.Single(DungeonHud.ProficiencyRows(member)));
+
+        member.WeaponXp[WeaponClass.Dagger] = 145;   // 100 leaves level 1, 45 into the 200 that leaves level 2
+        Assert.Equal("DAGGER 2   XP 45/200   DMG +1", Assert.Single(DungeonHud.ProficiencyRows(member)));
+
+        member.WeaponXp[WeaponClass.Dagger] = 345;   // level 3, where the movement discount joins it
+        Assert.Equal("DAGGER 3   XP 45/300   DMG +1   COST -1", Assert.Single(DungeonHud.ProficiencyRows(member)));
+    }
+
+    [Fact]
+    public void ProficiencyRows_ListTheClassesTheMemberIsLevellingOrHolding()
+    {
+        // A class earns a row by being practised or by being carried, in
+        // WeaponClass order - the order the XP book and a save both enumerate.
+        var member = Holding("staff_of_renewal");
+        member.Inventory[1] = TestWeapons.Get("great_axe");
+        member.WeaponXp[WeaponClass.Dagger] = 40;
+
+        Assert.Equal(new[] { "DAGGER 1   XP 40/100", "AXE 1   XP 0/100", "STAFF 1   XP 0/100" },
+            DungeonHud.ProficiencyRows(member));
+        Assert.DoesNotContain(DungeonHud.ProficiencyRows(member), row => row.StartsWith("WAND", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void WeaponStats_PrintsTheItemsCost_TheProficiencyRowPrintsTheDiscount()
+    {
+        // Two numbers, and the panel says which is which. The statline is the
+        // item as it reads in anyone's hands - the same string for a weapon in
+        // the bag as for one equipped - so it keeps the weapon's own resolved
+        // cost; the wielder's discount reads on the proficiency row, and what
+        // the gate and the charge actually take is the two together.
+        var member = Holding("flensing_knife");
+        member.WeaponXp[WeaponClass.Dagger] = 345;   // level 3: one off the cost
+        var knife = member.EquippedWeapon!;
+
+        Assert.Equal("DMG 15  RNG 40  COST 27", DungeonHud.WeaponStats(knife));
+        Assert.Contains("COST -1", Assert.Single(DungeonHud.ProficiencyRows(member)));
+        Assert.Equal(26, member.MovementCost(knife));
+    }
+
+    [Fact]
+    public void LevelUpLabel_NamesWhatTheCreditBought()
+    {
+        // The beat over whoever earned it: the class and the level now wielded
+        // at, or the pool and the ceiling now carried. Every number is read back
+        // off the member, so the callout states progression and decides none of
+        // it - no XP rule lives in the HUD or the scene.
+        var member = Holding("weakspot_stiletto");
+        member.WeaponXp[WeaponClass.Dagger] = 100;
+
+        Assert.Equal("DAGGER 2!", DungeonHud.LevelUpLabel(member, new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 100)));
+        Assert.Equal("MAX HP 100!", DungeonHud.LevelUpLabel(member, new XpCredit(XpPool.Health, null, 100)));
+        Assert.Equal("MAX MANA 100!", DungeonHud.LevelUpLabel(member, new XpCredit(XpPool.Mana, null, 100)));
+    }
+
+    [Fact]
+    public void InventoryLayout_KeepsTheSwapLineAndTheKeyHintOnScreen()
+    {
+        // The panel grows downward by a row per class a member is levelling or
+        // holding, so the lines a short window loses are the ones under the
+        // rows - what a swap costs, and which key equips. It opens where it
+        // always has while the whole of it fits, slides up when it does not,
+        // and only past that drops rows off the end of the list.
+        const int slots = 3;
+        const int most = 2 + 8;   // the two pools and every weapon class at once
+
+        var roomy = DungeonHud.LayoutInventory(720f, slots, most);
+        Assert.Equal(720f / 2f - 150f, roomy.Top);   // where the panel has always opened
+        Assert.Equal(most, roomy.Rows);
+
+        var tight = DungeonHud.LayoutInventory(520f, slots, most);
+        Assert.True(tight.Top < 520f / 2f - 150f);   // slid up to make the room
+        Assert.Equal(most, tight.Rows);              // and every row still printed
+
+        var cramped = DungeonHud.LayoutInventory(420f, slots, most);
+        Assert.True(cramped.Rows < most);            // the tail of the list goes before the key hint does
+
+        // The invariant, over every window the settings allow (320 x 240 up) and
+        // every row count a member can reach: what is drawn clears the help line
+        // at h - 24, or the panel has already dropped every row it could.
+        for (int h = 240; h <= 1600; h += 2)
+            for (int rows = 0; rows <= most; rows++)
+            {
+                var layout = DungeonHud.LayoutInventory(h, slots, rows);
+                Assert.InRange(layout.Rows, 0, rows);
+                Assert.True(layout.Top >= 56f, $"h={h} rows={rows}: over the top readouts");
+                Assert.True(layout.Bottom <= h - 24f || layout.Rows == 0, $"h={h} rows={rows}: past the help line");
+            }
     }
 }

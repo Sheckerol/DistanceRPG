@@ -9,11 +9,7 @@ public sealed class EnemyState : ActorState
     /// <summary>What a dummy holds unless told otherwise: the Efficiency sword — Block x1, Push x1, Light x1.</summary>
     public const string DefaultWeaponId = "arming_sword";
 
-    public EnemyState()
-    {
-        Hp = GameConstants.DummyHp;
-    }
-
+    /// <summary>A dummy's HP is the flat constant, and it spawns full: unwritten HP reads as this (<see cref="ActorState.Hp"/>), so no constructor copies it.</summary>
     public override int MaxHp => GameConstants.DummyHp;
 
     /// <summary>A fresh instance per enemy: acquired stacks are per item, so two dummies never share one.</summary>

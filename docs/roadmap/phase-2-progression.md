@@ -64,9 +64,9 @@ into one's reach still costs a free poke. Learning a threat zone by being
 punished by it, then finding a spear and turning it around, is a better first
 lesson than owning one from the start. Spears remain an early, common drop.
 
-### Stats are divisors, and every pool starts at 25
+### Stats are divisors, and every pool starts at 30
 
-**Max HP, max mana and a weapon's wear capacity all start at 25**, and all three
+**Max HP, max mana and a weapon's wear capacity all start at 30**, and all three
 grow the same way: *a full bar's worth of XP, divided by the stat that governs
 it.*
 
@@ -74,17 +74,17 @@ it.*
 xpToNextPoint = currentMax / governingStat
 ```
 
-| Pool | Governing stat | At 25, a point costs |
+| Pool | Governing stat | At 30, a point costs |
 | --- | --- | --- |
-| **Max HP** | CON | 6 at CON 4, **25 at CON 1** |
-| **Max mana** | INT | 6 at INT 4, **25 at INT 1** |
-| **Wear capacity** | **None — a flat 1** | 25, always. A weapon has no stats |
+| **Max HP** | CON | 7 at CON 4, **30 at CON 1** |
+| **Max mana** | INT | 7 at INT 4, **30 at INT 1** |
+| **Wear capacity** | **None — a flat 1** | 30, always. A weapon has no stats |
 
 Three things this gets right at once:
 
 - **The stat is a rate, not a bonus.** Nobody starts with more of anything; the
   spreads decide who *becomes* what. A CON 1 wizard and a CON 4 fighter open the
-  game with the same 25 HP and diverge from there, which is the whole thesis of
+  game with the same 30 HP and diverge from there, which is the whole thesis of
   §2.1 arriving as arithmetic instead of a claim.
 - **It self-slows.** The threshold is the *current* bar, so each point costs
   more than the last and no pool runs away. Growth is fast while you are fragile

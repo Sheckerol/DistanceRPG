@@ -19,7 +19,7 @@ public class DisplacementTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var ch = TestPools.Char(id, x: x, y: y);
         ch.Inventory[0] = TestWeapons.Get(weaponId);
         return ch;
     }
@@ -326,7 +326,7 @@ public class DisplacementTests
         Assert.Equal(At(5, 4), (a.X, a.Y));
         Assert.True(EnemyAi.CanHit(s, a, s.EquippedWeapon!, grid));
         Assert.Equal(0, braces);
-        Assert.Equal(GameConstants.PlayerHp - 10, a.Hp);
+        Assert.Equal(TestPools.FixtureHp - 10, a.Hp);
 
         var grid2 = new int[20, 20];
         var b = Char("B", 5, 5, "tower_guard");
@@ -438,7 +438,7 @@ public class DisplacementTests
         Assert.Equal(At(5, 4), (a.X, a.Y));
         Assert.Equal(new[] { spear }, braced);
         Assert.Equal(2, hits);
-        Assert.Equal(GameConstants.PlayerHp - 10 - 8, a.Hp);   // no shield on a dagger: the sword's 10 and the spear's 7 + 1 (Longshot x1 at the fourth tile) in full
+        Assert.Equal(TestPools.FixtureHp - 10 - 8, a.Hp);   // no shield on a dagger: the sword's 10 and the spear's 7 + 1 (Longshot x1 at the fourth tile) in full
     }
 
     [Fact]

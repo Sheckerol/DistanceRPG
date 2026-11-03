@@ -1105,13 +1105,13 @@
   the difference between members is entirely *which*. A 4 against a 1 is already
   a fourfold difference in growth rate, which is as wide as any progression
   system needs.
-- **Max HP, max mana and wear capacity all start at 25**, and all grow by
+- **Max HP, max mana and wear capacity all start at 30**, and all grow by
   `currentMax / governingStat` XP per point — CON, INT, and a flat 1 for
   weapons, which have no nature to divide by. The stat is a **rate, not a
   bonus**: everyone opens the game identical and diverges, which turns §2.1's
   thesis into arithmetic. It self-slows, because the threshold is the current
   bar.
-- **`WearCapacity` is an authored ladder: 25 → 30 → 40**, one step per full bar
+- **`WearCapacity` is an authored ladder: 30 → 40 → 55**, one step per full bar
   cashed, and **no fourth step until play asks for one**. Authored rather than
   computed precisely so a fourth can be appended.
 - **Grafting is 3% base when enchanting**, multiplied by
@@ -1210,3 +1210,72 @@
   number quietly having been smaller all along.
 - **This is also what keeps the arms race in the data files** (§5.5). A counter
   is an entry someone adds; a rebalance is a recompile and an argument.
+
+## Implementation pass — Phase 2 (innate stats and the three pools)
+
+Three rulings the branch made and the record did not carry. Each is written down
+here so the next reader meets the ruling rather than the arithmetic that assumes
+it.
+
+- **Max mana starts at 25 like every other pool, and the 160 is a movement
+  budget** [SUPERSEDES "A caster's starting **max mana is 160**"]. Two figures
+  were both live — that one, and "Max HP, max mana and wear capacity all start
+  at 25" — and the evidence between them is arithmetic rather than preference.
+  The §1.3 derivations that survive are `(160 − 40) / (8 + 3)` and
+  `r × (160 − 40k)`, where `40` is a staff's **movement** cost and `160` the
+  **movement** budget: the expression reads "budget less the cast's movement,
+  over the mana one cast moves", and a mana *pool* of 160 has no place in it.
+  `MovementUnitsPerMana` is derived *from* that identity, so reading the 160 as
+  mana would re-derive a shipped divisor nothing else asks to move. The 25 is
+  also the later pass — the one that fixed the 1–4 permutations and the wear
+  ladder — and §5.3, the file that will carry the number, names 25. So
+  `StartingPool` is the one key for HP, mana and wear capacity alike, and the
+  caster's 160 is `MovementBudget` beside it.
+- **The knock-on is accepted and watched, with one knob.** A fresh D opens able
+  to cast Renewal once, or Mire exactly once, from a full pool, refilled by
+  unspent movement; at 25 HP an arming sword's 10 kills a member in three. No
+  weapon and no enemy is rescaled, because §2.1 asks precisely for the flat
+  start — "a CON 1 wizard and a CON 4 fighter open the game with the same 25
+  HP" is the whole thesis arriving as arithmetic — and the provisional numbers
+  are expected to move. If play says otherwise the single edit is
+  `Tuning.StartingPool`. An actor with no progression — every enemy — still
+  carries the flat 100 it always did.
+- **`Serrated`'s magnitude is a percentage of the weapon's share of what was
+  dealt** [SUPERSEDES "`Serrated`'s magnitude comes from the weapon and the
+  wielder, not its tier: `BleedPercent × (base damage + proficiency level)`"].
+  The superseding pass already said it — "`Serrated` reads the weapon's share
+  too — the wound is as deep as the blow that made it" — and that is the
+  entry the code follows; this records which of the two wins, because the
+  earlier formula was still being quoted in the source. The later reading keeps
+  `Serrated` on the §1.6 line that every other attribution question is answered
+  on, and it does not lose what the earlier formula was for: the share carries
+  the wielder, because §2.2's `+floor(L / 2)` is part of the weapon's own damage
+  before anything else touches it, and it is still self-limiting on transfer,
+  because the share is whatever the soul's new weapon deals in hands that have
+  not trained it. Two consequences the earlier formula did not have, accepted:
+  a crit deepens the bleed, and a blocking target shallows it. Both are the
+  same sentence — the wound is as deep as the blow — read forwards.
+- **Element damage's INT scaling is §3.3's, not §2.2's.** "These ladders are
+  partly a character stat — element damage carries INT scaling" is a
+  *multiplier*, and §2.1's rule is that a stat divides a threshold and never
+  multiplies a value: there is no rate multiplier anywhere in Phase 2, which is
+  what lets one function serve four pools. The INT term belongs with the tier
+  that prices it and with unique potency, which are the same paragraph. Phase 2
+  ships the two seams it needs and nothing else — `InnateStats` on the member,
+  reachable wherever a wielder is, and `ActorState.WeaponLevel(weapon)` — so
+  §3.3 adds a term rather than a plumbing pass.
+
+- **Every pool starts at 30 rather than 25**, because the pool *is* the
+  enchantment lock budget (§3.3: the sum of equipped locks may not exceed max
+  mana). At 25 a fresh caster could hold one elemental enchantment (lock 20) or
+  a single Regeneration (lock 15) and nothing else; 30 admits two Regeneration
+  locks, or exactly one Arcane, which is the starting breadth the design wants
+  to be reachable. Max HP and wear capacity move with it rather than splitting
+  the constant, since §2.1's thesis is that every pool opens identical and
+  diverges only through play. `Tuning.StartingPool` is the one key.
+- **The `WearCapacity` ladder shifts with the starting bar, to 30 → 40 → 55.**
+  The first rung *is* the shared starting pool, so leaving the ladder at
+  25 → 30 → 40 would have made a weapon's first service raise its capacity from
+  30 to 30 and buy nothing. The rungs keep widening, so reaching the third step
+  is now 70 hits on one weapon rather than 55 — a longer arc, deliberately, and
+  still three steps with no fourth until play asks for one.

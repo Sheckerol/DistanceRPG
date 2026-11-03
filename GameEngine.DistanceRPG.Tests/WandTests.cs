@@ -23,7 +23,7 @@ public class WandTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId, DamageType? element = null)
     {
         var (x, y) = At(r, c);
-        var ch = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var ch = TestPools.Char(id, x: x, y: y);
         ch.Inventory[0] = TestWeapons.Get(weaponId, element);
         return ch;
     }
@@ -114,7 +114,7 @@ public class WandTests
         Assert.Equal(200 - 8, enemy.Hp);
         Assert.Equal(8, Assert.Single(resolutions).Dealt);
         Assert.Equal(GameConstants.MaxDistance - 45, a.DistLeft);
-        Assert.Equal(GameConstants.MaxMana - 18 - 4, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 18 - 4, a.Mana);
         Assert.Equal(((ActorState)a, 22, 22, "wand_of_the_nova"), Assert.Single(spent));
         Assert.Equal(0, turns.AttacksThisTurn(a));   // a cast is no chosen attack
 
@@ -356,7 +356,7 @@ public class WandTests
             int characterHits = 0;
             turns.CharacterHit += (_, _) => characterHits++;
             Assert.True(turns.TryCastArea(a, (a.X, a.Y)));
-            Assert.Equal(GameConstants.PlayerHp, b.Hp);
+            Assert.Equal(TestPools.FixtureHp, b.Hp);
             Assert.Equal(0, characterHits);
             Assert.Equal(200 - 8, enemy.Hp);
         }
@@ -379,9 +379,9 @@ public class WandTests
 
             Assert.True(turns.TryCastArea(a, (a.X, a.Y)));
 
-            Assert.Equal(GameConstants.PlayerHp - 4, b.Hp);
-            Assert.Equal(GameConstants.PlayerHp, c.Hp);
-            Assert.Equal(GameConstants.PlayerHp, a.Hp);
+            Assert.Equal(TestPools.FixtureHp - 4, b.Hp);
+            Assert.Equal(TestPools.FixtureHp, c.Hp);
+            Assert.Equal(TestPools.FixtureHp, a.Hp);
             Assert.Equal(200 - 8, enemy.Hp);
             Assert.Equal(4, Assert.Single(friendly).Dealt);
             Assert.Equal(2, hits.Count);
@@ -432,7 +432,7 @@ public class WandTests
         Assert.Single(casts);
         Assert.Equal(4, casts[0].ManaToSpend);
         Assert.Equal(((ActorState)a, 22, 22, "wand_of_the_nova"), Assert.Single(spent));
-        Assert.Equal(GameConstants.MaxMana - 22, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 22, a.Mana);
         Assert.Equal(GameConstants.MaxDistance - 45, a.DistLeft);
 
         // A one-target Blast pays exactly the same.
@@ -599,7 +599,7 @@ public class WandTests
         Assert.All(hits, h => Assert.Equal((20, true, RollOutcome.Crit, 16, 0, 16), (h.Hit.Roll, h.Hit.IsCrit, h.Hit.Outcome, h.Hit.WeaponShare, h.Hit.Absorbed, h.Hit.Taken)));
         Assert.All(guards, g => Assert.Equal(200 - 16, g.Hp));
         Assert.Equal(((ActorState)a, 13, 13, "wand_of_the_nova"), Assert.Single(spent));
-        Assert.Equal(GameConstants.MaxMana - 9 - 4, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 9 - 4, a.Mana);
 
         // A fumble doubles the cast's mana (36) and halves every hit (4 each): the same one roll.
         int fumbles = 0;
@@ -613,7 +613,7 @@ public class WandTests
         Assert.Equal((1, false, true, 36, 4), (fumbleCasts[0].Roll, fumbleCasts[0].IsCrit, fumbleCasts[0].IsFumble, fumbleCasts[0].ManaCost, fumbleCasts[0].ManaToSpend));
         Assert.All(fumbleHits, h => Assert.Equal((RollOutcome.Weak, 4), (h.Hit.Outcome, h.Hit.Dealt)));
         Assert.All(dummies, d => Assert.Equal(200 - 4, d.Hp));
-        Assert.Equal(GameConstants.MaxMana - 36 - 4, b.Mana);
+        Assert.Equal(TestPools.FixtureMana - 36 - 4, b.Mana);
 
         // The window is the caster's: an innate CritWindow x1 makes 19 a crit for the cast and its hits alike; without it 19 is plain.
         var c = Char("C", 5, 5, "wand_of_the_nova", Flaming);
@@ -663,7 +663,7 @@ public class WandTests
         }
         Assert.Equal((Shocking, 4), (payload.Type, payload.ManaToSpend));
         Assert.True(payload.ApplyToTarget.IsDefaultOrEmpty);
-        Assert.Equal(GameConstants.MaxMana, a.Mana);
+        Assert.Equal(TestPools.FixtureMana, a.Mana);
 
         // With nothing left after the cast the element is a non-event: untyped, unpaid.
         a.Mana = 18;

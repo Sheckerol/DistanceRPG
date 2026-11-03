@@ -74,6 +74,7 @@ public sealed class TurnSystem
     public event Action<ActorState>? OpportunistTriggered;                  // a free attack on a target that chose to leave reach
     public event Action<ActorState>? OverwatchTriggered;                    // a held shot fired at a target entering reach
     public event Action<ActorState>? RiposteTriggered;                      // a successful block answered with a counter-swing
+    public event Action<PartyMemberState, XpCredit, int>? XpCredited;       // a credit bought a member points or levels: the credit and how many (§2.2), for the level-up beat
     public event Action? GameOver;
 
     // ── Enemy-turn working state ─────────────────────────────────────────────
@@ -150,6 +151,15 @@ public sealed class TurnSystem
     // member's DistLeft, the acting enemy's budget.
     private readonly Dictionary<ActorState, Action<int>> _movementFeeds = new(ReferenceEqualityComparer.Instance);
 
+    // And for XP (§2.2): each of the four appliers that writes the thing a pool
+    // measures — damage dealt, levels applied, HP restored, mana spent — hands
+    // the figure to the feed the roster fixed for the earner. A party member's
+    // banks it and tells the presentation when a point lands; an enemy's does
+    // nothing, because an enemy has no pools. Which it is was decided when the
+    // roster was typed, so no applier asks an actor its kind, and the day
+    // enemies gain progression is the day this line changes and nothing else.
+    private readonly Dictionary<ActorState, Action<XpCredit>> _xpFeeds = new(ReferenceEqualityComparer.Instance);
+
     // ── Turn economy ─────────────────────────────────────────────────────────
     // Attacks each actor has chosen to make since its side's turn began — a
     // brace, a held shot, a counter or an opportunity attack is a reaction and
@@ -199,6 +209,12 @@ public sealed class TurnSystem
             _statusFeeds[member] = effect => CharacterBuffed?.Invoke(member, effect);
             _braceFeeds[member] = () => BraceTriggered?.Invoke(member);
             _movementFeeds[member] = spent => member.DistLeft = MathF.Max(0f, member.DistLeft - spent);
+            _xpFeeds[member] = credit =>
+            {
+                int gained = member.Credit(credit);
+                if (gained > 0)
+                    XpCredited?.Invoke(member, credit, gained);
+            };
             _sides[member] = Side.Party;
             _mayReact[member] = static () => true;                       // the party's zones are always armed
         }
@@ -210,6 +226,7 @@ public sealed class TurnSystem
             _statusFeeds[enemy] = effect => EnemyBuffed?.Invoke(enemy, effect);
             _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
             _movementFeeds[enemy] = spent => _enemyBudget = MathF.Max(0f, _enemyBudget - spent);   // only the acting enemy spends
+            _xpFeeds[enemy] = static _ => { };                           // an enemy carries no pools: the roster says so, never a type test
             _sides[enemy] = Side.Enemy;
             _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
         }
@@ -300,14 +317,16 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Can the member attack the enemy? A martial weapon in hand, the swing's
-    /// resolved movement to spare, an attack left under Charges, and the
-    /// enemy in reach and sight.
+    /// movement to spare — the weapon's resolved cost less this member's
+    /// proficiency discount (§2.2), the very number
+    /// <see cref="TryAttack"/> then charges — an attack left under Charges, and
+    /// the enemy in reach and sight.
     /// </summary>
     public bool CanAttack(PartyMemberState c, EnemyState enemy)
     {
         if (Phase != TurnPhase.Player || !enemy.Alive || !c.Alive) return false;
         var w = c.EquippedWeapon;
-        if (w == null || w.IsCaster || c.DistLeft < w.ResolvedCost) return false; // a caster casts, it can't strike
+        if (w == null || w.IsCaster || c.DistLeft < c.MovementCost(w)) return false; // a caster casts, it can't strike
         if (!HasAttackLeft(c)) return false;                                      // Charges is a cap: the throws are spent whatever movement is left
         return EnemyAi.CanHit(c, enemy, w, _grid);
     }
@@ -322,7 +341,7 @@ public sealed class TurnSystem
         if (!CanAttack(c, enemy)) return false;
         var w = c.EquippedWeapon!;
 
-        c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
+        c.DistLeft = MathF.Max(0f, c.DistLeft - c.MovementCost(w));
         CountAttack(c);
         AttackWith(c, enemy);
         return true;
@@ -407,7 +426,7 @@ public sealed class TurnSystem
         ArgumentNullException.ThrowIfNull(target);
         if (Phase != TurnPhase.Player || !CanCastOn(caster, target)) return false;
         var w = caster.EquippedWeapon!;   // CanCastOn gated on it
-        return caster.DistLeft >= w.ResolvedCost && caster.Mana >= w.ResolvedManaCost;
+        return caster.DistLeft >= caster.MovementCost(w) && caster.Mana >= w.ResolvedManaCost;
     }
 
     /// <summary>
@@ -422,7 +441,7 @@ public sealed class TurnSystem
         if (!CanCast(caster, target)) return false;
         var w = caster.EquippedWeapon!;
 
-        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
+        caster.DistLeft = MathF.Max(0f, caster.DistLeft - caster.MovementCost(w));
         CastWith(caster, target);
         return true;
     }
@@ -444,7 +463,7 @@ public sealed class TurnSystem
         if (Phase != TurnPhase.Player || !caster.Alive) return false;
         var w = caster.EquippedWeapon;
         if (w == null || !IsAreaCaster(w)) return false;
-        if (caster.DistLeft < w.ResolvedCost || caster.Mana < w.ResolvedManaCost) return false;
+        if (caster.DistLeft < caster.MovementCost(w) || caster.Mana < w.ResolvedManaCost) return false;
         return AreaTargets(caster, aim).Count > 0;
     }
 
@@ -492,7 +511,7 @@ public sealed class TurnSystem
         if (!CanCastArea(caster, aim)) return false;
         var w = caster.EquippedWeapon!;
 
-        caster.DistLeft = MathF.Max(0f, caster.DistLeft - w.ResolvedCost);
+        caster.DistLeft = MathF.Max(0f, caster.DistLeft - caster.MovementCost(w));
         CastAreaWith(caster, aim);
         return true;
     }
@@ -512,7 +531,7 @@ public sealed class TurnSystem
         int shots = c.Value(ModifierType.Overwatch);
         if (shots <= 0 || c.HeldShots > 0) return false;
         if (_partyZone.UsesThisTurn(c) >= shots) return false;
-        return c.DistLeft >= w.ResolvedCost;
+        return c.DistLeft >= c.MovementCost(w);
     }
 
     /// <summary>
@@ -527,7 +546,7 @@ public sealed class TurnSystem
         if (!CanOverwatch(c)) return false;
         var w = c.EquippedWeapon!;
 
-        c.DistLeft = MathF.Max(0f, c.DistLeft - w.ResolvedCost);
+        c.DistLeft = MathF.Max(0f, c.DistLeft - c.MovementCost(w));
         c.HeldShots = c.Value(ModifierType.Overwatch);
         return true;
     }
@@ -1019,7 +1038,10 @@ public sealed class TurnSystem
 
         // Attack cost scales the same way the prototype scaled it: the enemy's
         // budget is 100 vs the player's 160, so weapon costs shrink to match.
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.Weapon.ResolvedCost;
+        // The cost taken is the wielder's, which for an actor with no pools is
+        // the weapon's own (§2.2) -- the seam whichever phase gives enemies
+        // progression will need, and a no-op until it does.
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * enemy.MovementCost(enemy.Weapon);
 
         // The same gates as the party's: the budget, and Charges' cap on chosen attacks.
         if (!enemy.Alive || _enemyBudget < scaledCost || !HasAttackLeft(enemy))
@@ -1075,7 +1097,7 @@ public sealed class TurnSystem
     private void TryEnemyCastBeat(EnemyState caster)
     {
         var weapon = caster.Weapon;
-        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * weapon.ResolvedCost;
+        float scaledCost = GameConstants.EnemyMove / GameConstants.MaxDistance * caster.MovementCost(weapon);
         ActorState? target = caster.IsSupportCaster
             ? EnemyAi.SelectSupportTarget(caster, _enemies)
             : NearestHittable(caster);
@@ -1203,7 +1225,8 @@ public sealed class TurnSystem
     /// <summary>
     /// The HealingReceived applier: restore what the chain settled as applied
     /// — never past full, never on the dead — tell the side's typed healed
-    /// feed, land any status the chain settled, and queue HealingAboveFull
+    /// feed, credit the healed actor's health pool with exactly that much
+    /// (§2.2), land any status the chain settled, and queue HealingAboveFull
     /// with the overflow so whatever banks surplus healing can react to it.
     /// </summary>
     private void ApplyHealing(HealPayload settled, ActorState self, ActorState other, EventTable table)
@@ -1217,6 +1240,13 @@ public sealed class TurnSystem
             if (!_healFeeds.TryGetValue(self, out var healed))
                 throw new InvalidOperationException("Healed an actor that is not on this turn system's roster.");
             healed(applied);
+
+            // Constitution grows by getting hurt and then healed (§2.2): the
+            // credit is what was actually restored, already capped at what was
+            // missing, so overheal teaches nothing. Every source of healing in
+            // the game arrives at this one applier — a regen tick, a soul's
+            // drink, a potion later — so none of them needs a rule of its own.
+            CreditXp(self, new XpCredit(XpPool.Health, null, applied));
         }
         ApplyTicks(settled.Ticks, self, table);
         if (settled.Overflow > 0)
@@ -1442,11 +1472,12 @@ public sealed class TurnSystem
     /// status applications on the target, telling the target's typed feed
     /// (CharacterBuffed or EnemyBuffed, fixed when the roster was typed, never
     /// by asking the target its kind) and <see cref="ActorStatusApplied"/> of
-    /// each, then queues the one ManaSpent record of the cast: the cast's own
-    /// mana plus the triggers its enchantments paid, spent by that event's
-    /// applier and never past the pool (a fumble's doubled cost empties it, it
-    /// does not overdraw it). A cast whose parties are no longer both standing
-    /// lands on nothing.
+    /// each, credits the caster's proficiency with the levels the weapon's own
+    /// forged entries applied (§2.2), then queues the one ManaSpent record of
+    /// the cast: the cast's own mana plus the triggers its enchantments paid,
+    /// spent by that event's applier and never past the pool (a fumble's
+    /// doubled cost empties it, it does not overdraw it). A cast whose parties
+    /// are no longer both standing lands on nothing.
     /// </summary>
     private void ApplyCast(CastPayload settled, ActorState caster, ActorState target, EventTable table)
     {
@@ -1464,6 +1495,17 @@ public sealed class TurnSystem
             }
         }
 
+        // A staff deals no damage, so what it teaches is the status levels it
+        // landed — the staff's own output stated in the only units it has (§2.2)
+        // — read off the applications the chain settled, which are what this
+        // applier just wrote, and counting only the levels the staff's own
+        // forged entries applied: a status application is always an entry's
+        // doing, so the forged/acquired line a hit draws through ForgedShare is
+        // drawn here too, and a grafted applier levels nothing. A wand lands
+        // none (content refuses a status applier on one), so its cast credits
+        // nothing and its hits credit themselves, each with its own share.
+        CreditXp(caster, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.ForgedLevels));
+
         int wanted = settled.ManaCost + settled.ManaToSpend;
         table.Enqueue(GameEvent.ManaSpent, new ManaPayload(wanted, Math.Min(wanted, caster.Mana), settled.Weapon.Id), caster, target);
     }
@@ -1472,7 +1514,9 @@ public sealed class TurnSystem
     /// The ManaSpent applier: take what the chain settled as spent off the
     /// actor's pool (every actor carries one, so no feed is needed), never
     /// below zero; then hand back what the record restores — Siphon's refund
-    /// — never past the pool. Nothing for a record settled at zero both ways.
+    /// — never past the pool; then credit what was spent to the payer's mana
+    /// pool (§2.2), the refund left out of it. Nothing for a record settled at
+    /// zero both ways.
     /// </summary>
     private void ApplyManaSpent(ManaPayload settled, ActorState self, ActorState other, EventTable table)
     {
@@ -1481,6 +1525,13 @@ public sealed class TurnSystem
         if (settled.Restored > 0)
             after = Math.Min(self.MaxMana, after + settled.Restored);
         self.Mana = after;
+
+        // Mana actually spent (§2.2): what the pool paid, never what the spend
+        // wanted, and never netted against what the same record hands back — a
+        // refund is not an uncredit. Every cast and every trigger arrives here
+        // as one record, so the pool that pays for the enchantments is fed by
+        // running them.
+        CreditXp(self, new XpCredit(XpPool.Mana, null, settled.Spent));
     }
 
     /// <summary>
@@ -1496,14 +1547,52 @@ public sealed class TurnSystem
     }
 
     /// <summary>
+    /// Bank one XP credit for <paramref name="earner"/> through the feed the
+    /// roster fixed for it — a member's pools, an enemy's nothing — and tell the
+    /// presentation when it bought a point or a level. Nothing for nothing, as
+    /// <see cref="SpendMana"/> is: a blow that did nothing, a cast that landed
+    /// nothing and a heal on the unhurt all teach nothing, and say so by
+    /// arriving here at zero rather than by being guarded at four call sites.
+    /// <para>
+    /// The credit is raw (§2.2): the figure the applier settled, passed on
+    /// unscaled, because the governing stat divides the threshold and never
+    /// multiplies the gain.
+    /// </para>
+    /// <para>
+    /// The two guards come before the quiet path, not after it, so neither is
+    /// unreachable: a negative figure — what a defender handler that absorbed
+    /// more than the weapon's share would settle — is refused here rather than
+    /// lost to a feed that drops it (<see cref="PartyMemberState.Credit"/>
+    /// states the same rule for the pools: XP is credited, never taken back),
+    /// and an earner this system does not know is named the moment it earns
+    /// anything at all, including nothing, rather than at whatever later credit
+    /// happens to be positive.
+    /// </para>
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The credit is negative: XP is credited, never taken back.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="earner"/> is not on this system's roster.</exception>
+    private void CreditXp(ActorState earner, XpCredit credit)
+    {
+        if (credit.Amount < 0)
+            throw new ArgumentOutOfRangeException(nameof(credit), credit.Amount,
+                "XP is credited, never taken back: a refund is not a negative credit.");
+        if (!_xpFeeds.TryGetValue(earner, out var feed))
+            throw new InvalidOperationException("Credited XP to an actor that is not on this turn system's roster.");
+        if (credit.Amount == 0) return;
+        feed(credit);
+    }
+
+    /// <summary>
     /// The DamageTaken applier — the single world-write for a hit. Takes
     /// <see cref="DamagePayload.Taken"/> off the target's HP, spends the Ward
     /// levels that swallowed the rest, lands the settled status applications
     /// on both sides (riders on the defender, BlockWeaken on the attacker),
     /// hands the projected resolution to the target's typed hit feed
     /// (CharacterHit or EnemyHit, fixed when the roster was typed at
-    /// construction — never by asking the target its kind), then, on a
-    /// survivor, answers a successful block with the defender's Riposte and
+    /// construction — never by asking the target its kind), credits the
+    /// attacker's proficiency in the weapon's class with what the blow was worth
+    /// (§2.2), then, on a survivor, answers a successful block with the
+    /// defender's Riposte and
     /// performs the settled displacement tile by tile (step 8), and queues
     /// the follow-ups for the table to drain after it returns, in this order:
     /// Killed on a death, DamageDealt always, Crit on a crit. The order is a
@@ -1535,6 +1624,22 @@ public sealed class TurnSystem
         if (!_hitFeeds.TryGetValue(target, out var hitFeed))
             throw new InvalidOperationException("Hit an actor that is not on this turn system's roster.");
         hitFeed(CombatRules.Project(settled));
+
+        // What the blow taught the weapon (§2.2): its own damage after Block and
+        // before Ward, plus what the entries it was forged with added — never
+        // what was grafted on later. Credited here, from the payload the chain
+        // handed back, because the attacker cannot know what it did until the
+        // defender's handlers have run: damage is a value that returns.
+        //
+        // Per body, so a fan that crosses a ladder step pays the new level to
+        // the bodies it has not reached yet: the level is re-read at step 1 of
+        // each hit and this credit lands between them, so one swing can deal 15
+        // to its first four targets and 16 to its fifth. Intended, and
+        // deterministic — target order is the reach's and no roll is re-taken.
+        // Pinned by ProficiencyEffectTests.ALevelCrossedMidSwingPaysTheLaterBodies
+        // and by AttackShapeTests.GreatAxe_TwoExtra, so a single body taking one
+        // extra point reads as a level-up rather than an arithmetic slip.
+        CreditXp(attacker, new XpCredit(XpPool.Weapon, settled.Weapon.Class, settled.WeaponDealt + settled.ForgedShare));
 
         // The triggers the chain settled — the attacker's entries at step 4,
         // the defender's Sturdy and Immovable — are spent first, each side's

@@ -15,9 +15,9 @@ public class CombatRulesTests
     /// <summary>Resolve through the compiled chain with a party member holding each weapon (null: unarmed).</summary>
     private static AttackResolution Resolve(Weapon attackerWeapon, Weapon? defenderWeapon, int roll)
     {
-        var attacker = new PartyMemberState { Id = "A", ColorIndex = 0 };
+        var attacker = TestPools.Char("A");
         attacker.Inventory[0] = attackerWeapon;
-        var defender = new PartyMemberState { Id = "B", ColorIndex = 0 };
+        var defender = TestPools.Char("B");
         defender.Inventory[0] = defenderWeapon;
         return CombatRules.ResolveAttack(attacker, defender, attackerWeapon, distanceUnits: 0, () => roll);
     }
@@ -108,12 +108,17 @@ public class CombatRulesTests
         Assert.Equal(
             new[] { WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear },
             Enum.GetValues<WeaponClass>().Take(3));
+
+        // Read off the roster, which is where the game reads it: the loadout was
+        // stated twice -- once as content and once as a pair of arrays beside
+        // this assertion -- and only the arrays spawned, so pinning them pinned
+        // the copy that could drift. The arrays are gone; this is the statement.
         Assert.Equal(
             new[] { "weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal" },
-            GameConstants.CharStartingWeaponIds);
+            GameContent.Current.Party.All.Select(m => m.StartingWeaponId));
         Assert.Equal(
             new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire" },
-            GameConstants.StartingBagWeaponIds);
+            GameContent.Current.Party.All.Select(m => m.BagWeaponIds.Single()));
     }
 
     [Fact]

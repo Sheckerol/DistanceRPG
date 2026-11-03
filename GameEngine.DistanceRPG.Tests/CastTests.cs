@@ -18,7 +18,7 @@ public class CastTests
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
-        var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var c = TestPools.Char(id, x: x, y: y);
         c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }
@@ -100,7 +100,7 @@ public class CastTests
 
         Assert.Equal(1, b.StatusLevel(Regeneration));
         Assert.Equal(GameConstants.MaxDistance - 40, a.DistLeft);
-        Assert.Equal(GameConstants.MaxMana - 13 - 1, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 13 - 1, a.Mana);
         Assert.Equal(((ActorState)a, 14, 14, "staff_of_renewal"), Assert.Single(spent));
         Assert.Equal(new StatusEffect(Regeneration, null, 1), buffed);
         Assert.Equal(((ActorState)b, new StatusEffect(Regeneration, null, 1), (ActorState)a), Assert.Single(applied));
@@ -133,7 +133,7 @@ public class CastTests
         Assert.Equal(3, enemy.StatusLevel(Poison));
         Assert.Empty(b.StatusEffects);
         Assert.Equal(19, CastMana(a.EquippedWeapon!, 3));
-        Assert.Equal(GameConstants.MaxMana - 18 - 1, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 18 - 1, a.Mana);
         Assert.Equal(((ActorState)a, 19, 19, "staff_of_blight"), Assert.Single(spent));
         Assert.Equal((enemy, new StatusEffect(Poison, null, 3)), Assert.Single(buffed));
 
@@ -153,7 +153,7 @@ public class CastTests
         Assert.False(turns.CanCast(a, b));
         Assert.True(turns.TryCast(a, enemy));
         Assert.Equal(2, enemy.StatusLevel(Mire));
-        Assert.Equal(GameConstants.MaxMana - 22 - 1, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 22 - 1, a.Mana);
         Assert.Equal(80f, StatusBehaviours.MiredBudget(enemy, GameConstants.EnemyMove));
     }
 
@@ -164,7 +164,7 @@ public class CastTests
         Assert.False(turns.CanCast(a, enemy));
         Assert.False(turns.TryCast(a, enemy));
         Assert.Empty(enemy.StatusEffects);
-        Assert.Equal(GameConstants.MaxMana, a.Mana);
+        Assert.Equal(TestPools.FixtureMana, a.Mana);
         Assert.Equal(GameConstants.MaxDistance, a.DistLeft);
     }
 
@@ -176,10 +176,10 @@ public class CastTests
         Assert.False(turns.CanCast(a, enemy));
         Assert.True(turns.TryCast(a, b));
         Assert.Equal(5, b.StatusLevel(Ward));
-        Assert.Equal(GameConstants.MaxMana - 18 - 4, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 18 - 4, a.Mana);
         Assert.True(turns.TryCast(a, a));
         Assert.Equal(5, a.StatusLevel(Ward));
-        Assert.Equal(GameConstants.MaxMana - 2 * 22, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 2 * 22, a.Mana);
     }
 
     [Fact]
@@ -193,7 +193,7 @@ public class CastTests
         b.Alive = false;
         Assert.False(turns.CanCast(a, b));
         b.Alive = true;
-        Assert.False(turns.CanCast(a, new PartyMemberState { Id = "X", ColorIndex = 0, X = a.X, Y = a.Y }));   // not on the roster
+        Assert.False(turns.CanCast(a, TestPools.Char("X", x: a.X, y: a.Y)));   // not on the roster
         turns.EndTurn();
         Assert.Equal(TurnPhase.TurnEnding, turns.Phase);
         Assert.False(turns.CanCast(a, b));
@@ -214,7 +214,7 @@ public class CastTests
         var casts = CastProbe(turns);
         Assert.True(turns.TryCast(a, b));
         Assert.Equal(2, b.StatusLevel(Regeneration));
-        Assert.Equal(GameConstants.MaxMana - 6 - 1, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 6 - 1, a.Mana);
         var cast = Assert.Single(casts);
         Assert.Equal((20, true, false, 2, 6, 1), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
 
@@ -222,7 +222,7 @@ public class CastTests
         Assert.True(turns2.TryCast(a2, enemy));
         Assert.Equal(4, enemy.StatusLevel(Mire));
         Assert.Equal(60f, StatusBehaviours.MiredBudget(enemy, GameConstants.EnemyMove));
-        Assert.Equal(GameConstants.MaxMana - 11 - 2, a2.Mana);
+        Assert.Equal(TestPools.FixtureMana - 11 - 2, a2.Mana);
 
         // The window is the caster's: an innate CritWindow x1 makes 19 a crit too; without it 19 is a plain cast.
         var (turns3, a3, b3, _) = Scene("staff_of_renewal", () => 19);
@@ -248,7 +248,7 @@ public class CastTests
         var spent = ManaProbe(turns);
         Assert.True(turns.TryCast(a, b));
         Assert.Equal(1, b.StatusLevel(Regeneration));
-        Assert.Equal(GameConstants.MaxMana - 26 - 1, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 26 - 1, a.Mana);
         var cast = Assert.Single(casts);
         Assert.Equal((1, false, true, 1, 26, 1), (cast.Roll, cast.IsCrit, cast.IsFumble, cast.Levels, cast.ManaCost, cast.ManaToSpend));
         Assert.Equal(((ActorState)a, 27, 27, "staff_of_renewal"), Assert.Single(spent));
@@ -293,19 +293,19 @@ public class CastTests
         Assert.Equal((10, 2), (staff.ResolvedManaCost, ward.ResolvedTriggerCost(staff, 5)));
         Assert.True(turns.TryCast(a, b));
         Assert.Equal(5, b.StatusLevel(Ward));
-        Assert.Equal(GameConstants.MaxMana - 12, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 12, a.Mana);
         staff.Acquire(Resonant, 1);
         Assert.Equal((8, 2), (staff.ResolvedManaCost, ward.ResolvedTriggerCost(staff, 5)));
         Assert.True(turns.TryCast(a, b));
         Assert.Equal(10, b.StatusLevel(Ward));
-        Assert.Equal(GameConstants.MaxMana - 12 - 10, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 12 - 10, a.Mana);
 
         // Same Mire, cheaper: the discounted cast lands the full two levels for 12 plus the 1 trigger.
         var (turns2, a2, _, enemy) = Scene("staff_of_mire");
         a2.EquippedWeapon!.Acquire(Resonant, 4);
         Assert.True(turns2.TryCast(a2, enemy));
         Assert.Equal(2, enemy.StatusLevel(Mire));
-        Assert.Equal(GameConstants.MaxMana - 12 - 1, a2.Mana);
+        Assert.Equal(TestPools.FixtureMana - 12 - 1, a2.Mana);
     }
 
     [Fact]
@@ -384,7 +384,7 @@ public class CastTests
         Assert.Equal(TurnPhase.Player, turns.Phase);
         Assert.Equal(12, near.StatusLevel(Poison));
         Assert.Empty(far.StatusEffects);
-        Assert.Equal(GameConstants.PlayerHp, near.Hp);   // it ticks at the member's own turn end
+        Assert.Equal(TestPools.FixtureHp, near.Hp);   // it ticks at the member's own turn end
         Assert.Equal(GameConstants.MaxMana - 4 * 19, caster.Mana);
         Assert.Equal(new[] { 3, 6, 9, 12 }, applied.Select(x => x.Effect.Levels));
         Assert.All(applied, x => { Assert.Same(near, x.Target); Assert.Same(caster, x.Source); });
@@ -392,7 +392,7 @@ public class CastTests
 
         // The member's own turn end takes the twelve and a level off.
         turns.EndTurn();
-        Assert.Equal(GameConstants.PlayerHp - 12, near.Hp);
+        Assert.Equal(TestPools.FixtureHp - 12, near.Hp);
         Assert.Equal(11, near.StatusLevel(Poison));
     }
 
@@ -464,7 +464,7 @@ public class CastTests
         Assert.Equal(new[] { "Cast (0,0) regeneration@0" }, turns.Events.HandlersFor(GameEvent.Cast, a).Select(h => h.ToString()));
         Assert.Equal(new[] { "Cast (0,0) Enchantments" }, turns.Events.HandlersFor(GameEvent.Cast, b).Select(h => h.ToString()));
         Assert.Equal(new[] { "Cast (0,0) Enchantments" },
-            turns.Events.HandlersFor(GameEvent.Cast, new PartyMemberState { Id = "X", ColorIndex = 0 }).Select(h => h.ToString()));
+            turns.Events.HandlersFor(GameEvent.Cast, TestPools.Char("X")).Select(h => h.ToString()));
         Assert.Equal("Enchantments", EnchantmentBehaviours.LoopName);
     }
 
@@ -523,6 +523,6 @@ public class CastTests
         Assert.Equal(new StatusEffect(Searing, DamageType.Flaming, 3), Assert.Single(enemy.StatusEffects));
         Assert.Equal(3, enemy.StatusLevel(Searing, DamageType.Flaming));
         Assert.Equal(new StatusApplication(Searing, DamageType.Flaming, 3), Assert.Single(Assert.Single(casts).ApplyToTarget));
-        Assert.Equal(GameConstants.MaxMana - 18 - 1, a.Mana);   // 6 / 3 = 2 for three levels, less 10%
+        Assert.Equal(TestPools.FixtureMana - 18 - 1, a.Mana);   // 6 / 3 = 2 for three levels, less 10%
     }
 }

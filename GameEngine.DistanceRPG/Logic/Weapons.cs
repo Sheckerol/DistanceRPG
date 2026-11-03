@@ -17,7 +17,18 @@ public sealed class Weapon
     /// <summary>Percentages are integers out of this.</summary>
     private const int Percent = 100;
 
-    public Weapon(WeaponDef def, IReadOnlyList<Enchantment> enchantments)
+    /// <param name="def">The row this item is stamped from.</param>
+    /// <param name="enchantments">The entries attached, in attachment order: the forged ones first, anything acquired behind them.</param>
+    /// <param name="forgedCount">
+    /// How many of <paramref name="enchantments"/>, counted from the front, are
+    /// forged. Defaults to what <paramref name="def"/> lists, so an entry handed
+    /// in past that list is one something attached later;
+    /// <see cref="WeaponCatalogue.Instantiate"/> passes its own count, because a
+    /// wand's element is supplied at instantiation and is forged all the same
+    /// (§1.4, §3.1) though no def lists it.
+    /// </param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="forgedCount"/> is not a count of <paramref name="enchantments"/>.</exception>
+    public Weapon(WeaponDef def, IReadOnlyList<Enchantment> enchantments, int? forgedCount = null)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(enchantments);
@@ -33,6 +44,11 @@ public sealed class Weapon
         Forged = ModifierSet.Of(def.Forged.Select(kv => (kv.Key, kv.Value)).ToArray());
         Modifiers = Forged;
         Enchantments = enchantments.ToArray();   // attachment order, copied so nothing outside can reorder it
+        int forged = forgedCount ?? Math.Min(def.Enchantments.Count, Enchantments.Count);
+        if (forged < 0 || forged > Enchantments.Count)
+            throw new ArgumentOutOfRangeException(nameof(forgedCount), forgedCount,
+                $"'{def.Id}' was handed {Enchantments.Count} entries; the forged ones are a prefix of them.");
+        ForgedEnchantmentCount = forged;
         AreaShape = def.Shape;
         Unique = def.Unique;
         Resolve();
@@ -55,6 +71,31 @@ public sealed class Weapon
 
     /// <summary>In attachment order, which is gameplay (§1.7): never normalised, sorted or deduped.</summary>
     public IReadOnlyList<Enchantment> Enchantments { get; }
+
+    /// <summary>
+    /// How many of <see cref="Enchantments"/>, from the front, are forged: part
+    /// of what the weapon <em>is</em>, rather than what was attached to it later
+    /// (§3.1). The same line <see cref="Forged"/> draws through the modifiers,
+    /// drawn through the entries — fixed at construction, never written again.
+    /// <para>
+    /// The distinction is not weapon-versus-magic: a staff's effect and a wand's
+    /// element are forged, and they are the whole of what those weapons do — a
+    /// wand with no forged entry would have no XP source at all (§2.2). It is
+    /// what weapon proficiency is credited on, which is why it is a count here
+    /// and not a convention at the credit site: a wizard's Arcane dagger levels
+    /// daggers on the knife alone.
+    /// </para>
+    /// </summary>
+    public int ForgedEnchantmentCount { get; }
+
+    /// <summary>Whether the entry at <paramref name="index"/> of <see cref="Enchantments"/> is forged (<see cref="ForgedEnchantmentCount"/>).</summary>
+    /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>.</exception>
+    public bool IsForged(int index)
+    {
+        if ((uint)index >= (uint)Enchantments.Count)
+            throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {Enchantments.Count} enchantments.");
+        return index < ForgedEnchantmentCount;
+    }
 
     /// <summary>A wand's geometry; null for everything else.</summary>
     public AreaShape? AreaShape { get; }

@@ -24,7 +24,7 @@ public class StatusEffectTests
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId = "weakspot_stiletto")
     {
-        var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var c = TestPools.Char(id, x: x, y: y);
         c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }
@@ -74,7 +74,7 @@ public class StatusEffectTests
 
         Assert.Equal(1, b.StatusLevel(Regeneration));
         Assert.Equal(GameConstants.MaxDistance - Staff.Cost, a.DistLeft);
-        Assert.Equal(GameConstants.MaxMana - RenewalCastMana, a.Mana);   // 13 (Resonant x1) plus the innate's 1 trigger
+        Assert.Equal(TestPools.FixtureMana - RenewalCastMana, a.Mana);   // 13 (Resonant x1) plus the innate's 1 trigger
         Assert.NotNull(buffed);
         Assert.Equal(1, buffed!.Levels);
     }
@@ -89,7 +89,7 @@ public class StatusEffectTests
         Assert.True(turns.TryCast(a, b));
 
         Assert.Equal(3, b.StatusLevel(Regeneration));
-        Assert.Equal(GameConstants.MaxMana - 3 * RenewalCastMana, a.Mana);
+        Assert.Equal(TestPools.FixtureMana - 3 * RenewalCastMana, a.Mana);
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public class StatusEffectTests
     public void EndTurn_RegenHealsByLevelThenDecays()
     {
         var (turns, _, b) = Scene();
-        b.Hp = 50;
+        b.Hp = b.MaxHp - 50;
         b.ApplyStatus(Regeneration, null, 3);
 
         var healed = new List<int>();
@@ -160,7 +160,7 @@ public class StatusEffectTests
 
         turns.EndTurn();
 
-        Assert.Equal(53, b.Hp);
+        Assert.Equal(b.MaxHp - 47, b.Hp);
         Assert.Equal(2, b.StatusLevel(Regeneration));
         Assert.Equal(new[] { 3 }, healed);
     }
@@ -169,12 +169,12 @@ public class StatusEffectTests
     public void EndTurn_RegenIsRemovedAtExpiry()
     {
         var (turns, _, b) = Scene();
-        b.Hp = 50;
+        b.Hp = b.MaxHp - 50;
         b.ApplyStatus(Regeneration, null, 1);
 
         turns.EndTurn();
 
-        Assert.Equal(51, b.Hp);
+        Assert.Equal(b.MaxHp - 49, b.Hp);
         Assert.Empty(b.StatusEffects);
     }
 
@@ -275,9 +275,9 @@ public class StatusEffectTests
         Assert.True(12 >= staff.ResolvedManaCost + TriggerManaAtSix);
 
         // Never past the pool, nothing from nothing, and nothing for the dead.
-        caster.Mana = GameConstants.MaxMana - 3;
+        caster.Mana = TestPools.FixtureMana - 3;
         Assert.Equal(3, caster.RegenManaFromUnusedMovement(GameConstants.MaxDistance));
-        Assert.Equal(GameConstants.MaxMana, caster.Mana);
+        Assert.Equal(TestPools.FixtureMana, caster.Mana);
         caster.Mana = 0;
         Assert.Equal(0, caster.RegenManaFromUnusedMovement(9f));
         caster.Alive = false;
@@ -430,7 +430,7 @@ public class StatusEffectTests
         var ticks = new List<StatusTick>();
         turns.ActorStatusTicked += (actor, tick) => { if (actor == b) ticks.Add(tick); };
         turns.EndTurn();
-        Assert.Equal(GameConstants.PlayerHp - 4 - 2, b.Hp);
+        Assert.Equal(TestPools.FixtureHp - 4 - 2, b.Hp);
         Assert.Equal(3, b.StatusLevel(Searing, DamageType.Flaming));
         Assert.Equal(1, b.StatusLevel(Searing, DamageType.Cold));
         Assert.Equal(new[] { (DamageType.Flaming, 4), (DamageType.Cold, 2) }, ticks.Select(t => (t.Element!.Value, t.Damage)));
@@ -575,7 +575,7 @@ public class StatusEffectTests
         Assert.Equal(0, b.StatusLevel(Weakened));
         Assert.DoesNotContain(b.StatusEffects, e => e.Type == Weakened);
         Assert.Equal(1, b.StatusLevel(Poison));   // 2 ticked, minus one; the sweep left it alone
-        Assert.Equal(GameConstants.PlayerHp - 2, b.Hp);
+        Assert.Equal(TestPools.FixtureHp - 2, b.Hp);
 
         // The enemy side decays on the same round.
         var (turns2, _, _, enemy) = SceneWithEnemy();

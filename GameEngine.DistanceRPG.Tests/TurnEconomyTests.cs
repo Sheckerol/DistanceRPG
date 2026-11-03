@@ -13,7 +13,7 @@ public class TurnEconomyTests
 
     private static PartyMemberState Char(string id, float x, float y, string weaponId)
     {
-        var c = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var c = TestPools.Char(id, x: x, y: y);
         c.Inventory[0] = TestWeapons.Get(weaponId);
         return c;
     }

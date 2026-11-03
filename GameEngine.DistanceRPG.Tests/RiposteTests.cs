@@ -16,7 +16,7 @@ public class RiposteTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var ch = TestPools.Char(id, x: x, y: y);
         ch.Inventory[0] = TestWeapons.Get(weaponId);
         return ch;
     }
@@ -53,7 +53,7 @@ public class RiposteTests
         turns.EnemyHit += (_, r) => enemyHits.Add(r);
 
         Hit(turns, enemy, a, 10);
-        Assert.Equal(GameConstants.PlayerHp - 7, a.Hp);   // 10 into Block 3: a successful block
+        Assert.Equal(TestPools.FixtureHp - 7, a.Hp);   // 10 into Block 3: a successful block
         Assert.Same(a, Assert.Single(countered));
         var counter = Assert.Single(enemyHits);
         Assert.Equal((7, 3), (counter.Taken, counter.Blocked));   // the counter is a hit like any other: 10 into the dummy's Block 3
@@ -64,7 +64,7 @@ public class RiposteTests
 
         // The second blocked hit this turn goes unanswered: one counter per stack per turn.
         Hit(turns, enemy, a, 10);
-        Assert.Equal(GameConstants.PlayerHp - 14, a.Hp);
+        Assert.Equal(TestPools.FixtureHp - 14, a.Hp);
         Assert.Single(countered);
         Assert.Equal(200 - 7, enemy.Hp);
 
@@ -84,7 +84,7 @@ public class RiposteTests
         int counters = 0;
         crit.RiposteTriggered += _ => counters++;
         Hit(crit, kris, b, 19);
-        Assert.Equal(GameConstants.PlayerHp - 45, b.Hp);
+        Assert.Equal(TestPools.FixtureHp - 45, b.Hp);
         Assert.Equal(0, counters);
         Assert.Equal(200, kris.Hp);
 
@@ -95,7 +95,7 @@ public class RiposteTests
         int farCounters = 0;
         far.RiposteTriggered += _ => farCounters++;
         Hit(far, archer, c, 10);
-        Assert.Equal(GameConstants.PlayerHp - 6, c.Hp);   // 5 + 4 (Longshot x1: seven tiles, four past the free three) into Block 3, blocked all the same
+        Assert.Equal(TestPools.FixtureHp - 6, c.Hp);   // 5 + 4 (Longshot x1: seven tiles, four past the free three) into Block 3, blocked all the same
         Assert.Equal(0, farCounters);
         Assert.Equal(200, archer.Hp);
     }
@@ -118,6 +118,6 @@ public class RiposteTests
         Assert.Equal(200 - 7, enemy.Hp);                   // 10 into Block 3
         Assert.Same(enemy, Assert.Single(countered));
         Assert.Equal(1, characterHits);
-        Assert.Equal(GameConstants.PlayerHp - 4, a.Hp);   // the counter's 10 into the Tower Guard's 6 — and no counter to the counter: A holds no Riposte
+        Assert.Equal(TestPools.FixtureHp - 4, a.Hp);   // the counter's 10 into the Tower Guard's 6 — and no counter to the counter: A holds no Riposte
     }
 }

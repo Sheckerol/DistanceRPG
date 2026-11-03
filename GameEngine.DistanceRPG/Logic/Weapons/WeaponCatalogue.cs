@@ -58,6 +58,12 @@ public sealed class WeaponCatalogue
     /// drop (§3.1): it becomes the first enchantment, ahead of anything the
     /// entry lists. Nothing else takes an element. A unique enchantment is
     /// attached at tier 1 whatever the entry asked for.
+    /// <para>
+    /// Everything attached here is forged — what the weapon is as it drops, the
+    /// element included (§3.1) — so the count goes to the item rather than the
+    /// def's list being counted again there: only what is grafted on afterwards
+    /// is acquired (<see cref="Weapon.ForgedEnchantmentCount"/>).
+    /// </para>
     /// </summary>
     /// <exception cref="KeyNotFoundException">No such weapon, or an enchantment it names is unknown.</exception>
     /// <exception cref="ArgumentException">A wand with no element, or an element on anything else.</exception>
@@ -92,6 +98,6 @@ public sealed class WeaponCatalogue
             attached.Add(new Enchantment(entry, entry.Unique ? 1 : Math.Max(1, def.Enchantments[i].Tier)));
         }
 
-        return new Weapon(def, attached);
+        return new Weapon(def, attached, forgedCount: attached.Count);
     }
 }

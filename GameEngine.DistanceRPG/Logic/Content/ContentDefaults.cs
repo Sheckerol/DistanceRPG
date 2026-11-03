@@ -187,6 +187,36 @@ public static class ContentDefaults
     private const int WandCost = 45;
     private const int WandManaCost = 20;
 
+    // ---- The starting roster (§5.9): the §2.1 table, verbatim ----
+
+    /// <summary>
+    /// The four starting members as <c>party.json</c> would declare them: the
+    /// §2.1 table's spreads and starting weapons, with the slot-1 staff the
+    /// party has always carried and D's second, debuff staff in the bag.
+    /// <para>
+    /// Every spread is a permutation of 1–4, so no member is better endowed than
+    /// another; the pairs mirror each other, which is what makes each stat
+    /// somebody's 4 exactly once and leaves D the party's only CON 1 — the
+    /// caster as the single thing that must not be reached. The axe goes to C,
+    /// the only STR 4, and D gives up the second spear for a staff, because a
+    /// party with no caster never discovers half the game.
+    /// </para>
+    /// Expect these to move after playing: the permutation rule is the part
+    /// worth keeping, and which member gets which permutation is a first guess.
+    /// </summary>
+    public static readonly PartyData Party = new(
+    [
+        //             id   name       STR DEX CON INT   equipped                bag
+        Member("A", "Dagger", 1, 4, 2, 3, "weakspot_stiletto", "staff_of_renewal"),
+        Member("B", "Shield", 3, 1, 4, 2, "tower_guard", "staff_of_renewal"),
+        Member("C", "Axe", 4, 2, 3, 1, "great_axe", "staff_of_renewal"),
+        Member("D", "Caster", 2, 3, 1, 4, "staff_of_renewal", "staff_of_mire"),
+    ]);
+
+    private static PartyMemberDef Member(string id, string name, int str, int dex, int con, int @int,
+        string startingWeaponId, params string[] bagWeaponIds)
+        => new(id, name, new InnateStats(str, dex, con, @int), startingWeaponId, bagWeaponIds);
+
     private static EnchantmentDef Innate(string id, string name, TargetSide targets, int @lock, int potency, StatusEffectType applies)
         => new(id, name, EffectKind.ApplyStatus, targets, @lock, Trigger: null, potency, ApplyPercent: 100, applies, DamageType: null, Unique: false);
 

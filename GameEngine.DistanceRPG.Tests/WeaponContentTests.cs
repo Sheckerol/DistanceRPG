@@ -391,7 +391,8 @@ public class WeaponContentTests
     [InlineData(8, 12)]
     public void CritWindowLadder(int stacks, int threshold)
     {
-        var actor = new PartyMemberState { Id = "A", ColorIndex = 0, Innate = ModifierSet.Of((CritWindow, stacks)) };
+        var actor = TestPools.Char("A");
+        actor.Innate = ModifierSet.Of((CritWindow, stacks));
         Assert.Equal(threshold, CombatRules.CritThreshold(actor));
     }
 

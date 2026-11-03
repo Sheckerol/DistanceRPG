@@ -59,12 +59,14 @@ public static class CombatBehaviours
     /// <see cref="CritMultiplier"/>, whose Offset carries the base x2; a natural
     /// 1 halves it, floored at 1. Weapon plus innate, resolved together.
     /// <see cref="DamagePayload.WeaponShare"/> shadows <see cref="DamagePayload.Amount"/>
-    /// until step 3 closes it.
+    /// until step 3 closes it. The base the roll acts on is the wielder's, not
+    /// the item's: <see cref="CombatRules.BaseDamage"/> carries the proficiency
+    /// bonus (§2.2) into it, so a crit multiplies that too.
     /// </summary>
     public static DamagePayload Step1_RollToBase(DamagePayload payload, ActorState self, ActorState other)
     {
         var roll = CombatRules.RollToBase(
-            payload.Roll, payload.Weapon.Damage, CombatRules.CritThreshold(self), self.Value(CritMultiplier));
+            payload.Roll, CombatRules.BaseDamage(self, payload.Weapon), CombatRules.CritThreshold(self), self.Value(CritMultiplier));
         return payload with
         {
             Amount = roll.Damage,
@@ -85,14 +87,16 @@ public static class CombatBehaviours
     /// qualifies — fight at full extension and every stack pays, step in and
     /// none do; on a bow it is the curve the whole room is measured on. A
     /// reaction carries the distance it was earned at, so a brace at reach
-    /// pays the same way a swing at reach does.
+    /// pays the same way a swing at reach does. The re-take goes through
+    /// <see cref="CombatRules.BaseDamage"/> like the first one, so the
+    /// wielder's proficiency bonus survives it rather than being overwritten.
     /// </summary>
     public static DamagePayload Longshot(DamagePayload payload, ActorState self, ActorState other)
     {
         int bonus = LongshotBonus(self, payload.DistanceUnits);
         if (bonus <= 0) return payload;
         var roll = CombatRules.RollToBase(
-            payload.Roll, payload.Weapon.Damage + bonus, CombatRules.CritThreshold(self), self.Value(CritMultiplier));
+            payload.Roll, CombatRules.BaseDamage(self, payload.Weapon, bonus), CombatRules.CritThreshold(self), self.Value(CritMultiplier));
         return payload with { Amount = roll.Damage, WeaponShare = roll.Damage };
     }
 

@@ -164,4 +164,42 @@ public sealed record Tuning
 
     /// <summary>Percentage of an area cast's damage an ally takes when friendly fire is on.</summary>
     public int FriendlyFireAllyPercent { get; init; } = 50;
+
+    // ---- Progression (§2.1, §2.2) ----
+    // StartingPool is §5.3's own key, in its Economy group. WeaponXpPerLevel is
+    // named here, because §5.3 names the weapon ladder's 100 nowhere at all; the
+    // Economy group is where it lands when Phase 5 writes tuning.json. They are
+    // the two numbers a playtest would actually turn; the shape of a level's
+    // effect (Progression.DamagePerLevels and the rest) stays compiled.
+
+    /// <summary>
+    /// The bar every point-growing pool opens on (§2.1): max HP, max mana and —
+    /// from Phase 6a — a weapon's wear capacity alike, so the 25 is never a bare
+    /// literal in three places. A point costs <c>currentMax / governingStat</c>
+    /// from here, which is why a CON 1 wizard and a CON 4 fighter start level and
+    /// diverge rather than starting apart. Below 1 there is no step to take, and
+    /// <see cref="ContentValidator.ValidateTuning"/> refuses it at load.
+    /// <para>
+    /// <strong>A caster's pool opens here too, on 25 and not on 160.</strong>
+    /// settled.md had both figures live; the 160 in §1.3's derivations is the
+    /// <em>movement</em> budget — <c>(160 - 40) / (8 + 3)</c> divides a staff's
+    /// 40-unit movement cost out of <see cref="GameConstants.MaxDistance"/>,
+    /// which is what <see cref="MovementUnitsPerMana"/> above is derived from —
+    /// so there is no second starting-mana key and this one number is every
+    /// pool's bar. Recorded under settled.md's Phase 2 implementation pass, with
+    /// the consequence it accepts: a fresh caster gets one cast from a full
+    /// pool. The pool an actor with no progression carries is
+    /// <see cref="GameConstants.MaxMana"/>, and is a different number.
+    /// </para>
+    /// </summary>
+    public int StartingPool { get; init; } = 30;
+
+    /// <summary>
+    /// The weapon ladder's bar per level (§2.2): the doc's
+    /// <c>xpToNext(L) = 100 * L / governingStat</c> is
+    /// <c>XpToNext(WeaponXpPerLevel * L, stat)</c>, so the ladder and the pools
+    /// run on one function. Marked "tune later" where it is written and left
+    /// unnamed there; this is the name.
+    /// </summary>
+    public int WeaponXpPerLevel { get; init; } = 100;
 }

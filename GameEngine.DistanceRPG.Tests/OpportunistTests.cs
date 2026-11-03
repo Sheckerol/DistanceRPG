@@ -17,7 +17,7 @@ public class OpportunistTests
     private static PartyMemberState Char(string id, int r, int c, string weaponId)
     {
         var (x, y) = At(r, c);
-        var ch = new PartyMemberState { Id = id, ColorIndex = 0, X = x, Y = y };
+        var ch = TestPools.Char(id, x: x, y: y);
         ch.Inventory[0] = TestWeapons.Get(weaponId);
         return ch;
     }
@@ -186,7 +186,7 @@ public class OpportunistTests
         (a.X, a.Y) = At(5, 2);
         turns.NotifyCharacterMoved(a);
         Assert.Same(axe, Assert.Single(fired));
-        Assert.Equal(GameConstants.PlayerHp - 18, a.Hp);   // no shield on a dagger
+        Assert.Equal(TestPools.FixtureHp - 18, a.Hp);   // no shield on a dagger
 
         // Back in and out again: one per stack per turn.
         (a.X, a.Y) = At(5, 5);
@@ -204,6 +204,6 @@ public class OpportunistTests
         (b.X, b.Y) = At(5, 2);
         turns2.NotifyCharacterMoved(b);
         Assert.Equal(0, ambushes);
-        Assert.Equal(GameConstants.PlayerHp, b.Hp);
+        Assert.Equal(TestPools.FixtureHp, b.Hp);
     }
 }

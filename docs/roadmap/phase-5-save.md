@@ -86,7 +86,7 @@ Everything currently flagged as a knob, gathered in one place:
 | Farming | `DefeatStackChance`, `ReviveStepPercent`, `ResurrectTurnsBase`, `ResurrectTurnsFloor`, `CleanKillBonus` |
 | Uniques | `UniqueChanceCeiling`, `UniqueChanceMidpoint`, `UniqueChanceK` |
 | Dungeon | `BossFloorMin`, `BossFloorMax`, `BossStackOffset`, `CooldownRunsPerFloor`, `MercyFloor`, `DeathXpLossPercent` |
-| Enchanter | `WearPerHit`, `WearCapacityLadder` (25/30/40), `EnchantmentWearCost`, `GraftBaseChance` |
+| Enchanter | `WearPerHit`, `WearCapacityLadder` (30/40/55), `EnchantmentWearCost`, `GraftBaseChance` |
 | Inventory | `PartyCarrySlots` |
 | Consumables | `PotionUseCost`, `HealthPotionPercent`, `ManaPotionPercent`, `FarmYieldPerClear` |
 

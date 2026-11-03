@@ -13,8 +13,21 @@ public abstract class ActorState
     public float X { get; set; }
     public float Y { get; set; }
 
-    /// <summary>Current hit points; each kind of actor starts at its own full value.</summary>
-    public int Hp { get; set; }
+    /// <summary>
+    /// Current hit points; full at spawn — HP nobody has written reads as this
+    /// actor's own <see cref="MaxHp"/>, the same shape <see cref="Mana"/> has.
+    /// A kind whose maximum is computed from its own state (a party member's
+    /// earned points, §2.1) therefore spawns at whatever that computes to, with
+    /// no construction-order problem: the maximum is asked for when it is
+    /// wanted, not copied at the moment the actor is made.
+    /// </summary>
+    public int Hp
+    {
+        get => _hp ?? MaxHp;
+        set => _hp = value;
+    }
+
+    private int? _hp;
 
     /// <summary>Full hit points for this kind of actor.</summary>
     public abstract int MaxHp { get; }
@@ -42,6 +55,55 @@ public abstract class ActorState
     /// stacks resolve together, so a modifier's offset applies once.
     /// </summary>
     public int Value(ModifierType t) => GameContent.Current.Modifiers.Resolve(t, Stacks(t));
+
+    /// <summary>
+    /// The level this actor wields <paramref name="weapon"/> at: its proficiency
+    /// in that weapon's class (§2.2). Declared here, and virtual, so a rule that
+    /// reads a wielder's level — the damage bonus and the movement discount —
+    /// asks whoever is holding the thing rather than asking what kind of actor
+    /// it is.
+    /// <para>
+    /// <strong>Serrated does not read this.</strong> settled.md carried two
+    /// formulas for its magnitude — an earlier
+    /// <c>BleedPercent × (base damage + proficiency level)</c> and a later
+    /// "Serrated reads the weapon's share too" — and the later one is the rule
+    /// (recorded under the Phase 2 implementation pass). It loses nothing by it:
+    /// the weapon's share of what was dealt already carries this level, because
+    /// the damage bonus is part of the weapon's own damage before anything else
+    /// touches it.
+    /// </para>
+    /// <para>
+    /// The base is <see cref="Progression.StartingLevel"/>, whatever is held:
+    /// proficiency is a party member's, and an actor with no pools wields
+    /// everything at the level a class nobody has trained is wielded at. Both
+    /// level effects are no-ops there, so an enemy swings for exactly its
+    /// weapon's own numbers.
+    /// </para>
+    /// </summary>
+    public virtual int WeaponLevel(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return Progression.StartingLevel;
+    }
+
+    /// <summary>
+    /// The movement one swing or cast of <paramref name="weapon"/> costs this
+    /// actor: the weapon's own resolved cost — Light's discount already in it —
+    /// less the wielder's proficiency discount, never below
+    /// <see cref="Progression.MinimumMovementCost"/> (§2.2).
+    /// <para>
+    /// The discount is the wielder's and the cost is the weapon's, so the two
+    /// meet here and never on <see cref="Weapon.ResolvedCost"/>, which knows no
+    /// wielder and reads the same for an item in the bag as for one in hand.
+    /// Every gate and every charge in the turn system asks this, so what a swing
+    /// is refused for and what it is billed are one number.
+    /// </para>
+    /// </summary>
+    public int MovementCost(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        return Progression.MovementCost(weapon.ResolvedCost, WeaponLevel(weapon));
+    }
 
     /// <summary>
     /// The damage type this actor is attuned to, or null: what a typed hit

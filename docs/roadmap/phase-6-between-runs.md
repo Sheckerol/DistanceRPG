@@ -85,17 +85,17 @@ pool for every step:
 
 | Step | Capacity | Wear needed to reach the next |
 | --- | --- | --- |
-| Fresh | **25** | 25 |
-| Second | **30** | 30 |
-| Third | **40** | — |
+| Fresh | **30** | 30 |
+| Second | **40** | 40 |
+| Third | **55** | — |
 
 **Three steps and no fourth**, deliberately. A fourth is a number invented
 against a game nobody has played; these three are enough to see whether the
 curve feels like anything, and the ladder is authored rather than computed
 precisely so a fourth can be appended the moment play asks for one.
 
-The steps widen because the bar does. Reaching the third step means cashing 25
-and then 30 — 55 hits' worth of fighting on one weapon (§6.1), across at least
+The steps widen because the bar does. Reaching the third step means cashing 30
+and then 40 — 70 hits' worth of fighting on one weapon (§6.1), across at least
 two services and the downtime between them.
 
 A worked weapon is a tempered one. This is the third thing loyalty compounds —
@@ -412,7 +412,7 @@ GraftBaseChance   = 3%
 improvementChance = GraftBaseChance × (1 + wear ÷ StartingWearCapacity)
 ```
 
-`StartingWearCapacity` is 25 (§6.1), so a full fresh bar doubles the base to
+`StartingWearCapacity` is 30 (§6.1), so a full fresh bar doubles the base to
 **6%**, and a weapon two steps up the ladder cashing 40 reaches **7.8%**.
 
 **Proportional rather than thresholded, and that is the point.** A rule that

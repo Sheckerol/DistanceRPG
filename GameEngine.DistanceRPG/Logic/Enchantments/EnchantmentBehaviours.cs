@@ -214,16 +214,34 @@ public static class EnchantmentBehaviours
     /// The loop on Cast: <c>self</c> is the caster, <c>other</c> the target.
     /// Each attached entry with a cast behaviour fires in list order, seeing
     /// what the cast's own mana and the entries before it left of the pool.
+    /// <para>
+    /// Each entry's own application is attributed as it fires — the movement of
+    /// the levels in <see cref="CastPayload.ApplyToTarget"/> across that one
+    /// call — and a forged entry's goes into
+    /// <see cref="CastPayload.ForgedLevels"/> as well, which is what the cast
+    /// credits the staff's ladder with (§2.2). The same six lines
+    /// <see cref="DamageTakenLoop"/> attributes a hit's share with, for the same
+    /// reason: a staff's status application is not innate to the weapon def, it
+    /// is an entry's, so without this a grafted applier would level the staff it
+    /// was bolted onto. The difference is taken inside the loop and never off
+    /// its total, or an entry that applied nothing would be charged with its
+    /// neighbour's levels.
+    /// </para>
     /// </summary>
     public static CastPayload CastLoop(CastPayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            var enchantment = weapon.Enchantments[i];
             if (!OnCast.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaCost - payload.ManaToSpend);
+            int before = AppliedLevels(payload);
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int added = AppliedLevels(payload) - before;
+            if (added > 0 && weapon.IsForged(i))
+                payload = payload with { ForgedLevels = payload.ForgedLevels + added };
         }
         return payload;
     }
@@ -235,16 +253,31 @@ public static class EnchantmentBehaviours
     /// the weapon's share is closed by the time it runs, so what an entry adds
     /// is tracked apart from it the whole way down. With no kind in the table
     /// the hit passes through untouched.
+    /// <para>
+    /// Each entry's own contribution is attributed as it fires — the movement of
+    /// <see cref="DamagePayload.EnchantmentShare"/> across that one call — and a
+    /// forged entry's goes into <see cref="DamagePayload.ForgedShare"/> as well,
+    /// which is what weapon XP is credited for (§2.2). The difference is taken
+    /// inside the loop and never off its total, or an entry that added nothing
+    /// would be charged with its neighbour's share; and it is read off the
+    /// payload rather than asked of the behaviour, so a kind added to the table
+    /// is attributed without the loop knowing it exists.
+    /// </para>
     /// </summary>
     public static DamagePayload DamageTakenLoop(DamagePayload payload, ActorState self, ActorState other)
     {
         var weapon = self.EquippedWeapon;
         if (weapon == null) return payload;
-        foreach (var enchantment in weapon.Enchantments)
+        for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
+            var enchantment = weapon.Enchantments[i];
             if (!OnDamageTaken.TryGetValue(enchantment.Def.Effect, out var fire)) continue;
             int manaLeft = Math.Max(0, self.Mana - payload.ManaToSpend);
+            int before = payload.EnchantmentShare;
             payload = fire(payload, enchantment, weapon, manaLeft, self, other);
+            int added = payload.EnchantmentShare - before;
+            if (added > 0 && weapon.IsForged(i))
+                payload = payload with { ForgedShare = payload.ForgedShare + added };
         }
         return payload;
     }
@@ -384,7 +417,12 @@ public static class EnchantmentBehaviours
     /// <summary>
     /// The wand innates' behaviour on a hit, at step 4: what the element adds
     /// beside the weapon's share — its potency's levels, which Phase 1 prices
-    /// at nothing (the tier's contribution and INT scaling are §3.3's) — goes
+    /// at nothing (the tier's contribution and INT scaling are §3.3's: "element
+    /// damage carries INT scaling" is a stat *multiplying* a magnitude, and
+    /// §2.1's rule is that a stat divides a threshold and never multiplies a
+    /// value, so the term lands with the tier that prices it — recorded under
+    /// settled.md's Phase 2 implementation pass, and the seam it will read,
+    /// <see cref="PartyMemberState.Stats"/>, is here already) — goes
     /// into <see cref="DamagePayload.EnchantmentShare"/>, tracked apart from
     /// the weapon's the whole way down, and resolved against the target's
     /// attunement by the element's <em>own</em> type: on a two-element wand
@@ -468,6 +506,14 @@ public static class EnchantmentBehaviours
     /// share already carries the item and the wielder — and its price rides
     /// the same ladder: the DoT cost over the levels it lands, scaled to what
     /// it could pay. A hit that killed leaves no one to bleed, and costs nothing.
+    /// <para>
+    /// The wielder's part of that share is literal since §2.2:
+    /// <see cref="Progression.DamageBonus"/> enters the weapon's own damage at
+    /// step 1, so "the share carries the wielder" is the same claim the earlier
+    /// <c>BleedPercent × (base damage + proficiency level)</c> made, read off
+    /// the blow instead of off the wielder. settled.md carried both; the Phase 2
+    /// implementation pass records which one is the rule, and it is this one.
+    /// </para>
     /// </summary>
     public static DamagePayload Serrated(DamagePayload payload, Enchantment enchantment, Weapon weapon, int manaLeft, ActorState self, ActorState other)
     {
@@ -673,12 +719,16 @@ public static class EnchantmentBehaviours
     /// The element damage a hit of <paramref name="payload"/>'s cast carries,
     /// as the cast can foresee it before any target is known: the weapon's
     /// figure under the cast's roll when <paramref name="element"/> typed the
-    /// cast, plus the element's own share.
+    /// cast, plus the element's own share. The figure is the caster's, not the
+    /// item's — <see cref="CombatRules.BaseDamage"/>, proficiency bonus included
+    /// (§2.2) — because the hit's own share will carry that bonus too, and a
+    /// burn sized off an unbonused base would be paid for at one figure and land
+    /// at another from wand level 2 on.
     /// </summary>
     private static int ElementDamageOfCast(CastPayload payload, Enchantment element, Weapon weapon, ActorState caster)
     {
         int typed = payload.Type == element.Def.DamageType
-            ? CombatRules.RollToBase(payload.Roll, weapon.Damage, CombatRules.CritThreshold(caster), caster.Value(ModifierType.CritMultiplier)).Damage
+            ? CombatRules.RollToBase(payload.Roll, CombatRules.BaseDamage(caster, weapon), CombatRules.CritThreshold(caster), caster.Value(ModifierType.CritMultiplier)).Damage
             : 0;
         return typed + element.LevelsFor(element.Def.Potency);
     }
@@ -693,6 +743,10 @@ public static class EnchantmentBehaviours
 
     private static bool Fired(ImmutableArray<string> fired, string id)
         => !fired.IsDefaultOrEmpty && fired.Contains(id);
+
+    /// <summary>The levels a cast has settled on its target so far — a staff's output, in the only units it has (§2.2): what <see cref="CastLoop"/> attributes entry by entry.</summary>
+    private static int AppliedLevels(CastPayload payload)
+        => payload.ApplyToTarget.IsDefaultOrEmpty ? 0 : payload.ApplyToTarget.Sum(s => s.Levels);
 
     private static ImmutableArray<T> OrEmpty<T>(ImmutableArray<T> array)
         => array.IsDefault ? ImmutableArray<T>.Empty : array;
