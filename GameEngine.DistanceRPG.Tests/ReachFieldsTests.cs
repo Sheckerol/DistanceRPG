@@ -171,4 +171,26 @@ public class ReachFieldsTests
         Assert.True(area.Contains(Node(5.5f * Tile), Node(11.5f * Tile)));   // off the wall's line: seen
         Assert.False(area.Contains(Node(y), Node(11.5f * Tile)));            // straight behind it: hidden
     }
+
+    [Fact]
+    public void AttackTicks_CountBackFromTheEnd()
+    {
+        // 100 left at 30 an attack: stopping at 70 leaves one, 40 two, 10 three.
+        Assert.Equal([70f, 40f, 10f], ReachFields.AttackTicks(100f, 30));
+    }
+
+    [Fact]
+    public void AttackTicks_AnExactMultipleTicksTheActorsOwnSpot()
+    {
+        Assert.Equal([60f, 30f, 0f], ReachFields.AttackTicks(90f, 30));
+    }
+
+    [Theory]
+    [InlineData(20f, 30)]   // not enough for even one: no tick
+    [InlineData(0f, 30)]    // no movement
+    [InlineData(100f, 0)]   // a free attack
+    public void AttackTicks_NoneWhereNoneFit(float left, int cost)
+    {
+        Assert.Empty(ReachFields.AttackTicks(left, cost));
+    }
 }

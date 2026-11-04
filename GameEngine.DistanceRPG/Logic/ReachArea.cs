@@ -254,6 +254,27 @@ public static class ReachFields
         return true;
     }
 
+    /// <summary>
+    /// Where the attack-cost ruler's ticks sit, as distances from the actor
+    /// along a line as long as <paramref name="movementLeft"/>: counted back
+    /// from the line's far end, one every <paramref name="attackCost"/>, so a
+    /// tick at index k (0-based) is where stopping leaves k + 1 attacks' worth
+    /// of movement. The far end itself — no attack left — carries none, and
+    /// nothing is ticked for a free attack or no movement.
+    /// </summary>
+    public static IReadOnlyList<float> AttackTicks(float movementLeft, int attackCost)
+    {
+        var ticks = new List<float>();
+        if (attackCost <= 0 || !(movementLeft > 0f)) return ticks;
+        for (int k = 1; ; k++)
+        {
+            float d = movementLeft - k * attackCost;
+            if (d < -Slack) break;
+            ticks.Add(MathF.Max(0f, d));
+        }
+        return ticks;
+    }
+
     /// <summary>The eight-way walking distance across (dx, dy) in the open.</summary>
     public static float Octile(float dx, float dy)
     {

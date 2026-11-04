@@ -2485,6 +2485,10 @@ public class DungeonScene : Scene
     private static readonly ReachStyle EnemyWalk = new(new(1.00f, 0.30f, 0.30f, 0.10f), new(1.00f, 0.40f, 0.40f, 0.55f), 0.008f);
     private static readonly ReachStyle EnemyReach = new(new(1.00f, 0.15f, 0.15f, 0.05f), new(1.00f, 0.20f, 0.20f, 0.80f), 0.012f);
     private static readonly Vector4 HittableRing = new(1.00f, 0.87f, 0.25f, 0.90f);
+    private static readonly Vector4 RulerColor = new(0.95f, 0.95f, 0.95f, 0.70f);
+    private const float RulerWidth = 1.5f;     // logic units: the ruler's line
+    private const float TickHalf = 5f;         // logic units either side of the line
+    private const float TickWidth = 2f;
 
     private readonly record struct ReachStyle(Vector4 Fill, Vector4 Edge, float Lift)
     {
@@ -2522,7 +2526,7 @@ public class DungeonScene : Scene
 
         var key = new HashCode();
         key.Add(active); key.Add(active.X); key.Add(active.Y); key.Add(active.DistLeft);
-        key.Add(held); key.Add(held?.Range);
+        key.Add(held); key.Add(held?.Range); key.Add(held == null ? 0 : active.MovementCost(held));
         key.Add(hovered);
         foreach (var member in _party) { key.Add(member.State.Alive); key.Add(member.State.X); key.Add(member.State.Y); }
         foreach (var enemy in _enemies) { key.Add(enemy.State.Alive); key.Add(enemy.State.X); key.Add(enemy.State.Y); }
@@ -2555,7 +2559,36 @@ public class DungeonScene : Scene
         var rings = hittable
             .Select(e => new ReachOverlayRenderer.Ring(e.X, e.Y, e.Radius + 2f, e.Radius + 5f, HittableRing))
             .ToList();
-        _reachOverlay.Show(layers, rings);
+        _reachOverlay.Show(layers, rings, AttackCostRuler(active, held));
+    }
+
+    /// <summary>
+    /// The attack-cost ruler: four lines from the member along the map's axes,
+    /// each as long as the movement it has left — a pure ruler, straight through
+    /// walls — crossed by a tick every attack cost counted back from the far end
+    /// (<see cref="ReachFields.AttackTicks"/>), so stopping on the k-th tick
+    /// inward leaves k attacks' worth of movement. The cost is the one a swing
+    /// or cast charges (<see cref="ActorState.MovementCost"/>); nothing with an
+    /// empty hand.
+    /// </summary>
+    private static List<ReachOverlayRenderer.Segment> AttackCostRuler(PartyMemberState member, Weapon? held)
+    {
+        var segments = new List<ReachOverlayRenderer.Segment>();
+        float left = member.DistLeft;
+        if (held == null || left <= 0f) return segments;
+
+        var ticks = ReachFields.AttackTicks(left, member.MovementCost(held));
+        foreach (var (ux, uy) in new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) })
+        {
+            segments.Add(new(member.X, member.Y, member.X + ux * left, member.Y + uy * left, RulerWidth, RulerColor));
+            foreach (float d in ticks)
+            {
+                float cx = member.X + ux * d, cy = member.Y + uy * d;
+                // Across the line: swap the axis.
+                segments.Add(new(cx - uy * TickHalf, cy - ux * TickHalf, cx + uy * TickHalf, cy + ux * TickHalf, TickWidth, RulerColor));
+            }
+        }
+        return segments;
     }
 
     /// <summary>

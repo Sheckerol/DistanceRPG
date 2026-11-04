@@ -25,6 +25,9 @@ public sealed class ReachOverlayRenderer : Component, IRenderableComponent, ISha
     /// <summary>A ring on the floor around a logic point (an enemy's feet), radii in logic units.</summary>
     public readonly record struct Ring(float X, float Y, float Inner, float Outer, Vector4 Color);
 
+    /// <summary>A straight band on the floor from one logic point to another, its width in logic units.</summary>
+    public readonly record struct Segment(float X0, float Y0, float X1, float Y1, float Width, Vector4 Color);
+
     private const float Floor = 0.012f;          // just above the floor tiles
     private const int RingSegments = 40;
 
@@ -37,17 +40,19 @@ public sealed class ReachOverlayRenderer : Component, IRenderableComponent, ISha
     private readonly List<(Vector4 Color, int Start, int Count)> _draws = new();
     private IReadOnlyList<Layer> _layers = Array.Empty<Layer>();
     private IReadOnlyList<Ring> _rings = Array.Empty<Ring>();
+    private IReadOnlyList<Segment> _segments = Array.Empty<Segment>();
 
-    /// <summary>Replace what is drawn. An empty pair hides the overlay.</summary>
-    public void Show(IReadOnlyList<Layer> layers, IReadOnlyList<Ring> rings)
+    /// <summary>Replace what is drawn. Nothing at all hides the overlay.</summary>
+    public void Show(IReadOnlyList<Layer> layers, IReadOnlyList<Ring> rings, IReadOnlyList<Segment> segments)
     {
         _layers = layers;
         _rings = rings;
+        _segments = segments;
         _dirty = true;
     }
 
     /// <summary>Draw nothing.</summary>
-    public void Clear() => Show(Array.Empty<Layer>(), Array.Empty<Ring>());
+    public void Clear() => Show(Array.Empty<Layer>(), Array.Empty<Ring>(), Array.Empty<Segment>());
 
     /// <summary>Re-check which tiles are shown (the party has seen more floor).</summary>
     public void MarkDirty() => _dirty = true;
@@ -130,6 +135,8 @@ public sealed class ReachOverlayRenderer : Component, IRenderableComponent, ISha
         }
         foreach (var ring in _rings)
             Batch(ring.Color, () => EmitRing(vertices, indices, ring, Floor + 0.01f));
+        foreach (var segment in _segments)
+            Batch(segment.Color, () => EmitSegment(vertices, indices, segment, Floor + 0.016f));
 
         if (indices.Count == 0) return;
         var v = vertices.ToArray();
@@ -195,6 +202,17 @@ public sealed class ReachOverlayRenderer : Component, IRenderableComponent, ISha
             var p3 = WorldSpace.FromLogic(ring.X + MathF.Cos(a1) * ring.Inner, ring.Y + MathF.Sin(a1) * ring.Inner, y);
             AddFace(vertices, indices, p0, p1, p2, p3);
         }
+    }
+
+    private static void EmitSegment(List<float> vertices, List<uint> indices, Segment s, float y)
+    {
+        float dx = s.X1 - s.X0, dy = s.Y1 - s.Y0;
+        float len = MathF.Sqrt(dx * dx + dy * dy);
+        if (len <= 0f) return;
+        float nx = -dy / len * s.Width / 2f, ny = dx / len * s.Width / 2f;   // half the width, across the band
+        AddFace(vertices, indices,
+            WorldSpace.FromLogic(s.X0 - nx, s.Y0 - ny, y), WorldSpace.FromLogic(s.X1 - nx, s.Y1 - ny, y),
+            WorldSpace.FromLogic(s.X1 + nx, s.Y1 + ny, y), WorldSpace.FromLogic(s.X0 + nx, s.Y0 + ny, y));
     }
 
     // A floor quad over logic rectangle (x0, z0)–(x1, z1), converted to world units.
