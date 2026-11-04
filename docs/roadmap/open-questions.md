@@ -1368,3 +1368,21 @@ hub — `... - AND ITS BLOCK DROPS WITH IT`; (d) the count in other words: `1 RE
 CLEAR` (§6.6's "the first real clear"), `1 WORKER` (the docs' own), or a page line
 that drops `A COUNTED RUN` for the room to say `1 DUNGEON PAST THE TUTORIAL`.
 settled.md's Phase 6b implementation pass records the ruling.
+
+## An action bar for active abilities, and a levelled talent tree (§1.2, §3.4) — not yet planned
+
+Raised by the user on 2026-11-04, to plan **after the Phase 7 death mechanics and
+the movement/reach overlay (PR #17) are integrated** — not before.
+
+- **The bar.** Active abilities get visible buttons in a bar across the bottom of
+  the screen, in place of keys alone: Overwatch's hold fire (today only `O: HOLD
+  FIRE` and the `OVERWATCH n` / `n HELD` readout), weapon swaps, and potions.
+- **Talent tree.** It goes with an idea for a talent tree with levels; the bar is
+  where the active abilities such a tree grants would sit.
+- **Open:**
+  - Does hovering a button preview its cost on the attack-cost ruler and, for
+    Overwatch, the held zone?
+  - Is a button greyed out when it can't be afforded? A button can follow the
+    active member's `MovementLedger.Changed` the way the reach overlay does.
+  - How does the tree's levelling relate to the weapon and stat progression of
+    Phase 2?
