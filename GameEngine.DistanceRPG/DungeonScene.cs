@@ -272,6 +272,8 @@ public class DungeonScene : Scene
     private FogBoxSet _fogBoxes = null!;
     private FogState _fog = null!;
     private FogOverlayRenderer _fogOverlay = null!;
+    private ReachOverlayRenderer _reachOverlay = null!;
+    private int? _reachKey;   // a hash of what the overlay was last built from: rebuilt only when it changes
 
     // The floor's turn system: the one the visit's OpenTurns returned for the
     // floor being played (visit.Turns), replaced whole on every arrival.
@@ -708,6 +710,7 @@ public class DungeonScene : Scene
         UpdateMarchingFollowers(deltaTime);
         AutoEndTurnWhenDry();
         UpdateHover();
+        RefreshReachOverlay();
     }
 
     /// <summary>
@@ -944,6 +947,7 @@ public class DungeonScene : Scene
         BuildWalls();
         BuildStairs();
         SpawnEnemies();
+        BuildReachOverlay();
         BuildFogOverlay();
         BuildFogParticles();
     }
@@ -975,6 +979,7 @@ public class DungeonScene : Scene
         foreach (var member in living)
             _lastFogTile[member] = LogicTile(member.State.X, member.State.Y);
         _fogOverlay.MarkDirty();
+        _reachOverlay.MarkDirty();
         UpdateEnemyVisibility(notify: !keepSight);
     }
 
@@ -1127,6 +1132,16 @@ public class DungeonScene : Scene
 
     /// <summary>The colour an enemy's stand-in stands in: the boss's stone, every dummy's orange.</summary>
     private Vector4 LiveColor(EnemyState state) => state == _floor.Boss ? BossColor : EnemyColor;
+
+    // Added before the fog overlay, so the shroud blends over it.
+    private void BuildReachOverlay()
+    {
+        var reachObject = new TransformNodeObject();
+        _reachOverlay = reachObject.AddComponent<ReachOverlayRenderer>();
+        _reachOverlay.TileShown = (r, c) => _fog.Seen[r, c];
+        _reachKey = null;
+        AddFloorObject(reachObject);
+    }
 
     private void BuildFogOverlay()
     {
@@ -1875,13 +1890,7 @@ public class DungeonScene : Scene
         // two-body wall shoves that made the prototype drop inter-party
         // colliders. While marching, followers never block the leader, or
         // reversing through your own line would deadlock it.
-        var blockers = LiveEnemyBlockers();
-        if (!Marching)
-        {
-            foreach (var member in _party)
-                if (member != ActiveCharacter && member.State.Alive)
-                    blockers.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
-        }
+        var blockers = ActiveMoveBlockers();
         var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, blockers);
 
         // Budget depletes by distance actually travelled, so pushing into a
@@ -2468,6 +2477,87 @@ public class DungeonScene : Scene
         }
     }
 
+    // The reach overlay's colours: the active member's walk in blue, its reach
+    // in amber, a gold ring under each enemy it can hit now; a hovered enemy's
+    // walk and reach in red.
+    private static readonly ReachStyle MemberWalk = new(new(0.30f, 0.75f, 1.00f, 0.14f), new(0.45f, 0.85f, 1.00f, 0.65f), 0.000f);
+    private static readonly ReachStyle MemberReach = new(new(1.00f, 0.65f, 0.15f, 0.06f), new(1.00f, 0.70f, 0.20f, 0.75f), 0.004f);
+    private static readonly ReachStyle EnemyWalk = new(new(1.00f, 0.30f, 0.30f, 0.10f), new(1.00f, 0.40f, 0.40f, 0.55f), 0.008f);
+    private static readonly ReachStyle EnemyReach = new(new(1.00f, 0.15f, 0.15f, 0.05f), new(1.00f, 0.20f, 0.20f, 0.80f), 0.012f);
+    private static readonly Vector4 HittableRing = new(1.00f, 0.87f, 0.25f, 0.90f);
+
+    private readonly record struct ReachStyle(Vector4 Fill, Vector4 Edge, float Lift)
+    {
+        public ReachOverlayRenderer.Layer On(ReachArea area) => new(area, Fill, Edge, Lift);
+    }
+
+    /// <summary>
+    /// The reach overlay, in combat during the party's phase with no menu open
+    /// (hidden otherwise): where the active member can walk with the movement it
+    /// has left, around walls and bodies — the very blockers its steps collide
+    /// with (<see cref="ActiveMoveBlockers"/>) — and where a target would be in
+    /// its weapon's reach and sight from where it stands; a ring under each
+    /// visible enemy a click would hit now (<see cref="EnemyCue"/> ready); and,
+    /// for the enemy under the mouse, its own walk on its next turn's budget
+    /// (after Mire, as the turn system pays it) and its weapon's reach.
+    /// Rebuilt only when something it reads has changed.
+    /// </summary>
+    private void RefreshReachOverlay()
+    {
+        var active = ActiveCharacter.State;
+        bool show = !Transiting && _turns.Phase == TurnPhase.Player && !AnyMenuOpen
+            && _turns.AnyLiveEnemySeenThisTurn && active.Alive;
+        if (!show)
+        {
+            if (_reachKey != null) { _reachOverlay.Clear(); _reachKey = null; }
+            return;
+        }
+
+        var held = active.EquippedWeapon;
+        var hovered = HoveredEnemy is { IsActive: true } h && h.State.Alive ? h.State : null;
+        var hittable = _enemies
+            .Where(e => e.IsActive && e.State.Alive && EnemyCue(active, held, e.State) is { Ready: true })
+            .Select(e => e.State)
+            .ToList();
+
+        var key = new HashCode();
+        key.Add(active); key.Add(active.X); key.Add(active.Y); key.Add(active.DistLeft);
+        key.Add(held); key.Add(held?.Range);
+        key.Add(hovered);
+        foreach (var member in _party) { key.Add(member.State.Alive); key.Add(member.State.X); key.Add(member.State.Y); }
+        foreach (var enemy in _enemies) { key.Add(enemy.State.Alive); key.Add(enemy.State.X); key.Add(enemy.State.Y); }
+        foreach (var enemy in hittable) key.Add(enemy);
+        int hash = key.ToHashCode();
+        if (_reachKey == hash) return;
+        _reachKey = hash;
+
+        var grid = _map.Grid;
+        float enemyRadius = _enemies.Count > 0 ? _enemies[0].State.Radius : active.Radius;
+        var layers = new List<ReachOverlayRenderer.Layer>
+        {
+            MemberWalk.On(ReachFields.Walkable(grid, active.X, active.Y, active.Radius, active.DistLeft, ActiveMoveBlockers())),
+        };
+        if (held != null)
+            layers.Add(MemberReach.On(ReachFields.InReach(grid, active.X, active.Y, active.Radius, enemyRadius, held.Range)));
+
+        if (hovered != null)
+        {
+            var bodies = new List<GridCollision.Circle>();
+            foreach (var member in _party)
+                if (member.State.Alive) bodies.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
+            foreach (var enemy in _enemies)
+                if (enemy.State.Alive && enemy.State != hovered) bodies.Add(new GridCollision.Circle(enemy.State.X, enemy.State.Y, enemy.State.Radius));
+            float budget = StatusBehaviours.MiredBudget(hovered, hovered.MoveBudget);
+            layers.Add(EnemyWalk.On(ReachFields.Walkable(grid, hovered.X, hovered.Y, hovered.Radius, budget, bodies)));
+            layers.Add(EnemyReach.On(ReachFields.InReach(grid, hovered.X, hovered.Y, hovered.Radius, GameConstants.PlayerHalf, hovered.Weapon.Range)));
+        }
+
+        var rings = hittable
+            .Select(e => new ReachOverlayRenderer.Ring(e.X, e.Y, e.Radius + 2f, e.Radius + 5f, HittableRing))
+            .ToList();
+        _reachOverlay.Show(layers, rings);
+    }
+
     /// <summary>
     /// What clicking the enemy <paramref name="target"/> would do with
     /// <paramref name="held"/> — the swing, a debuff staff's cast (a support
@@ -2835,6 +2925,7 @@ public class DungeonScene : Scene
         if (newly.Count > 0)
         {
             _fogOverlay.MarkDirty();
+            _reachOverlay.MarkDirty();
             if (animate)
             {
                 _fogOverlay.AnimateReveal(newly, tile);
@@ -2973,6 +3064,24 @@ public class DungeonScene : Scene
     }
 
     /// <summary>Live enemies as collision blockers; corpses are walkable.</summary>
+    /// <summary>
+    /// What the active member's steps collide with: the walls aside, live
+    /// enemies always, and in combat the rest of the party too. While marching
+    /// the followers never block the leader, or reversing through your own line
+    /// would deadlock it. The one list movement and the reach overlay both read.
+    /// </summary>
+    private List<GridCollision.Circle> ActiveMoveBlockers()
+    {
+        var blockers = LiveEnemyBlockers();
+        if (!Marching)
+        {
+            foreach (var member in _party)
+                if (member != ActiveCharacter && member.State.Alive)
+                    blockers.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
+        }
+        return blockers;
+    }
+
     private List<GridCollision.Circle> LiveEnemyBlockers()
     {
         var blockers = new List<GridCollision.Circle>();

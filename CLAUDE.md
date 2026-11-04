@@ -60,6 +60,8 @@ GameEngine.DistanceRPG/         # Game executable
                                 # its choice kept by place; or, before he arrives, when he does
   CharacterObject.cs / EnemyObject.cs   # 3D stand-ins mirroring logic positions
   FogOverlayRenderer.cs         # Fog quad layer (opaque unexplored / translucent explored)
+  ReachOverlayRenderer.cs       # Combat floor overlay: the active member's walk and reach, rings under
+                                # enemies it can hit now, a hovered enemy's walk and reach (seen tiles only)
   WorldSpace.cs                 # Logic px (32/tile, y-down) ↔ world units (1/tile, XZ plane)
   ShippedData.cs                # Reads the embedded JSON masters: the built-in fallback, at the edge
   Data/                         # The JSON MASTER COPIES, hand-kept: tuning.json, restricted.json,
@@ -73,6 +75,8 @@ GameEngine.DistanceRPG/         # Game executable
     Pathfinder.cs               # A*, octile heuristic, JS-identical heap tie-breaking
     FogGeometry.cs / FogBoxBuilder.cs / FogState.cs   # Fog-box math + runtime grids
     GridCollision.cs            # Axis-separated circle-vs-tile-grid collision
+    ReachArea.cs                # ReachFields: where a body can walk on its budget (8-way lattice, walls
+                                # and bodies) and where a target is in reach and sight — never a guess
     TurnSystem.cs               # Turn state machine, drives combat via events
     Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
                                 # from the wear it has ever cashed (R4); where its slots open, what

@@ -248,5 +248,15 @@ public static class CombatRules
         float attackerX, float attackerY, float attackerRadius,
         float targetX, float targetY, float targetRadius,
         Weapon weapon)
-        => SurfaceDistance(attackerX, attackerY, attackerRadius, targetX, targetY, targetRadius) <= weapon.Range;
+        => InAttackRangeOf(attackerX, attackerY, attackerRadius, targetX, targetY, targetRadius, weapon.Range);
+
+    /// <summary>
+    /// <see cref="InAttackRange"/> for a bare range in logic units — the one
+    /// rule, which the reach overlay (<see cref="ReachFields.InReach"/>) reads too.
+    /// </summary>
+    public static bool InAttackRangeOf(
+        float attackerX, float attackerY, float attackerRadius,
+        float targetX, float targetY, float targetRadius,
+        float range)
+        => SurfaceDistance(attackerX, attackerY, attackerRadius, targetX, targetY, targetRadius) <= range;
 }

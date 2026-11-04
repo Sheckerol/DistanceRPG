@@ -320,6 +320,8 @@ public class SaveInventoryTests
             new("_fogBoxes", Kept.Derived, "the floor's regenerated fog boxes"),
             new("_fog", Kept.Derived, "the floor's fog, its seen[] and the current floor's visible[] saved"),
             new("_fogOverlay", Kept.NotSaved, "presentation: rebuilt by the arrival"),
+            new("_reachOverlay", Kept.NotSaved, "presentation: rebuilt by the arrival"),
+            new("_reachKey", Kept.NotSaved, "presentation: a cache key, cleared by the arrival so the overlay is worked out afresh"),
             new("_turns", Kept.Derived, "the system OpenTurns opens on the arrival, the turn's counters imported from the save's carry"),
             new("_floorObjects", Kept.NotSaved, "presentation: rebuilt by the arrival"),
             new("_stairMarkers", Kept.NotSaved, "presentation: rebuilt by the arrival from the regenerated stairs"),
