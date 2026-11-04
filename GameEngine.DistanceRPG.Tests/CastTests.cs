@@ -189,9 +189,9 @@ public sealed class CastTests : IDisposable
     public void Cast_RefusedOffTurn_ForTheDead_OutOfMovement_AndOffTheRoster()
     {
         var (turns, a, b, _) = Scene("staff_of_renewal");
-        a.DistLeft = 39f;
+        a.Movement.Reset(39f, MoveReason.Restore);
         Assert.False(turns.CanCast(a, b));   // 40 to cast
-        a.DistLeft = 40f;
+        a.Movement.Reset(40f, MoveReason.Restore);
         Assert.True(turns.CanCast(a, b));
         b.Alive = false;
         Assert.False(turns.CanCast(a, b));

@@ -367,11 +367,11 @@ public sealed class PotionDrinkTests : IDisposable
         }
 
         // Short by one: refused whole.
-        a.DistLeft = Cost - 1;
+        a.Movement.Reset(Cost - 1, MoveReason.Restore);
         Assert.False(turns.CanDrink(a, 1));
         Assert.Null(turns.TryDrink(a, 1));
         Assert.Equal((Cost - 1f, Health(2)), (a.DistLeft, a.PotionIn(1)));
-        a.DistLeft = Cost;
+        a.Movement.Reset(Cost, MoveReason.Restore);
         Assert.True(turns.CanDrink(a, 1));   // exactly the cost is enough
 
         // The fallen drink nothing.

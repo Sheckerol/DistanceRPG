@@ -207,7 +207,7 @@ public sealed class CampaignSaveTests : IDisposable
         c.SavedMovement = 40;
         c.StartTurn();
         Assert.Equal((200f, 140f), (c.BudgetBeforeMire, c.EffectiveMax));
-        c.DistLeft -= 37.123457f;   // a walk is its frames' steps: no short decimal form
+        c.Movement.SpendUpTo(37.123457f, MoveReason.Walk);   // a walk is its frames' steps: no short decimal form
         c.X += 3.1415927f;
         c.Y -= 0.3333333f;
         c.EndTurnSaveMovement();

@@ -288,7 +288,7 @@ public class CampaignVisitTests
         a.Hp = 12;
         a.Mana = 5;
         a.ApplyStatus(StatusEffectType.Poison, null, 4);
-        a.DistLeft = 3f;
+        a.Movement.Reset(3f, MoveReason.Restore);
         a.SavedMovement = 40f;
         a.EffectiveMax = 200f;
         a.HeldShots = 1;

@@ -90,7 +90,7 @@ public sealed class AttackShapeTests : IDisposable
         Assert.Equal(200 - 5, enemy.Hp);   // 8 into Block 3
 
         enemy.X = a.X + 28f + 90f;   // surface 90: the third tile, nothing to pay
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(200 - 5 - 4, enemy.Hp);   // 7 into Block 3
     }
@@ -243,7 +243,7 @@ public sealed class AttackShapeTests : IDisposable
         var e5 = Enemy(4, 5);
         var e6 = Enemy(5, 4);
         var crowd = new TurnSystem(grid, new[] { a }, new[] { e1, e2, e3, e4, e5, e6 }, () => 10);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(crowd.TryAttack(a, e1));
         Assert.Equal(200 - 30, e1.Hp);
         Assert.Equal(200 - 30, e2.Hp);
@@ -558,7 +558,7 @@ public sealed class AttackShapeTests : IDisposable
         Assert.Equal(200 - 3, enemy.Hp);   // 5 + 1 at the fourth tile, into Block 3: the pin rides the hit and changes nothing about it
 
         a.EquippedWeapon!.Acquire(Pin, 2);   // x3
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(4, enemy.StatusLevel(Mire));
         Assert.Equal(200 - 6, enemy.Hp);

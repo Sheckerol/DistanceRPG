@@ -205,7 +205,7 @@ public sealed class EnchantmentXpTests : IDisposable
         for (int cast = 0; cast < 14; cast++)
         {
             caster.Mana = caster.UsableMaxMana;
-            caster.DistLeft = Premise.Budget;
+            caster.Movement.Reset(Premise.Budget, MoveReason.Restore);
             Assert.True(turns.TryCast(caster, ally));
         }
         Assert.Equal((1, 14), Entry(staff, 0));           // a point short of the bar
@@ -214,7 +214,7 @@ public sealed class EnchantmentXpTests : IDisposable
         // clamp below is read against, because the same record's mana credit
         // grows the earned pool a point on its way past.
         caster.Mana = caster.UsableMaxMana;
-        caster.DistLeft = Premise.Budget;
+        caster.Movement.Reset(Premise.Budget, MoveReason.Restore);
         int ceiling = caster.UsableMaxMana;
         Assert.True(turns.TryCast(caster, ally));
 
@@ -245,7 +245,7 @@ public sealed class EnchantmentXpTests : IDisposable
         // at what the pool could pay rather than overdrawing it.
         roll = 1;
         caster.Mana = staff.ResolvedManaCost;
-        caster.DistLeft = Premise.Budget;
+        caster.Movement.Reset(Premise.Budget, MoveReason.Restore);
 
         Assert.True(turns.TryCast(caster, ally));
 
@@ -383,7 +383,7 @@ public sealed class EnchantmentXpTests : IDisposable
         for (int fired = 0; fired < 200 && weapon.Enchantments[0].Tier == 1; fired++)
         {
             member.Mana = member.UsableMaxMana;
-            member.DistLeft = Premise.Budget;
+            member.Movement.Reset(Premise.Budget, MoveReason.Restore);
             Fire(turns, member, dummy, def, weapon);
         }
 
@@ -468,7 +468,7 @@ public sealed class EnchantmentXpTests : IDisposable
 
         for (int swing = 0; swing < 4; swing++)
         {
-            a.DistLeft = Premise.Budget;
+            a.Movement.Reset(Premise.Budget, MoveReason.Restore);
             Assert.True(turns.TryAttack(a, dummy));
         }
 
@@ -506,8 +506,8 @@ public sealed class EnchantmentXpTests : IDisposable
 
         for (int swing = 0; swing < 10; swing++)
         {
-            wizard.DistLeft = Premise.Budget;
-            fighter.DistLeft = Premise.Budget;
+            wizard.Movement.Reset(Premise.Budget, MoveReason.Restore);
+            fighter.Movement.Reset(Premise.Budget, MoveReason.Restore);
             Assert.True(turns.TryAttack(wizard, wizardDummy));
             Assert.True(turns.TryAttack(fighter, fighterDummy));
         }
@@ -567,7 +567,7 @@ public sealed class EnchantmentXpTests : IDisposable
         var onHit = new List<int>();
         turns.Events.On<DamagePayload>(GameEvent.DamageTaken, new HandlerPriority(9, 8), "hit",
             (p, _, _) => { onHit.Add(p.Payments.IsDefaultOrEmpty ? 0 : p.Payments.Length); return p; });
-        member.DistLeft = Premise.Budget;
+        member.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(member, dummy));
         Assert.Equal(new[] { 0 }, onHit.ToArray());
         Assert.Equal(new[] { 0, 4 }, Xps(knife));

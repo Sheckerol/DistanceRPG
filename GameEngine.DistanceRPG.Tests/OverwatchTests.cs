@@ -276,9 +276,9 @@ public sealed class OverwatchTests : IDisposable
         Assert.True(turns.CanOverwatch(a));
         a.Inventory[0] = TestWeapons.Make("Held Darts", 190, 9, 15, manaCost: 0, WeaponClass.Throwing, (Overwatch, 1));
         Assert.True(turns.CanOverwatch(a));    // throwing is ranged too
-        a.DistLeft = 14f;
+        a.Movement.Reset(14f, MoveReason.Restore);
         Assert.False(turns.CanOverwatch(a));   // holding costs the throw's movement
-        a.DistLeft = 15f;
+        a.Movement.Reset(15f, MoveReason.Restore);
         Assert.True(turns.TryOverwatch(a));
         Assert.Equal(0f, a.DistLeft);
         Assert.Equal(1, a.HeldShots);

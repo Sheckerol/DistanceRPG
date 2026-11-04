@@ -77,6 +77,8 @@ GameEngine.DistanceRPG/         # Game executable
     GridCollision.cs            # Axis-separated circle-vs-tile-grid collision
     ReachArea.cs                # ReachFields: where a body can walk on its budget (8-way lattice, walls
                                 # and bodies) and where a target is in reach and sight — never a guess
+    MovementLedger.cs           # Every actor's movement left and its only door: TrySpend (an action, all
+                                # or nothing, bool), SpendUpTo (a walk), Reset; Changed says before/after/why
     TurnSystem.cs               # Turn state machine, drives combat via events
     Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
                                 # from the wear it has ever cashed (R4); where its slots open, what

@@ -606,8 +606,8 @@ internal static class SaveMapper
         member.BudgetBeforeMire = Movement(row.BudgetBeforeMire, ContentBounds.Distance * 1.5f, $"{at}.budgetBeforeMire", BudgetBeforeMireWhy);
         member.EffectiveMax = Movement(row.EffectiveMax, member.BudgetBeforeMire, $"{at}.effectiveMax",
             "a cap is the whole this turn cut it from less what Mire took (budgetBeforeMire)");
-        member.DistLeft = Movement(row.DistLeft, member.EffectiveMax, $"{at}.distLeft",
-            "movement left is what is left of the cap this turn (effectiveMax)");
+        member.Movement.Reset(Movement(row.DistLeft, member.EffectiveMax, $"{at}.distLeft",
+            "movement left is what is left of the cap this turn (effectiveMax)"), MoveReason.Restore);
         member.SavedMovement = Movement(row.SavedMovement, ContentBounds.Distance / 2f, $"{at}.savedMovement", SavedMovementWhy);
         return member;
     }

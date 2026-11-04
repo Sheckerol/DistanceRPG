@@ -67,13 +67,13 @@ public sealed class DisplacementTests : IDisposable
         // Mostly sideways, a little up: the dominant axis wins and the step is 4-directional.
         enemy.X = At(5, 6).X;
         enemy.Y = At(5, 6).Y - 10f;
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
 
         // Below rather than beside: the shove goes down the column.
         (enemy.X, enemy.Y) = At(6, 5);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(7, 5), (enemy.X, enemy.Y));
 
@@ -81,7 +81,7 @@ public sealed class DisplacementTests : IDisposable
         a.EquippedWeapon!.Acquire(Push, 2);
         Assert.Equal(3, a.Value(Push));
         (enemy.X, enemy.Y) = At(5, 6);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 9), (enemy.X, enemy.Y));
         Assert.Equal(3, displaced[^1].Tiles);
@@ -130,7 +130,7 @@ public sealed class DisplacementTests : IDisposable
         a.EquippedWeapon!.Acquire(Drag, 4);
         var tiles = new List<int>();
         turns.ActorDisplaced += (_, n) => tiles.Add(n);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 6), (enemy.X, enemy.Y));
         Assert.Equal(new[] { 2 }, tiles);
@@ -149,7 +149,7 @@ public sealed class DisplacementTests : IDisposable
         (enemy.X, enemy.Y) = At(5, 6);
         turns.NotifyActorMoved(enemy, MoveKind.Forced);
         Assert.Equal(new[] { 2 }, tiles);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 6), (enemy.X, enemy.Y));
         Assert.Equal(new[] { 2 }, tiles);
@@ -208,7 +208,7 @@ public sealed class DisplacementTests : IDisposable
         // An occupied tile stops it the same way, and nobody overlaps: shoved down the column into the bystander, it stays put.
         (enemy.X, enemy.Y) = At(6, 6);
         (a.X, a.Y) = At(5, 6);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(6, 6), (enemy.X, enemy.Y));
         Assert.Equal(At(7, 6), (bystander.X, bystander.Y));
@@ -217,7 +217,7 @@ public sealed class DisplacementTests : IDisposable
         // The edge of the map is a wall too.
         (a.X, a.Y) = At(5, 18);
         (enemy.X, enemy.Y) = At(5, 19);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 19), (enemy.X, enemy.Y));
 
@@ -303,7 +303,7 @@ public sealed class DisplacementTests : IDisposable
         (a.X, a.Y) = At(5, 5);
         (enemy.X, enemy.Y) = At(5, 6);
         turns.NotifyActorMoved(enemy, MoveKind.Forced);   // set down at the edge of S's reach, still inside it
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
         Assert.False(EnemyAi.CanHit(s, enemy, s.EquippedWeapon!, grid));  // shoved out
@@ -370,7 +370,7 @@ public sealed class DisplacementTests : IDisposable
         // Back out of reach (a forced move: the pair is released), then shoved in again: the use is spent.
         (enemy.X, enemy.Y) = At(5, 6);
         turns.NotifyActorMoved(enemy, MoveKind.Forced);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
         Assert.Equal(1, braces);

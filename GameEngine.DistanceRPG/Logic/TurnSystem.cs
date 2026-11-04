@@ -125,7 +125,6 @@ public sealed class TurnSystem
     // ── Enemy-turn working state ─────────────────────────────────────────────
     private int _enemyIdx;            // index of the enemy currently acting
     private float _timer;
-    private float _enemyBudget;
     private List<(float X, float Y)> _waypoints = new();
     private int _waypointIdx;
     private bool _enemyTurnPending;   // banner is up; enemy turn starts when it ends
@@ -194,7 +193,7 @@ public sealed class TurnSystem
     // And for movement spent through the table (a swap): the applier takes the
     // settled amount off the budget the roster fixed for the actor — a party
     // member's DistLeft, the acting enemy's budget.
-    private readonly Dictionary<ActorState, Action<int>> _movementFeeds = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ActorState, Action<int, MoveReason>> _movementFeeds = new(ReferenceEqualityComparer.Instance);
 
     // And for XP (§2.2): each of the four appliers that writes the thing a pool
     // measures — damage dealt, levels applied, HP restored, mana spent — hands
@@ -333,7 +332,7 @@ public sealed class TurnSystem
             _deathFeeds[member] = () => OnCharacterDied(member);
             _statusFeeds[member] = effect => CharacterBuffed?.Invoke(member, effect);
             _braceFeeds[member] = () => BraceTriggered?.Invoke(member);
-            _movementFeeds[member] = spent => member.DistLeft = MathF.Max(0f, member.DistLeft - spent);
+            _movementFeeds[member] = (spent, reason) => member.Movement.SpendUpTo(spent, reason);
             _xpFeeds[member] = credit =>
             {
                 int gained = member.Credit(credit);
@@ -356,7 +355,7 @@ public sealed class TurnSystem
             _deathFeeds[enemy] = () => OnEnemyDefeated(enemy);
             _statusFeeds[enemy] = effect => EnemyBuffed?.Invoke(enemy, effect);
             _braceFeeds[enemy] = () => EnemyBraceTriggered?.Invoke(enemy);
-            _movementFeeds[enemy] = spent => _enemyBudget = MathF.Max(0f, _enemyBudget - spent);   // only the acting enemy spends
+            _movementFeeds[enemy] = (spent, reason) => enemy.Movement.SpendUpTo(spent, reason);
             _xpFeeds[enemy] = static _ => { };                           // an enemy carries no pools: the roster says so, never a type test
             _wearFeeds[enemy] = static _ => { };                         // nor wear: no enemy's weapon is ever the party's to service
             // The n-th defeat of this dummy deepens what it is carrying, and the
@@ -557,7 +556,7 @@ public sealed class TurnSystem
         if (!CanAttack(c, enemy)) return false;
         var w = c.EquippedWeapon!;
 
-        c.DistLeft = MathF.Max(0f, c.DistLeft - c.MovementCost(w));
+        if (!c.Movement.TrySpend(c.MovementCost(w), MoveReason.Attack)) return false;
         CountAttack(c);
         AttackWith(c, enemy);
         return true;
@@ -754,7 +753,7 @@ public sealed class TurnSystem
         if (!CanCast(caster, target)) return false;
         var w = caster.EquippedWeapon!;
 
-        caster.DistLeft = MathF.Max(0f, caster.DistLeft - caster.MovementCost(w));
+        if (!caster.Movement.TrySpend(caster.MovementCost(w), MoveReason.Cast)) return false;
         CastWith(caster, target);
         return true;
     }
@@ -827,7 +826,7 @@ public sealed class TurnSystem
         if (!CanCastArea(caster, aim)) return false;
         var w = caster.EquippedWeapon!;
 
-        caster.DistLeft = MathF.Max(0f, caster.DistLeft - caster.MovementCost(w));
+        if (!caster.Movement.TrySpend(caster.MovementCost(w), MoveReason.Cast)) return false;
         CastAreaWith(caster, aim);
         return true;
     }
@@ -862,7 +861,7 @@ public sealed class TurnSystem
         if (!CanOverwatch(c)) return false;
         var w = c.EquippedWeapon!;
 
-        c.DistLeft = MathF.Max(0f, c.DistLeft - c.MovementCost(w));
+        if (!c.Movement.TrySpend(c.MovementCost(w), MoveReason.Overwatch)) return false;
         c.HeldShots = c.Value(ModifierType.Overwatch);
         return true;
     }
@@ -975,7 +974,7 @@ public sealed class TurnSystem
     private void AdvanceToNextEnemy()
     {
         if (_enemyIdx >= 0 && _enemyIdx < _enemies.Count)
-            ActingEnemy.RegenManaFromUnusedMovement(_enemyBudget);
+            ActingEnemy.RegenManaFromUnusedMovement(ActingEnemy.Movement.Left);
 
         while (++_enemyIdx < _enemies.Count)
         {
@@ -998,7 +997,7 @@ public sealed class TurnSystem
     {
         // The enemy's own budget — a dummy's 100, a boss's statline (the golem's
         // 40) — after Mire's cut, the same 10% a level the party pays.
-        _enemyBudget = StatusBehaviours.MiredBudget(enemy, enemy.MoveBudget);
+        enemy.Movement.Reset(StatusBehaviours.MiredBudget(enemy, enemy.MoveBudget), MoveReason.TurnStart);
 
         if (enemy.IsSupportCaster)
         {
@@ -1023,8 +1022,8 @@ public sealed class TurnSystem
 
         var blocked = OccupiedTilesExcept(enemy);
 
-        var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, _enemyBudget, blocked);
-        _enemyBudget = remaining;
+        var (waypoints, remaining) = EnemyAi.PlanMove(enemy, target, _grid, enemy.Movement.Left, blocked);
+        enemy.Movement.Reset(remaining, MoveReason.Walk);   // the path is paid as it is planned: what the planner left, exactly
 
         if (waypoints.Count == 0)
         {
@@ -1050,8 +1049,8 @@ public sealed class TurnSystem
         if (!EnemyAi.HasLivingAlly(caster, _enemies))
         {
             EnemyFleeing?.Invoke(caster);
-            var (flee, fleeLeft) = EnemyAi.PlanFlee(caster, _party, _grid, _enemyBudget, blocked);
-            _enemyBudget = fleeLeft;
+            var (flee, fleeLeft) = EnemyAi.PlanFlee(caster, _party, _grid, caster.Movement.Left, blocked);
+            caster.Movement.Reset(fleeLeft, MoveReason.Walk);
             if (flee.Count == 0) { BeginAttackPhase(); return; } // cornered: beats will no-op
             BeginWalk(flee);
             return;
@@ -1067,8 +1066,8 @@ public sealed class TurnSystem
         }
 
         var (waypoints, remaining) = EnemyAi.PlanApproach(
-            caster, ally.X, ally.Y, ally.Radius, caster.Weapon.Range, _grid, _enemyBudget, blocked);
-        _enemyBudget = remaining;
+            caster, ally.X, ally.Y, ally.Radius, caster.Weapon.Range, _grid, caster.Movement.Left, blocked);
+        caster.Movement.Reset(remaining, MoveReason.Walk);
         if (waypoints.Count == 0) { BeginAttackPhase(); return; }
         BeginWalk(waypoints);
     }
@@ -1345,7 +1344,7 @@ public sealed class TurnSystem
         float scaledCost = EnemyCostScale * enemy.MovementCost(enemy.Weapon);
 
         // The same gates as the party's: the budget, and Charges' cap on chosen attacks.
-        if (!enemy.Alive || _enemyBudget < scaledCost || !HasAttackLeft(enemy))
+        if (!enemy.Alive || !enemy.Movement.CanAfford(scaledCost) || !HasAttackLeft(enemy))
         {
             _nextEnemyPending = true;
             _timer = AttackBeatSeconds;
@@ -1360,7 +1359,7 @@ public sealed class TurnSystem
             return;
         }
 
-        _enemyBudget -= scaledCost;
+        enemy.Movement.TrySpend(scaledCost, MoveReason.Attack);   // affordable: checked above, before the target was looked for
         CountAttack(enemy);
         AttackWith(enemy, target);
         if (Phase == TurnPhase.GameOver) return;
@@ -1410,7 +1409,7 @@ public sealed class TurnSystem
             ? EnemyAi.SelectSupportTarget(caster, _enemies)
             : NearestHittable(caster);
 
-        if (_enemyBudget < scaledCost || caster.Mana < weapon.ResolvedManaCost
+        if (!caster.Movement.CanAfford(scaledCost) || caster.Mana < weapon.ResolvedManaCost
             || target == null || !CanCastOn(caster, target))
         {
             _nextEnemyPending = true;
@@ -1418,7 +1417,7 @@ public sealed class TurnSystem
             return;
         }
 
-        _enemyBudget -= scaledCost;
+        caster.Movement.TrySpend(scaledCost, MoveReason.Cast);    // affordable: checked above
         CastWith(caster, target);
         if (Phase == TurnPhase.GameOver) return;
 
@@ -1678,7 +1677,12 @@ public sealed class TurnSystem
         if (settled.Spent <= 0) return;
         if (!_movementFeeds.TryGetValue(self, out var spend))
             throw new InvalidOperationException("Spent the movement of an actor that is not on this turn system's roster.");
-        spend(settled.Spent);
+        spend(settled.Spent, settled.Source switch
+        {
+            "swap" => MoveReason.Swap,
+            "potion" => MoveReason.Potion,
+            _ => MoveReason.Other,
+        });
     }
 
     /// <summary>

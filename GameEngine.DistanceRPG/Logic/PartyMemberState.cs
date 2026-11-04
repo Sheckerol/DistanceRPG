@@ -14,6 +14,9 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public sealed class PartyMemberState : ActorState
 {
+    /// <summary>A member is made with the base budget to walk on.</summary>
+    public PartyMemberState() : base(Budget) { }
+
     public required string Id { get; init; }
     public required int ColorIndex { get; init; }
 
@@ -350,8 +353,8 @@ public sealed class PartyMemberState : ActorState
     /// </summary>
     private static float Budget => GameContent.Current.Tuning.MovementBudget;
 
-    /// <summary>Movement budget left this turn, in logic units.</summary>
-    public float DistLeft { get; set; } = Budget;
+    /// <summary>Movement budget left this turn, in logic units: <see cref="ActorState.Movement"/>'s balance, changed only through it.</summary>
+    public float DistLeft => Movement.Left;
 
     /// <summary>This turn's cap: base budget plus movement saved last turn, less what Mire cut.</summary>
     public float EffectiveMax { get; set; } = Budget;
@@ -384,7 +387,7 @@ public sealed class PartyMemberState : ActorState
         SavedMovement = 0;
         BudgetBeforeMire = Budget + bonus;
         EffectiveMax = StatusBehaviours.MiredBudget(this, BudgetBeforeMire);
-        DistLeft = EffectiveMax;
+        Movement.Reset(EffectiveMax, MoveReason.TurnStart);
     }
 
     /// <summary>
@@ -419,7 +422,7 @@ public sealed class PartyMemberState : ActorState
         SavedMovement = 0;
         BudgetBeforeMire = Budget;
         EffectiveMax = Budget;
-        DistLeft = Budget;
+        Movement.Reset(Budget, MoveReason.Rest);
     }
 
     /// <summary>

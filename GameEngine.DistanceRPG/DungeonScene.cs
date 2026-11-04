@@ -273,7 +273,9 @@ public class DungeonScene : Scene
     private FogState _fog = null!;
     private FogOverlayRenderer _fogOverlay = null!;
     private ReachOverlayRenderer _reachOverlay = null!;
-    private int? _reachKey;   // a hash of what the overlay was last built from: rebuilt only when it changes
+    private int? _reachKey;   // a hash of what the overlay was last built from besides movement: rebuilt when it changes
+    private bool _reachDirty;  // a watched ledger moved: rebuild whatever the key says
+    private MovementLedger? _watchedMember;   // the active member's ledger, which the overlay listens to
 
     // The floor's turn system: the one the visit's OpenTurns returned for the
     // floor being played (visit.Turns), replaced whole on every arrival.
@@ -780,6 +782,7 @@ public class DungeonScene : Scene
     public override void Shutdown()
     {
         _campaign.RunEnded -= OnRunEnded;   // the campaign outlives this scene: the next run's end is the next scene's to show
+        Watch(ref _watchedMember, null);     // the party outlives it too: let go of its ledger
         _hud.Dispose();
         base.Shutdown();
     }
@@ -1898,7 +1901,7 @@ public class DungeonScene : Scene
         float movedX = nx - state.X;
         float movedY = ny - state.Y;
         float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
-        state.DistLeft = MathF.Max(0f, state.DistLeft - moved);
+        state.Movement.SpendUpTo(moved, MoveReason.Walk);
 
         state.X = nx;
         state.Y = ny;
@@ -2216,7 +2219,7 @@ public class DungeonScene : Scene
         float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
         if (moved <= 0f) return;
 
-        state.DistLeft = MathF.Max(0f, state.DistLeft - moved);
+        state.Movement.SpendUpTo(moved, MoveReason.Walk);
         state.X = nx;
         state.Y = ny;
         member.SyncTransform();
@@ -2513,27 +2516,35 @@ public class DungeonScene : Scene
             && _turns.AnyLiveEnemySeenThisTurn && active.Alive;
         if (!show)
         {
+            Watch(ref _watchedMember, null);
             if (_reachKey != null) { _reachOverlay.Clear(); _reachKey = null; }
             return;
         }
 
         var held = active.EquippedWeapon;
         var hovered = HoveredEnemy is { IsActive: true } h && h.State.Alive ? h.State : null;
+        // Movement is heard, not polled: whatever changes the balance goes
+        // through the ledger, which says so (OnWatchedMovement).
+        Watch(ref _watchedMember, active.Movement);
         var hittable = _enemies
             .Where(e => e.IsActive && e.State.Alive && EnemyCue(active, held, e.State) is { Ready: true })
             .Select(e => e.State)
             .ToList();
 
         var key = new HashCode();
-        key.Add(active); key.Add(active.X); key.Add(active.Y); key.Add(active.DistLeft);
+        key.Add(active); key.Add(active.X); key.Add(active.Y);
         key.Add(held); key.Add(held?.Range); key.Add(held == null ? 0 : active.MovementCost(held));
         key.Add(hovered);
+        // A hovered enemy's walk is its next turn's budget, not its ledger's
+        // leftover: Mire landing on it this turn is what can change it.
+        key.Add(hovered == null ? 0f : StatusBehaviours.MiredBudget(hovered, hovered.MoveBudget));
         foreach (var member in _party) { key.Add(member.State.Alive); key.Add(member.State.X); key.Add(member.State.Y); }
         foreach (var enemy in _enemies) { key.Add(enemy.State.Alive); key.Add(enemy.State.X); key.Add(enemy.State.Y); }
         foreach (var enemy in hittable) key.Add(enemy);
         int hash = key.ToHashCode();
-        if (_reachKey == hash) return;
+        if (_reachKey == hash && !_reachDirty) return;
         _reachKey = hash;
+        _reachDirty = false;
 
         var grid = _map.Grid;
         float enemyRadius = _enemies.Count > 0 ? _enemies[0].State.Radius : active.Radius;
@@ -2551,7 +2562,7 @@ public class DungeonScene : Scene
                 if (member.State.Alive) bodies.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
             foreach (var enemy in _enemies)
                 if (enemy.State.Alive && enemy.State != hovered) bodies.Add(new GridCollision.Circle(enemy.State.X, enemy.State.Y, enemy.State.Radius));
-            float budget = StatusBehaviours.MiredBudget(hovered, hovered.MoveBudget);
+            float budget = StatusBehaviours.MiredBudget(hovered, hovered.MoveBudget);   // what StartEnemyAction will refill it to
             layers.Add(EnemyWalk.On(ReachFields.Walkable(grid, hovered.X, hovered.Y, hovered.Radius, budget, bodies)));
             layers.Add(EnemyReach.On(ReachFields.InReach(grid, hovered.X, hovered.Y, hovered.Radius, GameConstants.PlayerHalf, hovered.Weapon.Range)));
         }
@@ -2561,6 +2572,22 @@ public class DungeonScene : Scene
             .ToList();
         _reachOverlay.Show(layers, rings, AttackCostRuler(active, held));
     }
+
+    /// <summary>
+    /// Listen to <paramref name="next"/> in place of what <paramref name="slot"/>
+    /// held (null: to nothing), so the overlay rebuilds whenever that ledger
+    /// moves; a change of ledger rebuilds it too.
+    /// </summary>
+    private void Watch(ref MovementLedger? slot, MovementLedger? next)
+    {
+        if (ReferenceEquals(slot, next)) return;
+        if (slot != null) slot.Changed -= OnWatchedMovement;
+        slot = next;
+        if (slot != null) slot.Changed += OnWatchedMovement;
+        _reachDirty = true;
+    }
+
+    private void OnWatchedMovement(MovementChange change) => _reachDirty = true;
 
     /// <summary>
     /// The attack-cost ruler: four lines from the member along the map's axes,
