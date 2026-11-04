@@ -176,9 +176,9 @@ public sealed class WandTests : IDisposable
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
         var aim = (a.X, a.Y);
 
-        a.DistLeft = 44f;
+        a.Movement.Reset(44f, MoveReason.Restore);
         Assert.False(turns.CanCastArea(a, aim));   // 45 to cast
-        a.DistLeft = 45f;
+        a.Movement.Reset(45f, MoveReason.Restore);
         Assert.True(turns.CanCastArea(a, aim));
         a.Mana = 17;
         Assert.False(turns.CanCastArea(a, aim));   // 18 for the cast; the trigger is no gate

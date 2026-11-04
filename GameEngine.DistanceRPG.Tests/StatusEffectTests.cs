@@ -255,7 +255,7 @@ public sealed class StatusEffectTests : IDisposable
 
         var (turns2, a2, _) = Scene();
         a2.Mana = 0;
-        a2.DistLeft = Premise.Budget / 2f;   // half the budget left unspent
+        a2.Movement.Reset(Premise.Budget / 2f, MoveReason.Restore);   // half the budget left unspent
         turns2.EndTurn();
         Assert.Equal(8, a2.Mana);
     }

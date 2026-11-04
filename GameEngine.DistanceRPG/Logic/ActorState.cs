@@ -10,6 +10,17 @@ namespace GameEngine.DistanceRPG.Logic;
 /// </summary>
 public abstract class ActorState
 {
+    /// <param name="startingMovement">The movement the actor is made with (<see cref="Movement"/>).</param>
+    protected ActorState(float startingMovement = 0f) => Movement = new MovementLedger(startingMovement);
+
+    /// <summary>
+    /// The actor's movement left this turn, and the only door it changes
+    /// through: spent with <see cref="MovementLedger.TrySpend"/> (an action) or
+    /// <see cref="MovementLedger.SpendUpTo"/> (a walk), refilled with
+    /// <see cref="MovementLedger.Reset"/>, every change announced.
+    /// </summary>
+    public MovementLedger Movement { get; }
+
     public float X { get; set; }
     public float Y { get; set; }
 

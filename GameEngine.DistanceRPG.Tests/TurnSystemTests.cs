@@ -36,7 +36,7 @@ public sealed class TurnSystemTests : IDisposable
         var enemy = new EnemyState { X = 15 * Tile, Y = 15 * Tile };
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
-        a.DistLeft = 100f; // 60 spent
+        a.Movement.Reset(100f, MoveReason.Restore); // 60 spent
         float banked = -1f;
         turns.TurnEnded += saved => banked = saved;
 
@@ -57,7 +57,7 @@ public sealed class TurnSystemTests : IDisposable
     {
         var grid = new int[20, 20];
         var a = Char("A", 5 * Tile, 5 * Tile);
-        a.DistLeft = 300f; // from a previous bonus turn
+        a.Movement.Reset(300f, MoveReason.Restore); // from a previous bonus turn
         var enemy = new EnemyState { X = 15 * Tile, Y = 15 * Tile };
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
@@ -95,10 +95,10 @@ public sealed class TurnSystemTests : IDisposable
         var enemy = new EnemyState { X = 5 * Tile + 50f, Y = 5 * Tile };
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
 
-        a.DistLeft = a.EquippedWeapon!.ResolvedCost - 1; // one short of the dagger's 30
+        a.Movement.Reset(a.EquippedWeapon!.ResolvedCost - 1, MoveReason.Restore); // one short of the dagger's 30
         Assert.False(turns.TryAttack(a, enemy));
 
-        a.DistLeft = 160f;
+        a.Movement.Reset(160f, MoveReason.Restore);
         enemy.X = 15 * Tile; // out of range
         Assert.False(turns.TryAttack(a, enemy));
 

@@ -264,11 +264,11 @@ public sealed class ProficiencyEffectTests : IDisposable
         int cost = a.MovementCost(a.EquippedWeapon!);
         Assert.Equal(24, cost);
 
-        a.DistLeft = cost - 1;
+        a.Movement.Reset(cost - 1, MoveReason.Restore);
         Assert.False(turns.CanAttack(a, dummy));
         Assert.False(turns.TryAttack(a, dummy));
 
-        a.DistLeft = cost;
+        a.Movement.Reset(cost, MoveReason.Restore);
         Assert.True(turns.CanAttack(a, dummy));
         Assert.True(turns.TryAttack(a, dummy));
         Assert.Equal(0f, a.DistLeft);

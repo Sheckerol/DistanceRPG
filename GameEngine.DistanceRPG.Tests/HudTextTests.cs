@@ -2163,7 +2163,7 @@ public sealed class HudTextTests : IDisposable
         var tuning = GameContent.Current.Tuning;
         Assert.Equal(160f, DungeonScene.BudgetBeforeMire(member, TurnPhase.Player, tuning));   // no turn has started: the budget alone
 
-        member.DistLeft = 100f;
+        member.Movement.Reset(100f, MoveReason.Restore);
         turns.EndTurn();
         Assert.Equal(TurnPhase.TurnEnding, turns.Phase);
         Assert.Equal(50f, member.SavedMovement);

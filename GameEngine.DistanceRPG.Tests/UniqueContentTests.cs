@@ -642,7 +642,7 @@ public class UniqueContentTests
         {
             (enemy.X, enemy.Y) = At(5, 6);
             turns.NotifyActorMoved(enemy, MoveKind.Forced);   // back out of reach: the pair is released
-            a.DistLeft = Premise.Budget;
+            a.Movement.Reset(Premise.Budget, MoveReason.Restore);
             Assert.True(turns.TryAttack(a, enemy));           // shoved to tile 7, into the line
             Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
             Assert.Equal(Math.Min(entry, retaliations), braces);
@@ -669,7 +669,7 @@ public class UniqueContentTests
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
         Assert.Equal(throws, turns.AttacksPerTurn(a));
 
-        a.DistLeft = (throws + 1) * 15f;   // movement for a throw more than the cap allows: 15 a throw
+        a.Movement.Reset((throws + 1) * 15f, MoveReason.Restore);   // movement for a throw more than the cap allows: 15 a throw
         for (int i = 0; i < throws; i++)
             Assert.True(turns.TryAttack(a, enemy));
         Assert.False(turns.CanAttack(a, enemy));
