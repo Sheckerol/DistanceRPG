@@ -28,7 +28,7 @@ public class MapRect
         => row >= Y && row < Y + H && col >= X && col < X + W;
 }
 
-/// <summary>A 2-tile-wide corridor run; Horizontal is the carve direction.</summary>
+/// <summary>A corridor run, as wide as it was generated (<see cref="MapGenerator.CorridorWidth"/>; the prototype's two); Horizontal is the carve direction.</summary>
 public sealed class Corridor : MapRect
 {
     public bool Horizontal;

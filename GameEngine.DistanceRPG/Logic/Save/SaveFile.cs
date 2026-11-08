@@ -322,9 +322,16 @@ public sealed record ClawbackDto(string MemberId, string Pool, int Before, int A
 /// reload is never a reroll. Appended by Phase 5.7, with its default: a document
 /// written before it reads as a die not yet rolled.
 /// </param>
+/// <param name="DungeonsCleared">
+/// The campaign's clears at entry (<see cref="DungeonState.DungeonsCleared"/>):
+/// what capped the visit's rooms, so the floors a load generates fresh are
+/// placed as the entry placed the rest. Appended with beginner protection, with
+/// its default: a document written before it was entered uncapped, and reads so
+/// (<see cref="EnemyPlacer.Unprotected"/>).
+/// </param>
 public sealed record VisitDto(string DungeonId, long MapSeed, int BossFloor, int PromisedStacks, int FloorIndex, int DeepestFloorIndex, int Turn,
     bool BossDefeated, int BossDefeatedAtTurn, XpSnapshotDto EntrySnapshot, IReadOnlyList<SpoilDto> Spoils, CarryDto? Carry, IReadOnlyList<FloorDto> Floors,
-    int DiceRolled = 0);
+    int DiceRolled = 0, int DungeonsCleared = EnemyPlacer.Unprotected);
 
 /// <summary>
 /// One visited floor (§5.1's per-floor group): what a visit changed there, and

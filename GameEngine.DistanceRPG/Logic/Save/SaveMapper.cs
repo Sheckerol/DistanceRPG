@@ -120,7 +120,8 @@ internal static class SaveMapper
             visit.Spoils.Select((spoil, i) => SpoilOf(spoil, i, party, visit)).ToArray(),
             Carry(visit.CurrentCarry(), party, visit),
             floors,
-            visit.DiceRolled);
+            visit.DiceRolled,
+            visit.DungeonsCleared);
     }
 
     /// <summary>
@@ -924,6 +925,7 @@ internal static class SaveMapper
         if (row.BossFloor < 1 || row.BossFloor > DeepestBossFloor)
             throw new SaveFormatException($"{at}.bossFloor", $"{row.BossFloor} is no boss floor: a boss waits on floor 1 to {DeepestBossFloor}");
         NotNegative(row.PromisedStacks, $"{at}.promisedStacks");
+        NotNegative(row.DungeonsCleared, $"{at}.dungeonsCleared");
         Count(row.Turn, $"{at}.turn");
         Count(row.DiceRolled, $"{at}.diceRolled");
         // The map seed is any long by design: every floor's seed and every stream
@@ -954,13 +956,14 @@ internal static class SaveMapper
         for (int n = 0; n < saved.Count; n++)
             floors[n] = FloorOf(saved[n], n, row, def, content, $"{at}.floors[{n}]");
         for (int n = saved.Count; n < floors.Length; n++)
-            floors[n] = Floor.Generate(row.MapSeed, n, bottom: n == floors.Length - 1, def, row.PromisedStacks);   // never stood on: placed as an entry places it
+            floors[n] = Floor.Generate(row.MapSeed, n, bottom: n == floors.Length - 1, def, row.PromisedStacks,
+                row.DungeonsCleared);   // never stood on: placed as the entry placed it, under the clears it saw
 
         var spoils = Spoils(row.Spoils, party, floors, row.DeepestFloorIndex, $"{at}.spoils");
         var carry = row.Carry is { } counters ? Carry(counters, party, floors, row, $"{at}.carry") : null;
 
         return DungeonState.Restore(def, row.MapSeed, row.BossFloor, row.PromisedStacks, snapshot, floors, row.FloorIndex, row.DeepestFloorIndex,
-            row.Turn, row.BossDefeated, row.BossDefeatedAtTurn, carry, spoils, row.DiceRolled);
+            row.Turn, row.BossDefeated, row.BossDefeatedAtTurn, carry, spoils, row.DiceRolled, row.DungeonsCleared);
     }
 
     /// <summary>The party's XP at the door: the party's members, each once, in roster order, every pool a count play could have written.</summary>

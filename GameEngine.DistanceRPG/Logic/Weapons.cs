@@ -166,14 +166,14 @@ public sealed class Weapon : IItem
     public string Id { get; }
     public string Name { get; }
 
-    /// <summary>The name as the screen says it (<see cref="Shown"/>): <c>SKIRMISHERS PIKE</c>. The log keeps <see cref="Name"/>.</summary>
+    /// <summary>The name as the screen says it (<see cref="Shown"/>): <c>HOPLITES WALL</c>. The log keeps <see cref="Name"/>.</summary>
     public string ShownName => Shown(Name);
 
     /// <summary>
     /// A weapon's name as every screen says it: in capitals, as the HUD's font draws
     /// them, and with no apostrophe, which the font has no glyph for — drawn, the gap
-    /// read <c>SKIRMISHER S PIKE</c>. <c>Skirmisher's Pike</c> reads <c>SKIRMISHERS
-    /// PIKE</c>. The one door every weapon name takes onto the screen, as a save's
+    /// read <c>HOPLITE S WALL</c>. <c>Hoplite's Wall</c> reads <c>HOPLITES
+    /// WALL</c>. The one door every weapon name takes onto the screen, as a save's
     /// notice names an id bare.
     /// </summary>
     public static string Shown(string name)
@@ -496,13 +496,12 @@ public sealed class Weapon : IItem
     /// </summary>
     /// <param name="index">The entry's position in <see cref="Enchantments"/>.</param>
     /// <param name="xp">Mana that entry paid; never negative.</param>
-    /// <param name="stat">The INT that was doing the spending, 1..4; a flat 1 for a thing with no nature.</param>
-    /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>, <paramref name="xp"/> is negative, or <paramref name="stat"/> is outside 1..4.</exception>
-    public void CreditEnchantment(int index, int xp, int stat)
+    /// <exception cref="ArgumentOutOfRangeException">Nothing is attached at <paramref name="index"/>, or <paramref name="xp"/> is negative.</exception>
+    public void CreditEnchantment(int index, int xp)
     {
         if ((uint)index >= (uint)_enchantments.Count)
             throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {_enchantments.Count} enchantments.");
-        _enchantments[index] = _enchantments[index].WithXp(xp, stat);
+        _enchantments[index] = _enchantments[index].WithXp(xp);
     }
 
     public int Stacks(ModifierType t) => Modifiers.Stacks(t);

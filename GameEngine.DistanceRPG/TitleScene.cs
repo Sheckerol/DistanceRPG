@@ -168,6 +168,24 @@ internal sealed class TitleMenu
     }
 
     /// <summary>
+    /// A click on a row (after play, 2026-10; <see cref="TitleHud.TitleRow.Choice"/>):
+    /// on the slot list, its row, taken as that slot's number key takes it
+    /// (<see cref="SlotMenu.PressRow"/>); on the options, the option, taken as ENTER
+    /// on it takes it — CONTINUE while it is off, nothing.
+    /// </summary>
+    public TitleStep Click(int choice)
+    {
+        if (List is { } list)
+            return list.PressRow(choice) == SlotStep.Chosen
+                ? new TitleStep(list.Mode == SlotMenuMode.NewCampaign ? TitleAction.NewCampaign : TitleAction.Load, list.Chosen!.Value)
+                : default;
+        if (choice < 0 || choice >= Options.Count || Options[choice] == TitleOption.Continue && !ContinueOn)
+            return default;
+        Cursor = choice;
+        return Select();
+    }
+
+    /// <summary>
     /// ESC, asked by the game before it does anything else with it: on the slot
     /// list, an ask says no, and otherwise the list goes back to the options — each
     /// true, ESC spent — and on the options it is not the title's, so false: the
@@ -272,6 +290,8 @@ public sealed class TitleScene : Scene
         // key that answers one never also moves or chooses. KeyPressed fires once
         // per physical press, so a held key acts once.
         Input!.SubscribeToKeyPressed(e => OnKey(e.Key));
+        Input.SubscribeToMouseMoved(e => _hud.Clicks.Mouse = e.Position);
+        Input.SubscribeToMouseButtonPressed(_ => _hud.Clicks.Click(_hud.Clicks.Mouse), MouseButton.Left);
         Log.Info(Menu.Listing.Newest is { } newest
             ? $"[Title] The title: CONTINUE loads {SaveSlots.Label(newest.Number)}"
             : "[Title] The title: no save yet - CONTINUE is off");
@@ -309,12 +329,21 @@ public sealed class TitleScene : Scene
     private void OnKey(Keys key)
     {
         if (key == Keys.Escape) return;   // the game's to route: it asks HandleEscape
+        Take(menu => menu.Press(key), key.ToString());
+    }
+
+    /// <summary>A click on a row of the screen as it was drawn (<see cref="TitleHud.TitleRow.Choice"/>): taken as <see cref="TitleMenu.Click"/> takes it, and answered as a key is.</summary>
+    internal void Click(int choice) => Take(menu => menu.Click(choice), "a click");
+
+    /// <summary>A key's or a click's step on the menu (<paramref name="press"/>), logged, and what it asks of the host asked; nothing on the way out or mid-fade.</summary>
+    private void Take(Func<TitleMenu, TitleStep> press, string what)
+    {
         if (_leaving || Manager?.IsTransitioning == true) return;
 
         var asked = Menu.List?.Asking;
-        var step = Menu.Press(key);
+        var step = press(Menu);
         if (asked is not null && step.Action == TitleAction.None)
-            Log.Info($"[Title] {Asked(asked)} not taken ({key})");
+            Log.Info($"[Title] {Asked(asked)} not taken ({what})");
         else if (asked is null && Menu.List?.Asking is { } asking)
             Log.Info($"[Title] {Asked(asking)}? - ENTER to confirm, any other key to keep what it holds");
         if (Menu.List?.Said is { } said)

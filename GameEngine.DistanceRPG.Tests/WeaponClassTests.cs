@@ -26,14 +26,14 @@ public class WeaponClassTests
 
     private static readonly string ShippedWeapons = DataTexts.Shipped.Weapons!;
 
-    /// <summary>A <c>weapons.json</c> in the flat format the class section replaced (before Phase 5.R4): one list of weapons, each row naming every field, the Flensing Knife as it was written.</summary>
+    /// <summary>A <c>weapons.json</c> in the flat format the class section replaced (before Phase 5.R4): one list of weapons, each row naming every field, the Seax as it was written.</summary>
     private const string FlatFormat = """
         /* weapons.json - every weapon: the thirty-two variants, four to each of the eight classes, then the uniques. */
         {
           "weapons": [
             {
               "id": "flensing_knife",
-              "name": "Flensing Knife",
+              "name": "Seax",
               "class": "Dagger",
               "role": "Efficiency",
               "range": 40,

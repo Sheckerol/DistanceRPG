@@ -82,7 +82,7 @@ internal sealed class VisitScript
     /// <summary>Enter <paramref name="dungeonId"/> on <paramref name="seed"/>, open its first floor and arrive on it.</summary>
     public static VisitScript Enter(CampaignState campaign, string dungeonId, long seed, Func<int>? die = null, bool visitsOwnDie = false)
     {
-        campaign.Enter(dungeonId, seed);
+        campaign.Enter(dungeonId, seed, EnemyPlacer.Unprotected);
         var script = new VisitScript(campaign, die, visitsOwnDie);
         script.Open();
         return script;

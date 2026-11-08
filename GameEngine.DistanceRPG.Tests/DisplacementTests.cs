@@ -47,7 +47,7 @@ public sealed class DisplacementTests : IDisposable
     [Fact]
     public void SwordHit_PushesOneTilePerStack_AlongDominantAxis()
     {
-        // The Tower Guard's Push x1: a hit shoves the dummy one tile straight
+        // The Scutum and Gladius's Push x1: a hit shoves the dummy one tile straight
         // back along the attacker-to-target axis, set down on the tile's centre.
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "tower_guard");

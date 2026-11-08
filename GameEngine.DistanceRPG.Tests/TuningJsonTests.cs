@@ -843,7 +843,7 @@ public class TuningJsonTests
         // version 1 moves all three. The current version's is the default.
         var v3Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name).ToArray();
         Assert.NotEmpty(v3Keys);
-        Assert.Equal(TuningSchema.Keys.Where(k => k.Group == TuningGroup.Consumables).Select(k => k.Name), v3Keys);
+        Assert.Equal([nameof(Tuning.EnchantmentTierScale), .. TuningSchema.Keys.Where(k => k.Group == TuningGroup.Consumables).Select(k => k.Name)], v3Keys);
         Assert.Equal(3, SaveCodec.CurrentVersion);
         Assert.Equal(TuningJson.Hash(BuiltIn, version: 3), TuningJson.Hash(BuiltIn));
         string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2), three = TuningJson.Hash(BuiltIn, version: 3);

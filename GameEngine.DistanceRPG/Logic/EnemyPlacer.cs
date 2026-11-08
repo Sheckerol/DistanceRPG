@@ -1,7 +1,8 @@
 namespace GameEngine.DistanceRPG.Logic;
 
 /// <summary>
-/// Populates a generated map with enemy spawn positions: 0–4 dummies on
+/// Populates a generated map with enemy spawn positions: 0 to a room cap of
+/// dummies (<see cref="RoomCap"/>, at most <see cref="MaxEnemiesPerRoom"/>) on
 /// random distinct tiles of every room except the party's starting room.
 ///
 /// This runs as a separate step after map generation, on its own RNG stream
@@ -12,6 +13,29 @@ namespace GameEngine.DistanceRPG.Logic;
 public static class EnemyPlacer
 {
     public const int MaxEnemiesPerRoom = 4;
+
+    /// <summary>
+    /// A clear count no floor is capped under: what a placement outside a
+    /// campaign — the golden dungeon, a test, a tool — places as, every room
+    /// rolling the full 0 to <see cref="MaxEnemiesPerRoom"/> it always did.
+    /// </summary>
+    public const int Unprotected = MaxEnemiesPerRoom;
+
+    /// <summary>
+    /// Beginner protection: the most dummies a room on floor
+    /// <paramref name="floorNumber"/> (1-based, as the player reads it) may hold,
+    /// for a campaign that has cleared <paramref name="dungeonsCleared"/>
+    /// dungeons — the floor number plus the clears, never more than
+    /// <see cref="MaxEnemiesPerRoom"/>. So the tutorial's first floor holds one
+    /// a room at most, the next dungeon's first floor two, and the full four
+    /// arrive with depth or experience.
+    /// </summary>
+    public static int RoomCap(int floorNumber, int dungeonsCleared)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(floorNumber, 1);
+        ArgumentOutOfRangeException.ThrowIfNegative(dungeonsCleared);
+        return (int)Math.Min(MaxEnemiesPerRoom, (long)floorNumber + dungeonsCleared);
+    }
 
     /// <summary>The weapon a crowded room's healer is converted to.</summary>
     public const string HealerWeaponId = "staff_of_renewal";
@@ -44,8 +68,15 @@ public static class EnemyPlacer
     /// (<see cref="GameConstants.MinEnemiesForStaffHealer"/>+ enemies) may then
     /// convert one of its members into a staff healer.
     /// </summary>
-    public static List<(float X, float Y, string WeaponId)> PlaceEnemies(MapData map, long mapSeed)
+    /// <param name="maxPerRoom">
+    /// The most a room may hold (<see cref="RoomCap"/>): the count draw is one
+    /// draw whatever the cap, so a lower cap changes how many stand in a room and
+    /// never how many draws the stream has made before the count.
+    /// </param>
+    public static List<(float X, float Y, string WeaponId)> PlaceEnemies(MapData map, long mapSeed, int maxPerRoom = MaxEnemiesPerRoom)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxPerRoom, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(maxPerRoom, MaxEnemiesPerRoom);
         var rng = new Mulberry32(mapSeed ^ SeedSalt);
         var spawns = new List<(float X, float Y, string WeaponId)>();
         var catalogue = GameContent.Current.Weapons;
@@ -57,7 +88,7 @@ public static class EnemyPlacer
         {
             if ((room.Cy, room.Cx) == map.PlayerStart) continue;
 
-            int count = rng.NextInt(0, MaxEnemiesPerRoom);
+            int count = rng.NextInt(0, maxPerRoom);
             var taken = new HashSet<(int R, int C)>();
             int roomStart = spawns.Count;
             for (int i = 0; i < count; i++)

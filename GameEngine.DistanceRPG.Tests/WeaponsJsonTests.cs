@@ -187,7 +187,7 @@ public class WeaponsJsonTests
         // wrong kind, a field left out — each refused under the file's shape,
         // naming the weapon and the path. A modifier that is no modifier is an id
         // that resolves to nothing, pointing at the one it is nearest. The paths
-        // are the three sections' (the content rework, 1d): the Arming Sword is
+        // are the three sections' (the content rework, 1d): the Buckler and Sword is
         // variants[4], the Staff of Renewal variants[24].
         (string Text, string Entry, string Rule, string Detail)[] cases =
         [
@@ -252,7 +252,7 @@ public class WeaponsJsonTests
         Assert.Equal(("Sword", ContentValidator.RuleForgedNotAllowed), (excluded.EntryId, excluded.Rule));
         Assert.Equal("baseline Block x1 on a Melee weapon beside Block x1, Push x1 - restricted.json excludes [Push, Block]: Push is already forged here", excluded.Detail);
 
-        // A dependency: Riposte needing Brace, which the Riposte Blade does not carry.
+        // A dependency: Riposte needing Brace, which the Rapier and Dagger does not carry.
         var required = Broken(RiposteNeedsBrace);
         Assert.Equal(("riposte_blade", ContentValidator.RuleForgedNotAllowed), (required.EntryId, required.Rule));
         Assert.EndsWith("- restricted.json requires Riposte: [Brace], and this weapon has no Brace", required.Detail);

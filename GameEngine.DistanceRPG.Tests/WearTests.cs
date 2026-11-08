@@ -130,7 +130,7 @@ public sealed class WearTests : IDisposable
     public void EveryHitBanksWearPerHit_PerBody()
     {
         // S:785–788: WearPerHit is "per hit rather than per swing, per turn or
-        // scaled by damage". The Great Axe's Cleave x2 swing lands on three bodies:
+        // scaled by damage". The Dane Axe's Cleave x2 swing lands on three bodies:
         // three hits, three wear — one swing, one movement charge.
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "great_axe");
@@ -144,7 +144,7 @@ public sealed class WearTests : IDisposable
         Assert.Equal((200 - 15, 200 - 15, 200 - 15), (e1.Hp, e2.Hp, e3.Hp));
         Assert.Equal(3, axe.Wear);
 
-        // A counter is a hit: the Riposte Blade answers a blocked swing, and the
+        // A counter is a hit: the Rapier and Dagger answers a blocked swing, and the
         // counter wears the blade — taking the blow wears nothing.
         var b = Char("B", 5, 5, "riposte_blade");
         var blade = b.EquippedWeapon!;
@@ -382,7 +382,7 @@ public sealed class WearTests : IDisposable
         }
 
         // And the dungeon writes the crossing to the log, the one place it is
-        // said as it happens ([Wear] A's Weakspot Stiletto is full: wear 30 of 30):
+        // said as it happens ([Wear] A's Rondel is full: wear 30 of 30):
         // the scene's wiring subscribes to it once, with a handler that logs. Read
         // off the IL, as no test drives the scene.
         var wire = typeof(DungeonScene).GetMethod("WireTurnSystem", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -434,7 +434,7 @@ public sealed class WearTests : IDisposable
         // party wiped with come out of the dungeon as worn as they went down
         // (PHASE 6a DECISION 1).
         var campaign = CampaignRuns.Campaign();
-        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
         var a = campaign.Party[0];
         var knife = a.EquippedWeapon!;
@@ -509,7 +509,7 @@ public sealed class WearTests : IDisposable
             foreach (var weapon in member.Inventory.OfType<Weapon>())
                 Unworn(weapon, "the starting kit");
 
-        var visit = start.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = start.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         foreach (var floor in visit.Floors)
             foreach (var row in floor.Enemies)
             {

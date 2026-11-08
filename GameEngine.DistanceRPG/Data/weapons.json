@@ -29,8 +29,10 @@
  * martial class draws one variant per role instead, and names no dropOrder.
  *
  * variants: what a drop or a dummy carries. id: what everything names the weapon by - the starting
- * party (code), a drop, a save. name: what the screen calls it. class: one of the classes above.
- * role: a martial variant's - Efficiency, Purity, Control or Support - or null for a caster. adds:
+ * party (code), a drop, a save. name: what the screen calls it - a type, not a
+ * title (a Scutum and Gladius, a Rondel), 18 characters at the most: the run's end panel has room
+ * for no longer. class: one of the classes above. role: a martial variant's - Efficiency,
+ * Purity, Control or Support - or null for a caster. adds:
  * the modifiers it adds to its class's baseline, each to its stack count and summed onto it - {}
  * for a caster. enchantments: what it arrives with, in order, each an id from the game's
  * enchantment catalogue with its tier (1 when left out). shape: a wand's area - Blast (radius,
@@ -122,54 +124,54 @@
     /* ---- Dagger ---- */
     {
       "id": "flensing_knife",
-      "name": "Flensing Knife", "class": "Dagger", "role": "Efficiency", "adds": { "Light": 1 },
+      "name": "Seax", "class": "Dagger", "role": "Efficiency", "adds": { "Light": 1 },
       "enchantments": [], "shape": null
     },
     {
       "id": "assassins_fang",
-      "name": "Assassin's Fang", "class": "Dagger", "role": "Purity", "adds": { "CritWindow": 1 },
+      "name": "Stiletto", "class": "Dagger", "role": "Purity", "adds": { "CritWindow": 1 },
       "enchantments": [], "shape": null
     },
     {
       "id": "disarming_kris",
-      "name": "Disarming Kris", "class": "Dagger", "role": "Control", "adds": { "CritWeaken": 1 },
+      "name": "Kris", "class": "Dagger", "role": "Control", "adds": { "CritWeaken": 1 },
       "enchantments": [], "shape": null
     },
     {
       "id": "weakspot_stiletto",
-      "name": "Weakspot Stiletto", "class": "Dagger", "role": "Support", "adds": { "CritSunder": 1 },
+      "name": "Rondel", "class": "Dagger", "role": "Support", "adds": { "CritSunder": 1 },
       "enchantments": [], "shape": null
     },
     /* ---- Sword ---- */
     {
       "id": "arming_sword",
-      "name": "Arming Sword", "class": "Sword", "role": "Efficiency", "adds": { "Light": 1 },
+      "name": "Buckler and Sword", "class": "Sword", "role": "Efficiency", "adds": { "Light": 1 },
       "enchantments": [], "shape": null
     },
     {
       "id": "tower_guard",
-      "name": "Tower Guard", "class": "Sword", "role": "Purity", "adds": { "Block": 1 },
+      "name": "Scutum and Gladius", "class": "Sword", "role": "Purity", "adds": { "Block": 1 },
       "enchantments": [], "shape": null
     },
     {
       "id": "riposte_blade",
-      "name": "Riposte Blade", "class": "Sword", "role": "Control", "adds": { "Riposte": 1 },
+      "name": "Rapier and Dagger", "class": "Sword", "role": "Control", "adds": { "Riposte": 1 },
       "enchantments": [], "shape": null
     },
     {
       "id": "wardens_shield",
-      "name": "Warden's Shield", "class": "Sword", "role": "Support", "adds": { "BlockWeaken": 1 },
+      "name": "Targe and Claymore", "class": "Sword", "role": "Support", "adds": { "BlockWeaken": 1 },
       "enchantments": [], "shape": null
     },
     /* ---- Spear ---- */
     {
       "id": "skirmishers_pike",
-      "name": "Skirmisher's Pike", "class": "Spear", "role": "Efficiency", "adds": { "Light": 1 },
+      "name": "Hasta", "class": "Spear", "role": "Efficiency", "adds": { "Light": 1 },
       "enchantments": [], "shape": null
     },
     {
       "id": "phalanx_spear",
-      "name": "Phalanx Spear", "class": "Spear", "role": "Purity", "adds": { "Brace": 1 },
+      "name": "Sarissa", "class": "Spear", "role": "Purity", "adds": { "Brace": 1 },
       "enchantments": [], "shape": null
     },
     {
@@ -179,7 +181,7 @@
     },
     {
       "id": "pinning_lance",
-      "name": "Pinning Lance", "class": "Spear", "role": "Support", "adds": { "Pin": 1 },
+      "name": "Ranseur", "class": "Spear", "role": "Support", "adds": { "Pin": 1 },
       "enchantments": [], "shape": null
     },
     /* ---- Axe ---- */
@@ -190,24 +192,24 @@
     },
     {
       "id": "great_axe",
-      "name": "Great Axe", "class": "Axe", "role": "Purity", "adds": { "Cleave": 1 },
+      "name": "Dane Axe", "class": "Axe", "role": "Purity", "adds": { "Cleave": 1 },
       "enchantments": [], "shape": null
     },
-    /* The Reaver forges Splitting x2. */
+    /* The Pollaxe forges Splitting x2. */
     {
       "id": "reaver",
-      "name": "Reaver", "class": "Axe", "role": "Control", "adds": { "Splitting": 2 },
+      "name": "Pollaxe", "class": "Axe", "role": "Control", "adds": { "Splitting": 2 },
       "enchantments": [], "shape": null
     },
     {
       "id": "routing_axe",
-      "name": "Routing Axe", "class": "Axe", "role": "Support", "adds": { "Rout": 1 },
+      "name": "Bardiche", "class": "Axe", "role": "Support", "adds": { "Rout": 1 },
       "enchantments": [], "shape": null
     },
     /* ---- Ranged ---- */
     {
       "id": "hunting_bow",
-      "name": "Hunting Bow", "class": "Ranged", "role": "Efficiency", "adds": { "Light": 1 },
+      "name": "Shortbow", "class": "Ranged", "role": "Efficiency", "adds": { "Light": 1 },
       "enchantments": [], "shape": null
     },
     {
@@ -217,7 +219,7 @@
     },
     {
       "id": "pinning_bow",
-      "name": "Pinning Bow", "class": "Ranged", "role": "Control", "adds": { "Pin": 1 },
+      "name": "Composite Bow", "class": "Ranged", "role": "Control", "adds": { "Pin": 1 },
       "enchantments": [], "shape": null
     },
     {
@@ -233,7 +235,7 @@
     },
     {
       "id": "bandolier",
-      "name": "Bandolier", "class": "Throwing", "role": "Purity", "adds": { "Charges": 1 },
+      "name": "Throwing Knives", "class": "Throwing", "role": "Purity", "adds": { "Charges": 1 },
       "enchantments": [], "shape": null
     },
     {
@@ -243,7 +245,7 @@
     },
     {
       "id": "softening_javelins",
-      "name": "Softening Javelins", "class": "Throwing", "role": "Support", "adds": { "Softening": 1 },
+      "name": "Pila", "class": "Throwing", "role": "Support", "adds": { "Softening": 1 },
       "enchantments": [], "shape": null
     },
     /* ---- Staff ---- */

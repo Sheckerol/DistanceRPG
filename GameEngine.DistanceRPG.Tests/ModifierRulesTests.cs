@@ -127,8 +127,8 @@ public class ModifierRulesTests
         foreach (var t in All)
         {
             Assert.Equal(7, rules.Cap(t, 3));       // Widowmaker's CritWindow x3
-            Assert.Equal(6, rules.Cap(t, 2));       // Assassin's Fang, the Purity dagger: one higher than its siblings
-            Assert.Equal(5, rules.Cap(t, 1));       // Flensing Knife: CritWindow and Light alike
+            Assert.Equal(6, rules.Cap(t, 2));       // Stiletto, the Purity dagger: one higher than its siblings
+            Assert.Equal(5, rules.Cap(t, 1));       // Seax: CritWindow and Light alike
             Assert.Equal(4, rules.Cap(t, 0));       // never forged: the headroom alone
             Assert.Equal(104, rules.Cap(t, 100));   // nothing is capped
         }

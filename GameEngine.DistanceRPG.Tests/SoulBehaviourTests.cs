@@ -140,7 +140,7 @@ public sealed class SoulBehaviourTests : IDisposable
         Assert.Equal((false, TestPools.FixtureMana, 0), (a.Alive, a.Mana, hits[^1].Hit.DefenderManaToSpend));
         Assert.Single(spent);
 
-        // Same soul, other side: a dummy holding the Wall refuses the Tower Guard's shove and pays from its own pool.
+        // Same soul, other side: a dummy holding the Wall refuses the Scutum and Gladius's shove and pays from its own pool.
         var b = Char("B", 5, 5, "tower_guard");
         var wall = Enemy(5, 6, TestWeapons.Get("hoplites_wall"));
         var enemies = new TurnSystem(grid, new[] { b }, new[] { wall }, () => 10);
@@ -162,7 +162,7 @@ public sealed class SoulBehaviourTests : IDisposable
         Assert.All(chargedHits, h => Assert.Equal((false, null, 10), (h.Hit.OnDefendersTurn, h.Hit.Displace, h.Hit.DefenderManaToSpend)));
         Assert.Equal((At(5, 5), TestPools.FixtureHp - 30, TestPools.FixtureMana - 30), ((d.X, d.Y), d.Hp, d.Mana));
 
-        // In the wielder's own phase: the Riposte Blade answers the Wall's blocked thrust with a counter
+        // In the wielder's own phase: the Rapier and Dagger answers the Wall's blocked thrust with a counter
         // that shoves it a tile, and nothing is paid — the turn system marks the counter as landing on the
         // defender's own turn, and the thrust as landing in the blade's opponent's phase.
         var c = Char("C", 5, 5, "hoplites_wall");

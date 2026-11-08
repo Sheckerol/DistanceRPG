@@ -926,7 +926,7 @@ public static class Enchanter
         return $"THE ENCHANTER OPENS WHEN {tutorial.Name.ToUpperInvariant()} IS BEATEN";
     }
 
-    /// <summary>A weapon deposited already: <c>ARMING SWORD IS IN THE SHOP ALREADY</c>, named bare as the summary's <c>… IS BACK FROM THE ENCHANTER</c> names it. The screen never offers it.</summary>
+    /// <summary>A weapon deposited already: <c>BUCKLER AND SWORD IS IN THE SHOP ALREADY</c>, named bare as the summary's <c>… IS BACK FROM THE ENCHANTER</c> names it. The screen never offers it.</summary>
     public static string InTheShop(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);

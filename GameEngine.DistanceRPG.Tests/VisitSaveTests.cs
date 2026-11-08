@@ -31,10 +31,10 @@ public sealed class VisitSaveTests : IDisposable
 
     public void Dispose() => _premise.Dispose();
 
-    /// <summary>A seed the Spear Hall rolls five floors on, its boss holding a Tower Guard (pinned where a test leans on it).</summary>
+    /// <summary>A seed the Spear Hall rolls five floors on, its boss holding a Scutum and Gladius (pinned where a test leans on it).</summary>
     private const long FiveDeep = 4;
 
-    /// <summary>The shipped seed: the tutorial is two floors deep on it, its golem holding a Pinning Lance.</summary>
+    /// <summary>The shipped seed: the tutorial is two floors deep on it, its golem holding a Ranseur.</summary>
     private const long GoldenSeed = 2762136374;
 
     private const StringComparison Ordinal = StringComparison.Ordinal;
@@ -410,7 +410,7 @@ public sealed class VisitSaveTests : IDisposable
         // restores it — never re-rolls it. Restored under relations that take the
         // sword out of the Spear Hall boss's hands (every sword forges Block, and
         // Brace now excludes it), this seed's boss would be drawn a spear at a new
-        // entry; the saved one still holds its Tower Guard, on its dungeon's
+        // entry; the saved one still holds its Scutum and Gladius, on its dungeon's
         // statline.
         var script = VisitScript.Enter(NewCampaign(), "spear_hall", FiveDeep);
         while (script.Floor.DownStairs is not null)
@@ -974,7 +974,7 @@ public sealed class VisitSaveTests : IDisposable
         // turn, its banner included: the save holds none of their working state.
         var campaign = NewCampaign();
         Assert.True(SaveGame.IsSafePoint(campaign));
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Null(visit.Turns);
         Assert.True(SaveGame.IsSafePoint(campaign));
         Assert.NotNull(SaveGame.Capture(campaign).Campaign.Visit);

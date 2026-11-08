@@ -35,7 +35,7 @@ public class CampaignStateTests
     private static void Clear(CampaignState campaign, string dungeonId)
     {
         var party = campaign.Party;
-        var visit = campaign.Enter(dungeonId, 4);   // five floors deep wherever the range is the tuning's
+        var visit = campaign.Enter(dungeonId, 4, EnemyPlacer.Unprotected);   // five floors deep wherever the range is the tuning's
         visit.OpenTurns(party, () => 10);
         while (visit.Current.DownStairs is { } down)
         {

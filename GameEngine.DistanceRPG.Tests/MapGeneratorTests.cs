@@ -125,6 +125,44 @@ public class MapGeneratorTests
         Assert.NotEqual(GridToString(a.Grid), GridToString(c.Grid));
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(42)]
+    [InlineData(123)]
+    [InlineData(31337)]
+    [InlineData(2084311110)]
+    public void WiderHalls_KeepTheRoomsAndEveryPrototypeFloorTile_AndAreFloorWallToWall(long seed)
+    {
+        // After play (2026-10): "widen the halls ... to 3 tiles". The width is the
+        // caller's; the carving draws nothing, so the rooms are the prototype's, and
+        // a wider hall only adds floor - a party saved on the old map still stands.
+        var narrow = MapGenerator.Generate(new Mulberry32(seed));
+        var wide = MapGenerator.Generate(new Mulberry32(seed), MapGenerator.CorridorWidth);
+
+        Assert.Equal(narrow.Rooms.Select(r => (r.X, r.Y, r.W, r.H)), wide.Rooms.Select(r => (r.X, r.Y, r.W, r.H)));
+        Assert.Equal((narrow.PlayerStart, narrow.EnemyStart), (wide.PlayerStart, wide.EnemyStart));
+        Assert.Equal(narrow.Corridors.Count, wide.Corridors.Count);
+        for (int r = 0; r < MapGenerator.Rows; r++)
+            for (int c = 0; c < MapGenerator.Cols; c++)
+            {
+                if (narrow.Grid[r, c] == 0) Assert.Equal(0, wide.Grid[r, c]);
+                if (r == 0 || c == 0 || r == MapGenerator.Rows - 1 || c == MapGenerator.Cols - 1) Assert.Equal(1, wide.Grid[r, c]);
+            }
+
+        foreach (var corridor in wide.Corridors)
+        {
+            Assert.Equal(MapGenerator.CorridorWidth, corridor.Horizontal ? corridor.H : corridor.W);
+            for (int r = Math.Max(1, corridor.Y); r < Math.Min(MapGenerator.Rows - 1, corridor.Y + corridor.H); r++)
+                for (int c = Math.Max(1, corridor.X); c < Math.Min(MapGenerator.Cols - 1, corridor.X + corridor.W); c++)
+                    Assert.Equal(0, wide.Grid[r, c]);
+        }
+        Assert.True(GridUtils.IsFullyConnected(wide.Grid, wide.PlayerStart.Row, wide.PlayerStart.Col));
+    }
+
+    [Fact]
+    public void AHallNarrowerThanThePrototypes_IsRefused()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => MapGenerator.Generate(new Mulberry32(1), corridorWidth: 1));
+
     private static string GridToString(int[,] grid)
     {
         var chars = new char[grid.Length];

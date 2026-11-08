@@ -46,13 +46,13 @@
   /* ---- Statuses ---- */
 
   /* The effect of one level of each status, the only dial a status has: 1 damage a level for
-     Poison, Bleeding and Searing, 1 HP for Regeneration, 1 point absorbed for Ward, 10 percent of
+     Poison, Bleeding and Searing, 2 HP for Regeneration, 1 point absorbed for Ward, 10 percent of
      the movement budget for Mire (ten levels paralyse), 1 a hit for Sundered and Weakened, 1 Block
      for Softened. No decay dial: a status loses one level a round, and a damage-over-time's tick is
      its decay - Searing burns for its level, then loses one - so a burn lasts as many rounds as it
      has levels, against however long the fight runs. */
   "EffectPerLevel": {
-    "Regeneration": 1,  /* 1 HP restored per level at the target's turn end */
+    "Regeneration": 2,  /* 2 HP restored per level at the target's turn end (doubled after play, 2026-10) */
     "Ward": 1,          /* 1 point absorbed per level, spent as it absorbs */
     "Poison": 1,        /* 1 damage per level at the target's turn end */
     "Mire": 10,         /* 10 percent of the movement budget cut per level; ten levels is all of it */
@@ -322,6 +322,14 @@
      modifier the weapon carries. 1 is no bias, and a staff or a wand, which has no signature, has
      none (open-questions.md, PHASE 6a DECISION 5). */
   "DeepenSignatureWeight": 3,
+
+  /* How many times the mana an enchantment reserves is the spend that takes it up a tier: leaving a
+     tier costs lock x tier x this in mana spent through the entry, every enchantment alike. INT plays
+     no part - it grows a character's mana pool, never a weapon's ladder. The old bar, lock x tier /
+     INT, tiered a staff of renewal in a wizard's hands after two casts - and a tier doubles the
+     lock, which left it no pool to cast from. 5 makes a tier a long spend: 75 trigger mana to that
+     staff's second tier, in anyone's hands (after play, 2026-10). */
+  "EnchantmentTierScale": 5,
 
   /* ---- Inventory ---- */
 

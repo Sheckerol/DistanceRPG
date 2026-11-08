@@ -14,6 +14,13 @@ public enum GameMenu
     Inventory,
 
     /// <summary>
+    /// The character sheet (C, after play, 2026-10): the active member's stats,
+    /// pools in real numbers - mana current, spendable, reserved and max - and its
+    /// trained weapon classes. 1-4 switch the member shown; C or ESC close it.
+    /// </summary>
+    Character,
+
+    /// <summary>
     /// The pause menu (<see cref="PauseMenu"/>): 1 closes it, 2 saves the campaign
     /// into its own slot on the party's own turn, asking nothing — and off it says
     /// why not — and 3 quits to the title, the campaign's slot written first. ESC
@@ -496,6 +503,9 @@ public class DungeonScene : Scene
     private GameMenu _activeMenu = GameMenu.None;
 
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
+
+    /// <summary>Whether the character sheet is up (<see cref="GameMenu.Character"/>).</summary>
+    public bool CharacterOpen => ActiveMenu == GameMenu.Character;
 
     /// <summary>
     /// True while the bag's X has armed "leave" (§4.4): the next bag number puts
@@ -1508,6 +1518,7 @@ public class DungeonScene : Scene
         // yes to leaving when the way out has asked.
         input.SubscribeToKeyPressed(_ => StairKey(), Keys.E);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
+        input.SubscribeToKeyPressed(_ => ToggleCharacter(), Keys.C);
         // X, in the bag, arms "leave": the next bag number puts that weapon down
         // where the active member stands, rather than equipping it (§4.4).
         input.SubscribeToKeyPressed(_ => LeaveKey(), Keys.X);
@@ -1667,9 +1678,9 @@ public class DungeonScene : Scene
                     EquipSlot(slot);
             }
         }
-        else if (!AnyMenuOpen)
+        else if (!AnyMenuOpen || CharacterOpen)
         {
-            SetActiveCharacter(digit - 1);   // a number past the party selects nobody
+            SetActiveCharacter(digit - 1);   // a number past the party selects nobody; on the sheet, it shows that member
         }
     }
 
@@ -1701,6 +1712,14 @@ public class DungeonScene : Scene
     /// fade or on the defeat screen. Closing it disarms its X
     /// (<see cref="ActiveMenu"/>).
     /// </summary>
+    /// <summary>C opens the character sheet over the floor, or closes it; nothing behind another menu, or once the run is lost.</summary>
+    internal void ToggleCharacter()
+    {
+        if (Transiting || _turns is { Phase: TurnPhase.GameOver }) return;   // no floor open yet is no game over
+        if (ActiveMenu is not (GameMenu.None or GameMenu.Character)) return;
+        ActiveMenu = CharacterOpen ? GameMenu.None : GameMenu.Character;
+    }
+
     private void ToggleInventory()
     {
         if (Transiting || _turns.Phase == TurnPhase.GameOver) return;
@@ -1888,13 +1907,11 @@ public class DungeonScene : Scene
             dy *= scale;
         }
 
-        // Walls and live enemies always block. In combat the party body-blocks
-        // too — blockers are immovable circles here, so this is safe from the
-        // two-body wall shoves that made the prototype drop inter-party
-        // colliders. While marching, followers never block the leader, or
-        // reversing through your own line would deadlock it.
-        var blockers = ActiveMoveBlockers();
-        var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, blockers);
+        // Walls and live enemies block; the party never blocks itself (after
+        // play, 2026-10: two members stacked on one spot shoved one through a
+        // wall — GridCollision now lets walls win, and members walk through each
+        // other in combat as they always did marching).
+        var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, LiveEnemyBlockers());
 
         // Budget depletes by distance actually travelled, so pushing into a
         // wall costs nothing while sliding along it costs the slide.
@@ -1948,6 +1965,40 @@ public class DungeonScene : Scene
             ActiveMenu = GameMenu.ConfirmLeave;
         else
             BeginTransit(stair);
+    }
+
+    /// <summary>
+    /// A click on the way out, its tile or its label (after play, 2026-10: "a
+    /// click on the way out opens the dialogue to retreat"): E for it, so the
+    /// same prompt asks first. The stair is taken by the member standing on it,
+    /// so a click with someone else leading hands the lead to whoever stands
+    /// there; with nobody on it, it says so over the leader. Nothing with a menu
+    /// open, during a fade, or outside the player phase, as E.
+    /// </summary>
+    internal void ClickWayOut()
+    {
+        if (Transiting || AnyMenuOpen || _turns.Phase != TurnPhase.Player) return;
+        if (WayOutLeader(_visit, _campaign.Party, _activeIdx) is not { } leader)
+        {
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.StandOnWayOut, false));
+            return;
+        }
+        SetActiveCharacter(leader);
+        StairKey();
+    }
+
+    /// <summary>Who takes the way out for a click on it (<see cref="ClickWayOut"/>): the leader <paramref name="active"/> when they stand on it, else the first member who does; null with nobody on it.</summary>
+    internal static int? WayOutLeader(DungeonState visit, IReadOnlyList<PartyMemberState> party, int active)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        ArgumentNullException.ThrowIfNull(party);
+        bool OnIt(int i) => visit.StairUnder(party[i]) is { Kind: Stair.Exit };
+        if (active >= 0 && active < party.Count && OnIt(active))
+            return active;
+        for (int i = 0; i < party.Count; i++)
+            if (OnIt(i))
+                return i;
+        return null;
     }
 
     /// <summary>ENTER, routed by the menu that is open: on to the screen between runs from the run's summary, the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
@@ -2231,7 +2282,20 @@ public class DungeonScene : Scene
 
     private void HandleClick()
     {
-        if (AnyMenuOpen || Transiting) return;
+        if (Transiting) return;
+
+        // The menus and the keys lines as last drawn come first (after play,
+        // 2026-10): a key's words click as the key, a bag slot as its number
+        // (ClickZones), so a click there does only what its key would. On the
+        // character sheet, a row of the party list shows that member, as its
+        // number does.
+        if (_hud.Clicks.Click(_mousePos)) return;
+        if (CharacterOpen && DungeonHud.HitPartySelector(_mousePos, _party.Count, out int shown))
+        {
+            SetActiveCharacter(shown);
+            return;
+        }
+        if (AnyMenuOpen) return;
 
         // The HUD party list doubles as buttons and wins over world picking.
         if (DungeonHud.HitPartySelector(_mousePos, _party.Count, out int hudIdx))
@@ -2278,9 +2342,17 @@ public class DungeonScene : Scene
             return;
         }
 
+        // The way out under the cursor: its prompt, as E on it (ClickWayOut).
+        var floorPoint = FloorPointOf(origin, dir);
+        if (floorPoint is { } at && _visit.StairAt(at) is { Kind: Stair.Exit })
+        {
+            ClickWayOut();
+            return;
+        }
+
         // Nothing under the cursor: a wand aimed by a point (a Blast's centre,
         // a Cone's or Beam's direction) casts at the floor point the ray meets.
-        if (held?.AreaShape is { Kind: not AreaShapeKind.Nova } && FloorPointOf(origin, dir) is { } aim)
+        if (held?.AreaShape is { Kind: not AreaShapeKind.Nova } && floorPoint is { } aim)
             CastArea(caster, aim);
     }
 
@@ -2501,8 +2573,8 @@ public class DungeonScene : Scene
     /// <summary>
     /// The reach overlay, in combat during the party's phase with no menu open
     /// (hidden otherwise): where the active member can walk with the movement it
-    /// has left, around walls and bodies — the very blockers its steps collide
-    /// with (<see cref="ActiveMoveBlockers"/>) — and where a target would be in
+    /// has left, around walls and live enemies — the very blockers its steps collide
+    /// with (<see cref="LiveEnemyBlockers"/>) — and where a target would be in
     /// its weapon's reach and sight from where it stands; a ring under each
     /// visible enemy a click would hit now (<see cref="EnemyCue"/> ready); and,
     /// for the enemy under the mouse, its own walk on its next turn's budget
@@ -2550,7 +2622,7 @@ public class DungeonScene : Scene
         float enemyRadius = _enemies.Count > 0 ? _enemies[0].State.Radius : active.Radius;
         var layers = new List<ReachOverlayRenderer.Layer>
         {
-            MemberWalk.On(ReachFields.Walkable(grid, active.X, active.Y, active.Radius, active.DistLeft, ActiveMoveBlockers())),
+            MemberWalk.On(ReachFields.Walkable(grid, active.X, active.Y, active.Radius, active.DistLeft, LiveEnemyBlockers())),
         };
         if (held != null)
             layers.Add(MemberReach.On(ReachFields.InReach(grid, active.X, active.Y, active.Radius, enemyRadius, held.Range)));
@@ -3124,24 +3196,6 @@ public class DungeonScene : Scene
     }
 
     /// <summary>Live enemies as collision blockers; corpses are walkable.</summary>
-    /// <summary>
-    /// What the active member's steps collide with: the walls aside, live
-    /// enemies always, and in combat the rest of the party too. While marching
-    /// the followers never block the leader, or reversing through your own line
-    /// would deadlock it. The one list movement and the reach overlay both read.
-    /// </summary>
-    private List<GridCollision.Circle> ActiveMoveBlockers()
-    {
-        var blockers = LiveEnemyBlockers();
-        if (!Marching)
-        {
-            foreach (var member in _party)
-                if (member != ActiveCharacter && member.State.Alive)
-                    blockers.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
-        }
-        return blockers;
-    }
-
     private List<GridCollision.Circle> LiveEnemyBlockers()
     {
         var blockers = new List<GridCollision.Circle>();

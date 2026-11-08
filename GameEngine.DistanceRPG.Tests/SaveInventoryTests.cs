@@ -153,6 +153,7 @@ public class SaveInventoryTests
             new("MapSeed", Kept.Saved, "visit.mapSeed: every floor, stair and stream derives from it"),
             new("BossFloor", Kept.Saved, "visit.bossFloor: the value a load uses, never rolled again through a tuning that may have changed"),
             new("PromisedStacks", Kept.Saved, "visit.promisedStacks: the value a load uses, never re-derived"),
+            new("DungeonsCleared", Kept.Saved, "visit.dungeonsCleared: the room cap's clears at entry, which a load places unvisited floors under"),
             new("FloorIndex", Kept.Saved, "visit.floorIndex"),
             new("DeepestFloorIndex", Kept.Saved, "visit.deepestFloorIndex: floors down to it are the visited ones, and saved"),
             new("_turn", Kept.Saved, "visit.turn: the visit's clock (Turn reads it while no system is open)"),

@@ -373,20 +373,20 @@ public sealed class XpCreditTests : IDisposable
     {
         // A staff deals no damage, so its ladder is fed by status levels applied
         // — the staff's own output stated in the only units it has. One level of
-        // Regeneration is one point.
+        // Regeneration is one point, and a Renewal cast lands two.
         var (turns, a, b, _) = CastScene("staff_of_renewal");
 
         Assert.True(turns.TryCast(a, b));
-        Assert.Equal(1, a.WeaponXp[WeaponClass.Staff]);
-        Assert.Equal(1, b.StatusLevel(Regeneration));
+        Assert.Equal(2, a.WeaponXp[WeaponClass.Staff]);
+        Assert.Equal(2, b.StatusLevel(Regeneration));
         Assert.Equal(0, b.WeaponXp.Total);   // the target learns nothing: the cast is the caster's craft
 
         // A crit doubles the levels, so it doubles the credit — the same rule a
         // crit follows on a swing, in the caster's own units.
         var (crit, c, d, _) = CastScene("staff_of_renewal", () => 20);
         Assert.True(crit.TryCast(c, d));
-        Assert.Equal(2, d.StatusLevel(Regeneration));
-        Assert.Equal(2, c.WeaponXp[WeaponClass.Staff]);
+        Assert.Equal(4, d.StatusLevel(Regeneration));
+        Assert.Equal(4, c.WeaponXp[WeaponClass.Staff]);
 
         // And a debuff staff levels the same ladder off what it strips: Mire's
         // two levels are two, whichever staff applied them.
@@ -418,9 +418,9 @@ public sealed class XpCreditTests : IDisposable
 
         Assert.True(turns.TryCast(caster, ally));
 
-        Assert.Equal(1, ally.StatusLevel(Regeneration));
+        Assert.Equal(2, ally.StatusLevel(Regeneration));
         Assert.Equal(5, ally.StatusLevel(Ward));                 // the ally felt the whole cast
-        Assert.Equal(1, caster.WeaponXp[WeaponClass.Staff]);     // and the staff learnt its own level of it, never 6
+        Assert.Equal(2, caster.WeaponXp[WeaponClass.Staff]);     // and the staff learnt its own two levels of it, never 7
     }
 
     // ── Health XP: what was actually restored ────────────────────────────────

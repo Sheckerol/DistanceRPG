@@ -704,7 +704,7 @@ public class ContentFilesTests
 
         // Content is an edit to a file beside the game: a statline and a dungeon's
         // name are each changed in their own file, and the content that loads is
-        // the edited one — 1i's playtest: the Weakspot Stiletto's damage 25, a
+        // the edited one — 1i's playtest: the Rondel's damage 25, a
         // number of its own over its class's (REWORK DECISION 1).
         var edited = ShippedData.Load(Shipped with
         {
@@ -720,7 +720,7 @@ public class ContentFilesTests
         // enchantment, beside "what does it do?" (code) and "what may it coexist
         // with?" (restricted.json) — is the content files' to answer. So moving
         // one between rows is an edit to the files alone, and the content that
-        // loads follows it. A modifier between weapons: Pin from the Pinning Lance
+        // loads follows it. A modifier between weapons: Pin from the Ranseur
         // to the Halberd, and Push the other way, so each is still a Spear variant
         // adding one rider. An enchantment between weapons: the Staff of Mire's
         // innate to the Staff of Warding, and Ward the other way. A theme between

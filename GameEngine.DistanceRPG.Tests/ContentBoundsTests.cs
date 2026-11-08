@@ -277,7 +277,7 @@ public class ContentBoundsTests
         })
             yield return new(row, "hatchet", field, v => WithWeapons(DataTexts.Edit(text, "\"id\": \"hatchet\",", $"\"id\": \"hatchet\", \"{field}\": {v},")));
 
-        // Row 6: what the Riposte Blade adds, which the reader asks: 1 to the deepest forge.
+        // Row 6: what the Rapier and Dagger adds, which the reader asks: 1 to the deepest forge.
         var blade = weapons.Weapons[IndexOf("riposte_blade")];
         int riposte = blade.Forged[Riposte] - weapons.ClassOf(blade.Class)!.Baseline.GetValueOrDefault(Riposte);
         yield return new(ContentBounds.Adds, "riposte_blade", $"variants[{IndexOf("riposte_blade")}].adds.Riposte",
@@ -466,7 +466,7 @@ public class ContentBoundsTests
             Assert.Equal((WeaponsJson.FileName, false, id, ContentValidator.RuleNumberInRange), Stamp(Fails(Shipped with { Weapons = edited })));
         }
 
-        // The ends of the row read: the Riposte Blade adding as deep as any forge goes.
+        // The ends of the row read: the Rapier and Dagger adding as deep as any forge goes.
         var deepest = WeaponsJson.Read(DataTexts.InRow(text, "riposte_blade", $"\"Riposte\": {riposte}", $"\"Riposte\": {bound.Max}"));
         Assert.Equal(bound.Max, deepest.Weapons.Single(w => w.Id == "riposte_blade").Forged[Riposte]);
     }
@@ -559,7 +559,7 @@ public class ContentBoundsTests
         // path before a load builds a floor of it; one at the ceiling loads, every
         // floor below the party generated from the seed.
         var campaign = CampaignState.Start(GameContent.Current);
-        campaign.Enter("spear_hall", mapSeed: 4);
+        campaign.Enter("spear_hall", mapSeed: 4, EnemyPlacer.Unprotected);
         string text = SaveCodec.Write(SaveGame.Capture(campaign));
         SaveFile BossOn(int floor)
         {

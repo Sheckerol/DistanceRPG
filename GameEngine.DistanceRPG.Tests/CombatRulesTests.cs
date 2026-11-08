@@ -20,7 +20,7 @@ public sealed class CombatRulesTests : IDisposable
     private static Weapon Sword => TestWeapons.Get("tower_guard");        // dmg 10, Block x2 (absorbs 6), Push x1
     private static Weapon Spear => TestWeapons.Get("skirmishers_pike");   // dmg 7, Brace x1, Longshot x1, Light x1
 
-    /// <summary>A Block x1 sword: the shipped 3 absorbed, without Tower Guard's second stack or Riposte Blade's counter.</summary>
+    /// <summary>A Block x1 sword: the shipped 3 absorbed, without Scutum and Gladius's second stack or Rapier and Dagger's counter.</summary>
     private static Weapon BlockSword => TestWeapons.Make("Sword", 80, 10, 50, (Block, 1));
 
     /// <summary>Resolve through the compiled chain with a party member holding each weapon (null: unarmed).</summary>
