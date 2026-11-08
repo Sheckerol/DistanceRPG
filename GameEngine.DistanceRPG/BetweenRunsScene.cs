@@ -377,7 +377,7 @@ public sealed class BetweenRunsScene : Scene
     /// </summary>
     internal void OnKey(Keys key)
     {
-        if (_leaving || SceneManager.Instance.IsTransitioning) return;
+        if (_leaving || Manager?.IsTransitioning == true) return;
 
         var route = Route(Mode, key);
         if (route != KeyRoute.Game)

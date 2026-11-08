@@ -309,7 +309,7 @@ public sealed class TitleScene : Scene
     private void OnKey(Keys key)
     {
         if (key == Keys.Escape) return;   // the game's to route: it asks HandleEscape
-        if (_leaving || SceneManager.Instance.IsTransitioning) return;
+        if (_leaving || Manager?.IsTransitioning == true) return;
 
         var asked = Menu.List?.Asking;
         var step = Menu.Press(key);

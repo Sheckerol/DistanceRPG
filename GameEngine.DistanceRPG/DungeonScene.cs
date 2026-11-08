@@ -912,16 +912,16 @@ public class DungeonScene : Scene
     private void TearDownFloor()
     {
         foreach (var obj in _floorObjects)
-            RemoveGameObject(obj);
+            World.Remove(obj);
         _floorObjects.Clear();
         _stairMarkers.Clear();
         foreach (var enemy in _enemies)
-            RemoveGameObject(enemy);
+            World.Remove(enemy);
         _enemies.Clear();
         // Drops' markers and loose items' alike. A loose item itself is the
         // floor's (Floor.LooseItems) and stays on it, to be laid again on a return.
         foreach (var item in _groundItems)
-            RemoveGameObject(item.Marker);
+            World.Remove(item.Marker);
         _groundItems.Clear();
 
         _pendingMistBursts.Clear();
@@ -1019,13 +1019,13 @@ public class DungeonScene : Scene
         float d = MapGenerator.Rows * WorldSpace.UnitsPerTile;
         var floor = new PrimitiveBoxObject(w, FloorThickness, d, FloorColor);
         floor.Position = new Vector3(w / 2f, -FloorThickness / 2f, d / 2f);
-        AddGameObject(floor);
+        World.Add(floor);
     }
 
     /// <summary>An object the floor being played owns: added to the scene, and taken down with the floor.</summary>
     private void AddFloorObject(GameObject obj)
     {
-        AddGameObject(obj);
+        World.Add(obj);
         _floorObjects.Add(obj);
     }
 
@@ -1087,7 +1087,7 @@ public class DungeonScene : Scene
         {
             var character = new CharacterObject(members[i], MemberColor(members[i], i));
             _party.Add(character);
-            AddGameObject(character);
+            World.Add(character);
         }
 
         _activeIdx = 0;
@@ -1128,7 +1128,7 @@ public class DungeonScene : Scene
             if (!state.Alive)
                 enemy.SetDefeatedVisual(true, snap: true);
             _enemies.Add(enemy);
-            AddGameObject(enemy);
+            World.Add(enemy);
         }
         Log.Info($"[Map] {_enemies.Count(e => e.State.Alive)} of {_enemies.Count} enemies standing across {_map.DebugRooms.Count} rooms");
     }
@@ -2113,7 +2113,7 @@ public class DungeonScene : Scene
     /// </summary>
     private void ContinueAfterRun()
     {
-        if (_endedRun is null || _runOverSent || _transit == Transit.Leaving || SceneManager.Instance.IsTransitioning) return;
+        if (_endedRun is null || _runOverSent || _transit == Transit.Leaving || Manager?.IsTransitioning == true) return;
         Log.Info("[Run] On to the screen between runs");
         StartFadeOut(Transit.Leaving);
     }
@@ -2828,7 +2828,7 @@ public class DungeonScene : Scene
         {
             Position = WorldSpace.FromLogic(corpse.X, corpse.Y, GroundItemHeight / 2f),
         };
-        AddGameObject(marker);
+        World.Add(marker);
         var laid = new GroundItem(corpse, drop, marker, LogicTile(corpse.X, corpse.Y));
         _groundItems.Add(laid);
         UpdateGroundItemVisibility();
@@ -2852,7 +2852,7 @@ public class DungeonScene : Scene
         {
             Position = WorldSpace.FromLogic(x, y, GroundItemHeight / 2f),
         };
-        AddGameObject(marker);
+        World.Add(marker);
         var laid = new GroundItem(null, null, marker, loose.Tile, loose);
         _groundItems.Add(laid);
         UpdateGroundItemVisibility();
@@ -2954,7 +2954,7 @@ public class DungeonScene : Scene
         }
 
         _groundItems.Remove(item);
-        RemoveGameObject(item.Marker);
+        World.Remove(item.Marker);
         if (slot == 0)
             _turns.NotifyWeaponChanged(member);   // an empty hand filled is a reach changed
 
