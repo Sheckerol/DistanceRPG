@@ -21,6 +21,21 @@ public class ReachFieldsTests
     }
 
     [Fact]
+    public void TheOverlayComesBackAtTheTurnsStart_WithAnEnemyInViewNotYetSighted()
+    {
+        // The turn's start: sightings wiped, nobody has crossed a tile, an enemy in plain view.
+        Assert.True(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, enemySeenThisTurn: false, liveEnemyInView: true));
+        // A fight that has just lost sight of its enemy keeps it.
+        Assert.True(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, enemySeenThisTurn: true, liveEnemyInView: false));
+        // No fight, the enemies' phase, a menu, a stair's fade, a fallen member: off.
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, enemySeenThisTurn: false, liveEnemyInView: false));
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.EnemyMoving, false, true, true, true));
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, true, true, true, true));
+        Assert.False(DungeonScene.ReachOverlayOn(true, TurnPhase.Player, false, true, true, true));
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, false, true, true));
+    }
+
+    [Fact]
     public void OpenFloor_CostIsTheEightWayDistance()
     {
         var grid = Room(20, 20);

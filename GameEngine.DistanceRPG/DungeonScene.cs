@@ -661,7 +661,7 @@ public class DungeonScene : Scene
     private void EvaluateMarchingForTurn()
     {
         _marchingThisTurn = false;
-        if (_enemies.Any(e => e.State.Alive && e.IsActive)) return;
+        if (LiveEnemyInView) return;
 
         var leader = ActiveCharacter.State;
         foreach (var member in _party)
@@ -2584,8 +2584,7 @@ public class DungeonScene : Scene
     private void RefreshReachOverlay()
     {
         var active = ActiveCharacter.State;
-        bool show = !Transiting && _turns.Phase == TurnPhase.Player && !AnyMenuOpen
-            && _turns.AnyLiveEnemySeenThisTurn && active.Alive;
+        bool show = ReachOverlayOn(Transiting, _turns.Phase, AnyMenuOpen, active.Alive, _turns.AnyLiveEnemySeenThisTurn, LiveEnemyInView);
         if (!show)
         {
             Watch(ref _watchedMember, null);
@@ -2644,6 +2643,20 @@ public class DungeonScene : Scene
             .ToList();
         _reachOverlay.Show(layers, rings, AttackCostRuler(active, held));
     }
+
+    /// <summary>
+    /// Whether the reach overlay shows: the party's phase, nothing in the way, and
+    /// a fight on — a live enemy seen this turn, or one in view now. Both, because
+    /// the turn's sightings start empty and fill only when sight is next asked, as
+    /// someone crosses a tile: with the second alone a fight that has just lost
+    /// sight of its enemy would drop the overlay, and with the first alone an enemy
+    /// standing in plain view at the turn's start would not bring it back.
+    /// </summary>
+    internal static bool ReachOverlayOn(bool transiting, TurnPhase phase, bool menuOpen, bool memberAlive, bool enemySeenThisTurn, bool liveEnemyInView)
+        => !transiting && phase == TurnPhase.Player && !menuOpen && memberAlive && (enemySeenThisTurn || liveEnemyInView);
+
+    /// <summary>Is a live enemy on a tile the party can see right now?</summary>
+    private bool LiveEnemyInView => _enemies.Any(e => e.State.Alive && e.IsActive);
 
     /// <summary>
     /// Listen to <paramref name="next"/> in place of what <paramref name="slot"/>
