@@ -74,7 +74,7 @@
     "Sword": {
       "kind": "melee", "stats": ["STR", "DEX"], "signature": "Block",
       "baseline": { "Block": 1, "Push": 1 },
-      "range": 80, "damage": 10, "cost": 50, "manaCost": 0
+      "range": 60, "damage": 10, "cost": 50, "manaCost": 0
     },
     /* Spear (STR): reach 128, exactly four tiles, so Longshot's tile count is a rule. */
     "Spear": {
@@ -86,7 +86,7 @@
     "Axe": {
       "kind": "melee", "stats": ["STR"], "signature": "Cleave",
       "baseline": { "Cleave": 1, "Opportunist": 1 },
-      "range": 60, "damage": 18, "cost": 60, "manaCost": 0
+      "range": 90, "damage": 18, "cost": 60, "manaCost": 0
     },
     /* Ranged (DEX): damage 5 is meant to look low; the range curve does the work. */
     "Ranged": {
