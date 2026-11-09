@@ -53,7 +53,7 @@ public class TuningFitTests
     {
         // A forge limit below a shipped spread breaks RuleMaxForged. CritWindow 2
         // is below the Widowmaker's x3, the deepest any weapon forges it: 3,
-        // naming it. Cleave 1 is below the Great Axe's x2 — no Cleave unique exists
+        // naming it. Cleave 1 is below the Dane Axe's x2 — no Cleave unique exists
         // yet, so x2 is the deepest — and is raised to 2, not to a unique's 3.
         var warnings = new List<string>();
         var limits = new Dictionary<ModifierType, int>(BuiltIn.MaxForged) { [CritWindow] = 2, [Cleave] = 1, [Light] = 1, [Brace] = 3 };

@@ -72,7 +72,7 @@ public sealed class CampaignSaveTests : IDisposable
 
     private static DungeonState In(CampaignState campaign, string dungeonId, long seed)
     {
-        var visit = campaign.Enter(dungeonId, seed);
+        var visit = campaign.Enter(dungeonId, seed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, Ten);
         return visit;
     }
@@ -186,8 +186,8 @@ public sealed class CampaignSaveTests : IDisposable
         // it, and a unique soul whose spend banked and bought nothing.
         var knife = TestWeapons.Get("flensing_knife_unique");
         Assert.Equal(["serrated", "vampiric", "overheal"], knife.Enchantments.Select(e => e.Id));
-        knife.CreditEnchantment(1, 7, stat: 1);
-        knife.CreditEnchantment(0, 4, stat: 1);
+        knife.CreditEnchantment(1, 7);
+        knife.CreditEnchantment(0, 4);
         Assert.Equal([(1, 4), (3, 7), (1, 0)], knife.Enchantments.Select(e => (e.Tier, e.Xp)));
         a.Inventory[2] = knife;
         campaign.See(knife);
@@ -207,7 +207,7 @@ public sealed class CampaignSaveTests : IDisposable
         c.SavedMovement = 40;
         c.StartTurn();
         Assert.Equal((200f, 140f), (c.BudgetBeforeMire, c.EffectiveMax));
-        c.DistLeft -= 37.123457f;   // a walk is its frames' steps: no short decimal form
+        c.Movement.SpendUpTo(37.123457f, MoveReason.Walk);   // a walk is its frames' steps: no short decimal form
         c.X += 3.1415927f;
         c.Y -= 0.3333333f;
         c.EndTurnSaveMovement();
@@ -270,7 +270,7 @@ public sealed class CampaignSaveTests : IDisposable
 
         Differs(c => c.Party[2].X = BitConverter.Int32BitsToSingle(BitConverter.SingleToInt32Bits(c.Party[2].X) + 1), "campaign.Party[2].X");
         Differs(c => c.Party[0].WeaponIn(0)!.Acquire(ModifierType.CritWindow, 1), "campaign.Party[0].EquippedWeapon.Modifiers");
-        Differs(c => c.Party[3].WeaponIn(0)!.CreditEnchantment(0, 1, stat: 1), "campaign.Party[3].EquippedWeapon.Enchantments[0].Xp");
+        Differs(c => c.Party[3].WeaponIn(0)!.CreditEnchantment(0, 1), "campaign.Party[3].EquippedWeapon.Enchantments[0].Xp");
         Differs(c => c.Party[1].ApplyStatus(StatusEffectType.Poison, null, 1), "campaign.Party[1].StatusEffects");
         Differs(c => c.Party[1].BudgetBeforeMire = 161f, "campaign.Party[1].BudgetBeforeMire");
         Differs(c => c.Party[1].HpXp = 30, "campaign.Party[1].HealthPool");
@@ -499,8 +499,8 @@ public sealed class CampaignSaveTests : IDisposable
         var campaign = NewCampaign();
         var catalogue = GameContent.Current.Enchantments;
         var knife = TestWeapons.Get("flensing_knife_unique");
-        knife.CreditEnchantment(1, 7, stat: 1);
-        knife.CreditEnchantment(2, 5, stat: 1);
+        knife.CreditEnchantment(1, 7);
+        knife.CreditEnchantment(2, 5);
         var sword = new Weapon(GameContent.Current.Weapons["arming_sword"],
             [new Enchantment(catalogue["vampiric"], 2) { Xp = 5 }, new Enchantment(catalogue["shattering"], 4) { Xp = 9 }, new Enchantment(catalogue["arcane"], 1)],
             forgedCount: 1);
@@ -561,7 +561,7 @@ public sealed class CampaignSaveTests : IDisposable
         // and sleeps — the whole pool is spendable again. The unwritten pool reads
         // the new ceiling, as the live member's does; the written one does not.
         foreach (var member in new[] { d, restored, written })
-            member.EquippedWeapon!.CreditEnchantment(0, 15 + 30, stat: 1);
+            member.EquippedWeapon!.CreditEnchantment(0, 15 + 30);
         Assert.Equal(3, restored.EquippedWeapon!.Enchantments[0].Tier);
         Assert.Equal((d.UsableMaxMana, d.UsableMaxMana), (d.Mana, restored.Mana));
         Assert.True(restored.Mana > written.Mana, $"the unwritten pool reads {restored.Mana}, the written one {written.Mana}");

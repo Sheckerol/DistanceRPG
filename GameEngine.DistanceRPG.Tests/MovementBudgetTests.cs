@@ -58,7 +58,7 @@ public class MovementBudgetTests
             var member = TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto"));
             Assert.Equal((200f, 200f), (member.DistLeft, member.EffectiveMax));
 
-            member.DistLeft = 150f;
+            member.Movement.Reset(150f, MoveReason.Restore);
             Assert.Equal(75f, member.EndTurnSaveMovement());
             member.StartTurn();
             Assert.Equal((275f, 275f, 0f), (member.EffectiveMax, member.DistLeft, member.SavedMovement));

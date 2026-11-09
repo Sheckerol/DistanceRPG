@@ -16,7 +16,7 @@ public class CampaignVisitTests
 
     private static readonly string[] Ids = ["A", "B", "C", "D"];
 
-    /// <summary>Four fixture members in roster order: the first holding <paramref name="first"/>, the rest a Weakspot Stiletto.</summary>
+    /// <summary>Four fixture members in roster order: the first holding <paramref name="first"/>, the rest a Rondel.</summary>
     private static PartyMemberState[] Party(Weapon? first = null)
         => Ids.Select((id, i) => TestPools.Holding(id, i == 0 && first is not null ? first : TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
             .ToArray();
@@ -121,9 +121,9 @@ public class CampaignVisitTests
         // Once: the same members, whatever visits come and go.
         var members = campaign.Party.ToArray();
         var weapons = members.Select(m => m.EquippedWeapon).ToArray();
-        campaign.Enter("tutorial", GoldenSeed);
+        campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         Leave(campaign);
-        campaign.Enter("tutorial", 1);
+        campaign.Enter("tutorial", 1, EnemyPlacer.Unprotected);
         Assert.Equal(members.Length, campaign.Party.Count);
         for (int i = 0; i < members.Length; i++)
         {
@@ -159,7 +159,7 @@ public class CampaignVisitTests
         Assert.DoesNotContain("cold", loadout);
         Assert.DoesNotContain("shocking", loadout);
 
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         var party = campaign.Party;
         visit.OpenTurns(party, () => 10);
 
@@ -189,7 +189,7 @@ public class CampaignVisitTests
         Assert.Equal(met, campaign.SeenInOrder);
 
         // A new visit, every floor fresh, meets nothing again: it is already met.
-        campaign.Enter("tutorial", 1);
+        campaign.Enter("tutorial", 1, EnemyPlacer.Unprotected);
         Assert.Equal(met, campaign.SeenInOrder);
         Assert.Equal(loadout.Length + 2, met.Length);
     }
@@ -206,7 +206,7 @@ public class CampaignVisitTests
         // visit.
         var campaign = new CampaignState(Party(TestWeapons.Make("Maul", range: 60, damage: 60, cost: 30)));
         var party = campaign.Party;
-        var first = campaign.Enter("tutorial", GoldenSeed);
+        var first = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Same(first, campaign.Visit);
 
         // Farm a dummy — a clean kill, the tuning's clean-kill cycles on its count — and explore, on the first floor.
@@ -221,7 +221,7 @@ public class CampaignVisitTests
         Assert.True(first.Current.Fog.Seen[start.R, start.C]);
 
         // Never two visits: the one in progress has to be left first.
-        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", 1));
+        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", 1, EnemyPlacer.Unprotected));
         Assert.Same(first, campaign.Visit);
 
         Leave(campaign);
@@ -230,7 +230,7 @@ public class CampaignVisitTests
         Assert.Null(campaign.Visit);
 
         // A new seed: a new dungeon, nothing of the old one in it.
-        var second = campaign.Enter("tutorial", 1);
+        var second = campaign.Enter("tutorial", 1, EnemyPlacer.Unprotected);
         Assert.Same(second, campaign.Visit);
         Assert.NotEqual(GridText(first.Floors[0].Map.Grid), GridText(second.Floors[0].Map.Grid));
         Assert.Empty(second.Floors.Intersect(first.Floors));
@@ -240,7 +240,7 @@ public class CampaignVisitTests
         // The same seed: the same maps regenerated, and every row fresh — the
         // farmed dummy's twin standing, at zero, and the fog dark.
         Leave(campaign);
-        var again = campaign.Enter("tutorial", GoldenSeed);
+        var again = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Equal(first.BossFloor, again.BossFloor);
         for (int n = 0; n < again.Floors.Length; n++)
         {
@@ -281,14 +281,14 @@ public class CampaignVisitTests
         a.WeaponXp[WeaponClass.Dagger] = 40;
         a.HpXp += 7;
         a.ManaXp += 9;
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, () => 10);
 
         // A run's wear on them.
         a.Hp = 12;
         a.Mana = 5;
         a.ApplyStatus(StatusEffectType.Poison, null, 4);
-        a.DistLeft = 3f;
+        a.Movement.Reset(3f, MoveReason.Restore);
         a.SavedMovement = 40f;
         a.EffectiveMax = 200f;
         a.HeldShots = 1;
@@ -300,7 +300,7 @@ public class CampaignVisitTests
         Assert.Equal((12, false), (a.Hp, b.Alive));
 
         var kept = campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => (w as Weapon)?.Id)))).ToArray();
-        campaign.Enter("tutorial", 1);
+        campaign.Enter("tutorial", 1, EnemyPlacer.Unprotected);
 
         Assert.All(campaign.Party, m =>
         {
@@ -323,8 +323,8 @@ public class CampaignVisitTests
         // campaigns as on one, and the shipped seed still reaches the shipped map.
         const long Seed = 1234567;
         var hall = GameContent.Current.Dungeons["spear_hall"];
-        var one = new CampaignState(Party()).Enter("spear_hall", Seed);
-        var two = new CampaignState(Party()).Enter("spear_hall", Seed);
+        var one = new CampaignState(Party()).Enter("spear_hall", Seed, EnemyPlacer.Unprotected);
+        var two = new CampaignState(Party()).Enter("spear_hall", Seed, EnemyPlacer.Unprotected);
 
         Assert.Equal((Seed, Seed), (one.MapSeed, two.MapSeed));
         Assert.Equal(DungeonState.RollBossFloor(Seed, hall), one.BossFloor);
@@ -340,20 +340,20 @@ public class CampaignVisitTests
         }
 
         // Another seed, another dungeon.
-        var other = new CampaignState(Party()).Enter("spear_hall", 7654321);
+        var other = new CampaignState(Party()).Enter("spear_hall", 7654321, EnemyPlacer.Unprotected);
         Assert.NotEqual(GridText(one.Floors[0].Map.Grid), GridText(other.Floors[0].Map.Grid));
 
-        // And the shipped seed's first floor is the golden dungeon, row for row.
+        // And the shipped seed's first floor is the golden dungeon with its halls
+        // widened (after play, 2026-10): every golden floor tile still floor, the
+        // golden rooms and start.
         var golden = GoldenData.Instance;
-        var shipped = new CampaignState(Party()).Enter("tutorial", golden.MapSeed);
+        var shipped = new CampaignState(Party()).Enter("tutorial", golden.MapSeed, EnemyPlacer.Unprotected);
         var map = shipped.Floors[0].Map;
         for (int r = 0; r < MapGenerator.Rows; r++)
-        {
-            var row = new char[MapGenerator.Cols];
             for (int c = 0; c < MapGenerator.Cols; c++)
-                row[c] = map.Grid[r, c] == 1 ? '1' : '0';
-            Assert.Equal(golden.GridRows[r], new string(row));
-        }
+                if (golden.GridRows[r][c] == '0')
+                    Assert.Equal(0, map.Grid[r, c]);
+        Assert.Equal(GridText(MapGenerator.Generate(new Mulberry32(golden.MapSeed), MapGenerator.CorridorWidth).Grid), GridText(map.Grid));
         Assert.Equal((golden.PlayerStart[0], golden.PlayerStart[1]), map.PlayerStart);
     }
 }

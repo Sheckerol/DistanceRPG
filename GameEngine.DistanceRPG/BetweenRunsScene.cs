@@ -367,7 +367,65 @@ public sealed class BetweenRunsScene : Scene
     /// is up (<see cref="Route"/>), so a key it takes never also moves the choice or
     /// descends. KeyPressed fires once per physical press, so a held key acts once.
     /// </summary>
-    private void WireInput() => Input!.SubscribeToKeyPressed(e => OnKey(e.Key));
+    private void WireInput()
+    {
+        Input!.SubscribeToKeyPressed(e => OnKey(e.Key));
+        Input.SubscribeToMouseMoved(e => _hud.Clicks.Mouse = e.Position);
+        Input.SubscribeToMouseButtonPressed(_ => _hud.Clicks.Click(_hud.Clicks.Mouse), MouseButton.Left);
+    }
+
+    // ── Clicks (after play, 2026-10) ────────────────────────────────────────
+    //
+    // A row of a list, as the screen drew it: the first click moves the choice
+    // onto it, as W/S would, and a click on the row already chosen is ENTER on it.
+    // A key's words on the keys line or the menu click as the key itself
+    // (ClickZones), through OnKey and the game's ESC as every key goes.
+
+    /// <summary>A click on the dungeon list's <paramref name="index"/>: chosen, where it can be; on the dungeon chosen already, ENTER descends.</summary>
+    internal void ClickDungeon(int index)
+    {
+        if (!Clickable(HubMode.Dungeons)) return;
+        if (index == _chosen)
+            OnKey(Keys.Enter);
+        else if (index >= 0 && index < _listings.Count && _listings[index].Selectable)
+            _chosen = index;
+    }
+
+    /// <summary>A click on the WEAPONS page's row <paramref name="index"/>: chosen, where W/S could stop (<see cref="HubWeapons.Point"/>); on the row chosen already, ENTER — taken up, or put down.</summary>
+    internal void ClickWeapon(int index)
+    {
+        if (!Clickable(HubMode.Weapons) && !Clickable(HubMode.Carrying)) return;
+        if (index == _weapons.Chosen)
+            OnKey(Keys.Enter);
+        else
+            _weapons.Point(index);
+    }
+
+    /// <summary>A click on the ALCHEMIST page's row <paramref name="index"/>: chosen, a member or a potion — H, M and T act on it.</summary>
+    internal void ClickAlchemist(int index)
+    {
+        if (!Clickable(HubMode.Alchemist) || !_alchemist.Open) return;
+        _alchemist.Point(index);
+    }
+
+    /// <summary>A click on the deposit panel's offer or source <paramref name="index"/>: chosen; on the one chosen already, ENTER chooses it.</summary>
+    internal void ClickOffer(int index)
+    {
+        if (!Clickable(HubMode.Deposit) || _panel!.Current is not (DepositPanel.Step.Offer or DepositPanel.Step.Sources)) return;
+        if (index == _panel.Chosen)
+            OnKey(Keys.Enter);
+        else
+            _panel.Point(index);
+    }
+
+    /// <summary>Whether a click on a row of <paramref name="mode"/> acts now — that mode up, the screen staying — and, when it does, what the last key was answered or refused with cleared, as any key's are.</summary>
+    private bool Clickable(HubMode mode)
+    {
+        if (_leaving || Manager?.IsTransitioning == true || Mode != mode) return false;
+        _answer = null;
+        _refusal = null;
+        return true;
+    }
 
     /// <summary>
     /// One key press: where <see cref="Route"/> sends it. Any key but ESC clears what
@@ -377,7 +435,7 @@ public sealed class BetweenRunsScene : Scene
     /// </summary>
     internal void OnKey(Keys key)
     {
-        if (_leaving || SceneManager.Instance.IsTransitioning) return;
+        if (_leaving || Manager?.IsTransitioning == true) return;
 
         var route = Route(Mode, key);
         if (route != KeyRoute.Game)
@@ -686,7 +744,7 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>
     /// A deposit, as the log says it (the plan's 1h), from what the enchanter handed
     /// back (<see cref="DepositMade"/>; Logic never logs): <c>[Enchanter] Deposited
-    /// Tower Guard (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
+    /// Scutum and Gladius (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
     /// (capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of
     /// Renewal from the bag</c>. The ordinal is named here, in the session that made
     /// the deposit, so a finished service's improvement roll, which the run's end
@@ -710,12 +768,12 @@ public sealed class BetweenRunsScene : Scene
 
     /// <summary>
     /// A take-back, as the log says it (the plan's 1h), from what the enchanter
-    /// handed back (<see cref="TakenBack"/>): <c>[Enchanter] Took back Tower Guard
+    /// handed back (<see cref="TakenBack"/>): <c>[Enchanter] Took back Scutum and Gladius
     /// (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run
     /// worked lost, 30 wear returned (capacity 31 -> 30), deposit #0</c> — the
     /// capacity after as it was before the deposit. A transfer's names its source
     /// too, back at the stable's end after it, its wear never cashed: <c>[Enchanter]
-    /// Took back Riposte Blade (riposte_blade) and Nameless Knife
+    /// Took back Rapier and Dagger (riposte_blade) and Nameless Knife
     /// (flensing_knife_unique) to the stable's end: Transfer vampiric (T3) from Nameless
     /// Knife forfeited, …</c>.
     /// </summary>

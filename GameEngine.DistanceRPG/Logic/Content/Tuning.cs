@@ -504,6 +504,16 @@ public sealed record Tuning
     /// </summary>
     public int DeepenSignatureWeight { get; init; }
 
+    /// <summary>
+    /// How many times the mana an entry reserves its tier bar is: leaving a tier
+    /// costs <c>Lock x Tier x EnchantmentTierScale / INT</c> mana spent through it
+    /// (<see cref="Enchantment.XpToNextTier"/>). 1 is §3.3's bar, which tiered a
+    /// staff of renewal in a wizard's hands after two casts and, its lock doubled,
+    /// left no pool to cast it from; raised after play (2026-10) so a tier takes
+    /// a long spend to show.
+    /// </summary>
+    public int EnchantmentTierScale { get; init; }
+
     // ---- Inventory (§4.4) ----
 
     /// <summary>

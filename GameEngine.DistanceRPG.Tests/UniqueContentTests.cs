@@ -131,7 +131,7 @@ public class UniqueContentTests
         foreach (var t in Enum.GetValues<ModifierType>())
             Assert.Equal(3 + headroom, Rules.Cap(t, 3));
 
-        // The ceilings the combat doc quotes, each the forged depth plus the headroom: a Weakspot Stiletto's
+        // The ceilings the combat doc quotes, each the forged depth plus the headroom: a Rondel's
         // CritSunder x1, a Stiletto-derived unique raising it to x3, and the Bulwark's Block x3.
         Assert.Equal(1 + headroom, Rules.Cap(CritSunder, TestWeapons.Get("weakspot_stiletto").Forged.Stacks(CritSunder)));
         using (TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
@@ -176,7 +176,7 @@ public class UniqueContentTests
             }
             else
             {
-                Assert.Equal(new[] { CritWindow }, changed);   // the Dagger signature, from the Flensing Knife's x1
+                Assert.Equal(new[] { CritWindow }, changed);   // the Dagger signature, from the Seax's x1
                 Assert.Equal(2, def.Forged[CritWindow]);
                 Assert.Equal(1, def.Forged[Light]);
                 Assert.Equal(3, def.Enchantments.Count);       // x2 buys three
@@ -201,10 +201,10 @@ public class UniqueContentTests
         Assert.Equal(("test_same", ContentValidator.RuleUniqueDerivation), (ex.EntryId, ex.Rule));
 
         // And the modifier raised is one its variant's role may raise (the four shapes): a Purity variant
-        // deepens the signature alone, so a Tower Guard unique never raises its Push; a Control or Support
+        // deepens the signature alone, so a Scutum and Gladius unique never raises its Push; a Control or Support
         // variant raises the signature or its own rider, so a Halberd unique never raises the spear's second
-        // baseline modifier, Longshot, nor a Weakspot Stiletto unique the dagger's CritMultiplier. The
-        // Shieldbreaker, raising the Reaver's own Splitting, loads with the defaults, as does the Halberd
+        // baseline modifier, Longshot, nor a Rondel unique the dagger's CritMultiplier. The
+        // Shieldbreaker, raising the Pollaxe's own Splitting, loads with the defaults, as does the Halberd
         // braced three times (below).
         ex = LoadWith(Martial("test_purity_rider", "tower_guard", [(Block, 2), (Push, 3)], "sturdy"));
         Assert.Equal(("test_purity_rider", ContentValidator.RuleUniqueRaisedByRole), (ex.EntryId, ex.Rule));
@@ -642,7 +642,7 @@ public class UniqueContentTests
         {
             (enemy.X, enemy.Y) = At(5, 6);
             turns.NotifyActorMoved(enemy, MoveKind.Forced);   // back out of reach: the pair is released
-            a.DistLeft = Premise.Budget;
+            a.Movement.Reset(Premise.Budget, MoveReason.Restore);
             Assert.True(turns.TryAttack(a, enemy));           // shoved to tile 7, into the line
             Assert.Equal(At(5, 7), (enemy.X, enemy.Y));
             Assert.Equal(Math.Min(entry, retaliations), braces);
@@ -669,7 +669,7 @@ public class UniqueContentTests
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
         Assert.Equal(throws, turns.AttacksPerTurn(a));
 
-        a.DistLeft = (throws + 1) * 15f;   // movement for a throw more than the cap allows: 15 a throw
+        a.Movement.Reset((throws + 1) * 15f, MoveReason.Restore);   // movement for a throw more than the cap allows: 15 a throw
         for (int i = 0; i < throws; i++)
             Assert.True(turns.TryAttack(a, enemy));
         Assert.False(turns.CanAttack(a, enemy));

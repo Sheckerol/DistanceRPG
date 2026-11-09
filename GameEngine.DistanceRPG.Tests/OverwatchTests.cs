@@ -231,7 +231,7 @@ public sealed class OverwatchTests : IDisposable
     {
         // Forced movement triggers the zones (settled), and on the enemy turn
         // a held shot answers a shove as it answers a walk. The dummy swings at
-        // R's Riposte Blade from just outside the Crossbow's reach; the block
+        // R's Rapier and Dagger from just outside the Crossbow's reach; the block
         // earns R's counter, whose shove carries the dummy a tile toward A —
         // into the reach, on the enemy's turn — and the held shot goes.
         var grid = new int[20, 20];
@@ -276,9 +276,9 @@ public sealed class OverwatchTests : IDisposable
         Assert.True(turns.CanOverwatch(a));
         a.Inventory[0] = TestWeapons.Make("Held Darts", 190, 9, 15, manaCost: 0, WeaponClass.Throwing, (Overwatch, 1));
         Assert.True(turns.CanOverwatch(a));    // throwing is ranged too
-        a.DistLeft = 14f;
+        a.Movement.Reset(14f, MoveReason.Restore);
         Assert.False(turns.CanOverwatch(a));   // holding costs the throw's movement
-        a.DistLeft = 15f;
+        a.Movement.Reset(15f, MoveReason.Restore);
         Assert.True(turns.TryOverwatch(a));
         Assert.Equal(0f, a.DistLeft);
         Assert.Equal(1, a.HeldShots);

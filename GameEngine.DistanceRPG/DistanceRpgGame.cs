@@ -421,7 +421,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <param name="leading">What the launch's move of the old autosave, a load that brought nothing back, or a NEW CAMPAIGN that did not begin, says, leading the rest; null for nothing.</param>
     private void ShowTitle(IReadOnlyList<string>? leading = null)
     {
-        if (SceneManager.Instance.IsTransitioning)
+        if (SceneManager.IsTransitioning)
         {
             _pendingScene = () => ShowTitle(leading);
             return;
@@ -607,9 +607,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     public void SaveNow() => _handSaveRequested = true;
 
     /// <summary>Tell the screen up now — the dungeon's pause menu, or the menu between runs — what a save by hand came to, drawn inside the menu.</summary>
-    private static void AnswerHandSave(string notice)
+    private void AnswerHandSave(string notice)
     {
-        switch (SceneManager.Instance.CurrentScene)
+        switch (SceneManager.CurrentScene)
         {
             case DungeonScene dungeon:
                 dungeon.SlotSaved(notice);
@@ -733,7 +733,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// The log's lines for what a run's end did at the enchanter, off its reports
     /// (<see cref="RunResult.Services"/>): whether the run counted, what it worked
     /// with each one's runs and what it left stalled — <c>[Enchanter] Run counted:
-    /// worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte Blade 0/1</c>, or
+    /// worked Wand of the Cone 2/2, Rotwood 1/2; stalled Rapier and Dagger 0/1</c>, or
     /// <c>[Enchanter] Run not counted: nothing worked; stalled …</c> — then a line
     /// for each service it finished, with its improvement roll as it was drawn
     /// (Phase 6a.4): <c>[Enchanter] Wand of the Cone finished: attached vampiric;
@@ -927,7 +927,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// </summary>
     private void ShowBetweenRuns()
     {
-        if (SceneManager.Instance.IsTransitioning)
+        if (SceneManager.IsTransitioning)
         {
             _pendingScene = ShowBetweenRuns;
             return;
@@ -949,7 +949,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// </summary>
     private void BeginRun(string dungeonId)
     {
-        if (SceneManager.Instance.IsTransitioning)
+        if (SceneManager.IsTransitioning)
         {
             _pendingScene = () => BeginRun(dungeonId);
             return;
@@ -978,7 +978,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// </summary>
     private void ResumeRun(ViewDto? view)
     {
-        if (SceneManager.Instance.IsTransitioning)
+        if (SceneManager.IsTransitioning)
         {
             _pendingScene = () => ResumeRun(view);
             return;
@@ -1001,9 +1001,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// current stays loaded until the fade swaps it out, which is the scene
     /// manager's own contract.
     /// </summary>
-    private static void SwapTo(string name, Scene scene)
+    private void SwapTo(string name, Scene scene)
     {
-        var scenes = SceneManager.Instance;
+        var scenes = SceneManager;
         if (scenes.HasScene(name))
             scenes.UnregisterScene(name);
         scenes.RegisterScene(name, scene);
@@ -1014,7 +1014,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     {
         base.OnUpdateFrame(e);
 
-        if (_pendingScene is { } pending && !SceneManager.Instance.IsTransitioning)
+        if (_pendingScene is { } pending && !SceneManager.IsTransitioning)
         {
             _pendingScene = null;
             pending();
@@ -1035,7 +1035,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// </summary>
     private void ClearResumeOnceUp()
     {
-        var scenes = SceneManager.Instance;
+        var scenes = SceneManager;
         if (scenes.IsTransitioning || scenes.CurrentScene is null)
             return;
         _resuming = false;
@@ -1202,8 +1202,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// step a quit settles with — or null: between runs, on the screen between
     /// runs before a run's scene has opened, or once the run has ended.
     /// </summary>
-    private static DungeonScene? PlayingScene(CampaignState campaign)
-        => SceneManager.Instance.CurrentScene is DungeonScene scene && campaign.Visit is { } visit && ReferenceEquals(scene.Visit, visit)
+    private DungeonScene? PlayingScene(CampaignState campaign)
+        => SceneManager.CurrentScene is DungeonScene scene && campaign.Visit is { } visit && ReferenceEquals(scene.Visit, visit)
             ? scene
             : null;
 
@@ -1213,8 +1213,8 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// (PHASE 6a DECISION 10), and taken back once a later one goes through — or
     /// null: mid-run, or on any other screen.
     /// </summary>
-    private static BetweenRunsScene? HubScene(CampaignState campaign)
-        => SceneManager.Instance.CurrentScene is BetweenRunsScene hub && campaign.Visit is null ? hub : null;
+    private BetweenRunsScene? HubScene(CampaignState campaign)
+        => SceneManager.CurrentScene is BetweenRunsScene hub && campaign.Visit is null ? hub : null;
 
     /// <summary>
     /// The window is closing — the close button from anywhere, the title's QUIT or
@@ -1303,7 +1303,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// </summary>
     private void OnEscape()
     {
-        var scenes = SceneManager.Instance;
+        var scenes = SceneManager;
         if (scenes.IsTransitioning) return;
         bool consumed = scenes.CurrentScene switch
         {

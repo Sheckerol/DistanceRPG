@@ -220,13 +220,21 @@ public sealed class Floor
     /// floor's number is the boss floor, <paramref name="index"/> plus one.
     /// Nothing reads it above the bottom, which holds no boss.
     /// </param>
-    internal static Floor Generate(long mapSeed, int index, bool bottom, DungeonDef def, int? promisedStacks = null)
+    /// <param name="dungeonsCleared">
+    /// How many dungeons the campaign has cleared, which with the floor number
+    /// caps how many dummies a room may hold (<see cref="EnemyPlacer.RoomCap"/>,
+    /// beginner protection). Fixed for a visit: a clear is recorded when its run
+    /// ends, never during one. Left out, nothing is capped
+    /// (<see cref="EnemyPlacer.Unprotected"/>).
+    /// </param>
+    internal static Floor Generate(long mapSeed, int index, bool bottom, DungeonDef def, int? promisedStacks = null,
+        int dungeonsCleared = EnemyPlacer.Unprotected)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentNullException.ThrowIfNull(def);
 
         var (seed, map, fogBoxes) = Terrain(mapSeed, index);
-        var rows = PlaceEnemies(map, seed, def);
+        var rows = PlaceEnemies(map, seed, def, EnemyPlacer.RoomCap(index + 1, dungeonsCleared));
         var stairs = StairPlacer.Place(map, mapSeed, index);
 
         EnemyState[] enemies = rows;
@@ -323,7 +331,7 @@ public sealed class Floor
     private static (long Seed, MapData Map, FogBoxSet FogBoxes) Terrain(long mapSeed, int index)
     {
         long seed = DungeonState.FloorSeed(mapSeed, index);
-        var map = MapGenerator.Generate(new Mulberry32(seed));
+        var map = MapGenerator.Generate(new Mulberry32(seed), MapGenerator.CorridorWidth);   // the halls three wide (after play, 2026-10)
         var fogBoxes = FogBoxBuilder.Build(map);   // expands map.Corridors in place, exactly as the scene always has
         return (seed, map, fogBoxes);
     }
@@ -338,11 +346,11 @@ public sealed class Floor
     /// a draw: they are stamped on rows already placed. A save restores these
     /// rows instead of placing them again (§5.1).
     /// </summary>
-    private static EnemyState[] PlaceEnemies(MapData map, long floorSeed, DungeonDef def)
+    private static EnemyState[] PlaceEnemies(MapData map, long floorSeed, DungeonDef def, int maxPerRoom)
     {
         var weapons = GameContent.Current.Weapons;
         var rows = new List<EnemyState>();
-        foreach (var (x, y, weaponId) in EnemyPlacer.PlaceEnemies(map, floorSeed))
+        foreach (var (x, y, weaponId) in EnemyPlacer.PlaceEnemies(map, floorSeed, maxPerRoom))
         {
             rows.Add(new EnemyState
             {
@@ -633,6 +641,16 @@ public sealed class DungeonState
     public int PromisedStacks { get; }
 
     /// <summary>
+    /// The campaign's clears at entry: with each floor's number, what capped how
+    /// many dummies its rooms could hold (<see cref="EnemyPlacer.RoomCap"/>,
+    /// beginner protection). Fixed at <see cref="Enter"/> and saved beside
+    /// <see cref="PromisedStacks"/>, so the floors a load generates fresh — the
+    /// ones nobody has stood on — are placed under the cap the entry placed the
+    /// rest under.
+    /// </summary>
+    public int DungeonsCleared { get; private init; } = EnemyPlacer.Unprotected;
+
+    /// <summary>
     /// Every floor of the visit, index 0 first — the first floor, whose up-stairs
     /// are the way out — to the boss floor at <c>BossFloor − 1</c>, the bottom.
     /// All of them built at <see cref="Enter"/> and none rebuilt inside the visit.
@@ -797,18 +815,21 @@ public sealed class DungeonState
     /// </para>
     /// </summary>
     /// <exception cref="ArgumentException">The party is empty or names a null member: a visit needs someone to make it.</exception>
-    public static DungeonState Enter(DungeonDef def, long mapSeed, IReadOnlyList<PartyMemberState> party)
+    /// <param name="dungeonsCleared">The campaign's clears, for every floor's room cap (<see cref="EnemyPlacer.RoomCap"/>); left out, nothing is capped.</param>
+    public static DungeonState Enter(DungeonDef def, long mapSeed, IReadOnlyList<PartyMemberState> party,
+        int dungeonsCleared = EnemyPlacer.Unprotected)
     {
         ArgumentNullException.ThrowIfNull(def);
+        ArgumentOutOfRangeException.ThrowIfNegative(dungeonsCleared);
         RequireParty(party);
 
         int bossFloor = RollBossFloor(mapSeed, def);
         int promised = PromisedStacksFor(bossFloor);   // once, under the tuning current now
         var floors = new Floor[bossFloor];
         for (int n = 0; n < bossFloor; n++)
-            floors[n] = Floor.Generate(mapSeed, n, bottom: n == bossFloor - 1, def, promised);
+            floors[n] = Floor.Generate(mapSeed, n, bottom: n == bossFloor - 1, def, promised, dungeonsCleared);
 
-        var visit = new DungeonState(def, mapSeed, bossFloor, promised, floors, XpSnapshot.Of(party));
+        var visit = new DungeonState(def, mapSeed, bossFloor, promised, floors, XpSnapshot.Of(party)) { DungeonsCleared = dungeonsCleared };
         visit.Arrive(party, floors[0].UpStairs);
         return visit;
     }
@@ -857,10 +878,11 @@ public sealed class DungeonState
     /// <exception cref="ArgumentOutOfRangeException">The depth is below one floor, or the promise, the clock or the die's count is negative.</exception>
     internal static DungeonState Restore(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, XpSnapshot entrySnapshot, Floor[] floors,
         int floorIndex, int deepestFloorIndex, int turn, bool bossDefeated, int bossDefeatedAtTurn, TurnCarry? carry, IReadOnlyList<Weapon> spoils,
-        int diceRolled)
+        int diceRolled, int dungeonsCleared = EnemyPlacer.Unprotected)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(entrySnapshot);
+        ArgumentOutOfRangeException.ThrowIfNegative(dungeonsCleared);
         ArgumentNullException.ThrowIfNull(floors);
         ArgumentNullException.ThrowIfNull(spoils);
         ArgumentOutOfRangeException.ThrowIfLessThan(bossFloor, 1);
@@ -904,6 +926,7 @@ public sealed class DungeonState
 
         var visit = new DungeonState(def, mapSeed, bossFloor, promisedStacks, floors, entrySnapshot)
         {
+            DungeonsCleared = dungeonsCleared,
             FloorIndex = floorIndex,
             DeepestFloorIndex = deepestFloorIndex,
             BossDefeated = bossDefeated,
@@ -1042,6 +1065,16 @@ public sealed class DungeonState
         if (!member.Alive) return null;
 
         var tile = TileOf(member);
+        foreach (var stair in StairsOf(Current))
+            if (stair.Tile == tile)
+                return stair;
+        return null;
+    }
+
+    /// <summary>The stair of the current floor whose tile holds <paramref name="point"/> (logic units), or null: where a click on the floor lands (after play, 2026-10).</summary>
+    public StairUse? StairAt((float X, float Y) point)
+    {
+        var tile = ((int)MathF.Floor(point.Y / GameConstants.LogicUnitsPerTile), (int)MathF.Floor(point.X / GameConstants.LogicUnitsPerTile));
         foreach (var stair in StairsOf(Current))
             if (stair.Tile == tile)
                 return stair;

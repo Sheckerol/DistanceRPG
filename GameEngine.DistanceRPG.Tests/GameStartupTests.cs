@@ -1068,10 +1068,11 @@ public class GameStartupTests
         // and has no other slot from anywhere — so the one it binds once the first
         // save has gone through is the one it was handed.
         var hostBegins = typeof(ITitleHost).GetMethod(nameof(ITitleHost.BeginNewCampaign))!;
-        var onKey = typeof(TitleScene).GetMethod("OnKey", Declared)!;
-        Assert.Equal(["TitleScene.OnKey"], Callers(hostBegins));
-        Assert.Equal(1, Mentions(onKey, hostBegins));
-        var keyed = Walk(onKey);
+        // Take is the one door a key and a click both go through (after play, 2026-10).
+        var take = typeof(TitleScene).GetMethod("Take", Declared)!;
+        Assert.Equal(["TitleScene.Take"], Callers(hostBegins));
+        Assert.Equal(1, Mentions(take, hostBegins));
+        var keyed = Walk(take);
         int told = keyed.FindIndex(i => i.Called is { } called && Same(called, hostBegins));
         Assert.True(told > 0 && keyed[told - 1].Called is { } stepSlot && Same(stepSlot, typeof(TitleStep).GetProperty(nameof(TitleStep.Slot))!.GetMethod!),
             "The title does not hand the host's NEW CAMPAIGN the slot its step names");

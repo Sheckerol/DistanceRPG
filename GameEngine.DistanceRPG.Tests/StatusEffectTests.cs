@@ -80,11 +80,20 @@ public sealed class StatusEffectTests : IDisposable
         Assert.True(turns.CanCast(a, b));
         Assert.True(turns.TryCast(a, b));
 
-        Assert.Equal(1, b.StatusLevel(Regeneration));
+        Assert.Equal(2, b.StatusLevel(Regeneration));   // two levels a cast
         Assert.Equal(Premise.Budget - Staff.Cost, a.DistLeft);
         Assert.Equal(TestPools.FixtureMana - RenewalCastMana, a.Mana);   // 13 (Resonant x1) plus the innate's 1 trigger
         Assert.NotNull(buffed);
-        Assert.Equal(1, buffed!.Levels);
+        Assert.Equal(2, buffed!.Levels);
+    }
+
+    [Fact]
+    public void ShippedRenewal_LandsTwoLevels_AtTwoHpEach()
+    {
+        // The healing-staff buff after play (2026-10): two levels a cast, each worth double the
+        // first guess's one HP. Pinned against the shipped numbers, which the premise never reads.
+        Assert.Equal(2, ShippedContent.Content.Enchantments["regeneration"].Potency);
+        Assert.Equal(2, ShippedContent.Tuning.EffectPerLevel[Regeneration]);
     }
 
     [Fact]
@@ -96,7 +105,7 @@ public sealed class StatusEffectTests : IDisposable
         Assert.True(turns.TryCast(a, b));
         Assert.True(turns.TryCast(a, b));
 
-        Assert.Equal(3, b.StatusLevel(Regeneration));
+        Assert.Equal(6, b.StatusLevel(Regeneration));
         Assert.Equal(TestPools.FixtureMana - 3 * RenewalCastMana, a.Mana);
     }
 
@@ -106,7 +115,7 @@ public sealed class StatusEffectTests : IDisposable
         var (turns, a, _) = Scene();
         Assert.True(turns.CanCast(a, a));
         Assert.True(turns.TryCast(a, a));
-        Assert.Equal(1, a.StatusLevel(Regeneration));
+        Assert.Equal(2, a.StatusLevel(Regeneration));
     }
 
     [Fact]
@@ -255,7 +264,7 @@ public sealed class StatusEffectTests : IDisposable
 
         var (turns2, a2, _) = Scene();
         a2.Mana = 0;
-        a2.DistLeft = Premise.Budget / 2f;   // half the budget left unspent
+        a2.Movement.Reset(Premise.Budget / 2f, MoveReason.Restore);   // half the budget left unspent
         turns2.EndTurn();
         Assert.Equal(8, a2.Mana);
     }

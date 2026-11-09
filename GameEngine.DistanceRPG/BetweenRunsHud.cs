@@ -91,7 +91,7 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// The keys line with a weapon taken up, which names it: <c>CARRYING THE
-    /// ARMING SWORD - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK</c>.
+    /// BUCKLER AND SWORD - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK</c>.
     /// TAB is not named: it does nothing while a weapon is carried.
     /// </summary>
     internal static string CarryingKeysLine(Weapon carried) => $"CARRYING {HubWeapons.The(carried)} - W/S CHOOSE WHERE - ENTER PUTS IT DOWN - ESC PUTS IT BACK";
@@ -116,7 +116,11 @@ public sealed class BetweenRunsHud : IDisposable
     private readonly Game _game;
     private readonly TextRenderer _text = new();
     private readonly FullscreenFade _fade = new();
+    private readonly ClickZones _clicks;
     private bool _glReady;
+
+    /// <summary>Where a click lands on the screen as it was last drawn (<see cref="ClickZones"/>), and the mouse it lights under.</summary>
+    internal ClickZones Clicks => _clicks;
 
     /// <summary>How far the hub dims under the menu: further than the dungeon's floor does under its pause menu (0.65), since the hub is text on black, and its rows would otherwise read through the menu's.</summary>
     private const float MenuDim = 0.88f;
@@ -124,6 +128,7 @@ public sealed class BetweenRunsHud : IDisposable
     public BetweenRunsHud(Game game)
     {
         _game = game;
+        _clicks = new ClickZones(() => game.InputEvents);
     }
 
     // ── What the list says ───────────────────────────────────────────────────
@@ -374,13 +379,13 @@ public sealed class BetweenRunsHud : IDisposable
     /// (<see cref="RunResult.Services"/>), none for an empty shop: on a run that
     /// counted, each finished service (cyan, and green when its improvement roll
     /// grafted) — <c>WAND OF THE CONE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC
-    /// - NO CHANGE</c>, <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - REFINED -
+    /// - NO CHANGE</c>, <c>RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - REFINED -
     /// GRAFTED BLOCK</c>, a transfer's source on a line of its own under the weapon
     /// its soul went to (<see cref="SourceBack"/>) — then each worked one — <c>THE
     /// ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/>
     /// lines of those together, a service never split, and then <c>AND 2 MORE AT THE
     /// ENCHANTER</c>, <paramref name="moreTail"/> after it; then the stalled weapons
-    /// in yellow, wrapped, <c>STALLED AT THE ENCHANTER: RIPOSTE BLADE</c>. On a run
+    /// in yellow, wrapped, <c>STALLED AT THE ENCHANTER: RAPIER AND DAGGER</c>. On a run
     /// that did not count, the one grey line <see cref="WorkedNothing"/>. A weapon
     /// and an enchantment are named by the content's rows, and by the bare id where
     /// a row is gone, so the summary never throws while it draws.
@@ -435,7 +440,7 @@ public sealed class BetweenRunsHud : IDisposable
     /// <c>… - GRAFTED BLOCK</c>, which the summary draws green. A weapon that came
     /// back as it went — a roll that missed, or found nothing to improve, or none
     /// made — says <c>NO CHANGE</c>. A transfer's weapon says where its soul landed
-    /// (Phase 6a.6): <c>RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT
+    /// (Phase 6a.6): <c>RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT
     /// T2 - NO CHANGE</c>, or a reorder's <c>… - FLAMING NOW LAST AT T1 - …</c>, short
     /// enough that the widest names and a two-digit tier still fit the dungeon's end
     /// panel at its scale.
@@ -526,7 +531,7 @@ public sealed class BetweenRunsHud : IDisposable
     // ── The list, row by row ─────────────────────────────────────────────────
 
     /// <summary>One row of the list as the screen draws it: the text, its colour, its scale, and the height it takes before the next row.</summary>
-    internal readonly record struct ListRow(string Text, Vector4 Color, float Scale, float Pitch);
+    internal readonly record struct ListRow(string Text, Vector4 Color, float Scale, float Pitch, int? Choice = null);
 
     // A listing's row, and the smaller rows said under it or under the list.
     private const float ListingScale = 1.8f;
@@ -569,9 +574,9 @@ public sealed class BetweenRunsHud : IDisposable
                 : !listing.Selectable ? DungeonHud.DarkGrey
                 : listing.Early ? DungeonHud.Orange
                 : DungeonHud.White;
-            rows.Add(new ListRow(i == chosen ? $"> {line} <" : line, color, ListingScale, ListingPitch));
+            rows.Add(new ListRow(i == chosen ? $"> {line} <" : line, color, ListingScale, ListingPitch, i));
             if (listing.Def.RetiresOnClear)
-                rows.Add(new ListRow(TutorialWarning(listing.Def), DungeonHud.Orange, NoteScale, NotePitch));
+                rows.Add(new ListRow(TutorialWarning(listing.Def), DungeonHud.Orange, NoteScale, NotePitch, i));
         }
 
         var content = GameContent.Current;
@@ -922,7 +927,7 @@ public sealed class BetweenRunsHud : IDisposable
 
     /// <summary>
     /// A transfer's source held in the shop, over its detail (Phase 6a.6): what it
-    /// is there for, <c>HELD - GIVING VAMPIRIC TO THE RIPOSTE BLADE</c>. The soul is
+    /// is there for, <c>HELD - GIVING VAMPIRIC TO THE RAPIER AND DAGGER</c>. The soul is
     /// still on it until the service is done.
     /// </summary>
     internal static string HeldLine(Deposit deposit)
@@ -1131,7 +1136,7 @@ public sealed class BetweenRunsHud : IDisposable
                     var offer = panel.Offers[i];
                     string line = DepositPanel.OfferLine(offer);
                     bool chosen = i == panel.Chosen;
-                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, offer.Refusal is not null), PanelOfferScale, PanelOfferPitch));
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, offer.Refusal is not null), PanelOfferScale, PanelOfferPitch, i));
                 }
                 break;
             }
@@ -1146,7 +1151,7 @@ public sealed class BetweenRunsHud : IDisposable
                     var move = panel.Moves[i];
                     string line = DepositPanel.MoveLine(move);
                     bool chosen = i == panel.Chosen;
-                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, move.Refusal is not null), PanelOfferScale, PanelOfferPitch));
+                    rows.Add(new ListRow(chosen ? $"> {line} <" : line, ListColor(chosen, move.Refusal is not null), PanelOfferScale, PanelOfferPitch, i));
                 }
                 break;
             }
@@ -1223,6 +1228,7 @@ public sealed class BetweenRunsHud : IDisposable
 
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
+        _clicks.BeginFrame(_game.ShaderManager, w, h);
 
         DrawCentered(w, TitleY, Title, TitleScale, DungeonHud.Cyan);
 
@@ -1251,7 +1257,7 @@ public sealed class BetweenRunsHud : IDisposable
             _fade.Draw(_game.ShaderManager, MenuDim);
             foreach (var row in DungeonHud.PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), canSave: true, DungeonHud.PauseSavesLine(scene.SavesInto),
                          scene.MenuAnswer))
-                _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+                DungeonHud.DrawMenuRow(_text, _clicks, w, row);
         }
         else
         {
@@ -1270,6 +1276,11 @@ public sealed class BetweenRunsHud : IDisposable
                 foreach (var row in panelRows)
                 {
                     DrawCentered(w, y, row.Text, row.Scale, row.Color);
+                    float x = w / 2f - row.Text.Length * GlyphAdvance * row.Scale / 2f;
+                    if (row.Choice is { } offer)
+                        _clicks.AddText(x, y, row.Text.Length, row.Scale, () => scene.ClickOffer(offer));
+                    else
+                        _clicks.AddKeys(row.Text, x, y, row.Scale, leadOnly: true);   // a service, by its number
                     y += row.Pitch;
                 }
             }
@@ -1279,6 +1290,7 @@ public sealed class BetweenRunsHud : IDisposable
 
         var (bottom, bottomColor) = BottomLine(scene.Mode, scene.HasTitle, scene.Weapons.Carried?.Weapon, scene.Panel, scene.Alchemist.Open);
         DrawCentered(w, h - KeysLineFromBottom, bottom, KeysLineScale, bottomColor);
+        _clicks.AddKeys(bottom, w / 2f - bottom.Length * GlyphAdvance * KeysLineScale / 2f, h - KeysLineFromBottom, KeysLineScale);
         _text.Flush(_game.ShaderManager);
     }
 
@@ -1308,6 +1320,8 @@ public sealed class BetweenRunsHud : IDisposable
         foreach (var row in rows)
         {
             DrawCentered(w, rowY, row.Text, row.Scale, row.Color);
+            if (row.Choice is { } listing && scene.Mode == BetweenRunsScene.HubMode.Dungeons)
+                _clicks.AddText(w / 2f - row.Text.Length * GlyphAdvance * row.Scale / 2f, rowY, row.Text.Length, row.Scale, () => scene.ClickDungeon(listing));
             rowY += row.Pitch;
         }
     }
@@ -1330,7 +1344,14 @@ public sealed class BetweenRunsHud : IDisposable
         {
             var row = rows[i];
             bool isCarried = carried is not null && ReferenceEquals(row.Weapon, carried);
-            DrawRuns(left, layout.Top + (i - top) * WeaponRowPitch, WeaponRowScale, HubWeapons.Runs(row, chosen: i == page.Chosen, isCarried));
+            float rowY = layout.Top + (i - top) * WeaponRowPitch;
+            var runs = HubWeapons.Runs(row, chosen: i == page.Chosen, isCarried);
+            DrawRuns(left, rowY, WeaponRowScale, runs);
+            if (scene.Mode is BetweenRunsScene.HubMode.Weapons or BetweenRunsScene.HubMode.Carrying)
+            {
+                int index = i;
+                _clicks.AddText(left, rowY, runs.Sum(run => run.Text.Length), WeaponRowScale, () => scene.ClickWeapon(index));
+            }
         }
 
         float right = w / 2f + RightColumn;
@@ -1371,7 +1392,16 @@ public sealed class BetweenRunsHud : IDisposable
         int top = page.Window(layout.Rows);
         int chosen = page.Chosen;
         for (int i = top; i < Math.Min(rows.Count, top + layout.Rows); i++)
-            DrawRuns(left, layout.RowsTop + (i - top) * WeaponRowPitch, WeaponRowScale, AlchemistPage.Runs(rows[i], chosen: i == chosen));
+        {
+            float rowY = layout.RowsTop + (i - top) * WeaponRowPitch;
+            var runs = AlchemistPage.Runs(rows[i], chosen: i == chosen);
+            DrawRuns(left, rowY, WeaponRowScale, runs);
+            if (scene.Mode == BetweenRunsScene.HubMode.Alchemist)
+            {
+                int index = i;
+                _clicks.AddText(left, rowY, runs.Sum(run => run.Text.Length), WeaponRowScale, () => scene.ClickAlchemist(index));
+            }
+        }
 
         float right = w / 2f + RightColumn;
         y = layout.Top;
@@ -1425,5 +1455,6 @@ public sealed class BetweenRunsHud : IDisposable
     {
         _text.Dispose();
         _fade.Dispose();
+        _clicks.Dispose();
     }
 }

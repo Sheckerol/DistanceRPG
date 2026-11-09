@@ -430,9 +430,9 @@ public sealed class ReloadDeterminismTests : IDisposable
     {
         // The die is the visit's: two visits on one seed roll one sequence — the
         // n-th roll the visit stream's n-th draw — and another seed another.
-        var first = NewCampaign().Enter("spear_hall", FiveDeep);
-        var second = NewCampaign().Enter("spear_hall", FiveDeep);
-        var other = NewCampaign().Enter("spear_hall", GoldenSeed);
+        var first = NewCampaign().Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
+        var second = NewCampaign().Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
+        var other = NewCampaign().Enter("spear_hall", GoldenSeed, EnemyPlacer.Unprotected);
         static int[] Roll(DungeonState visit, int count) => Enumerable.Range(0, count).Select(_ => visit.RollD20()).ToArray();
         var rolls = Roll(first, 200);
         Assert.Equal(rolls, Roll(second, 200));
@@ -444,7 +444,7 @@ public sealed class ReloadDeterminismTests : IDisposable
         // zone armed, nothing seen, so nothing else rolls — is the stream's first
         // draw, and the die has rolled once.
         var campaign = NewCampaign();
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(campaign.Party);
         var script = new VisitScript(campaign, visitsOwnDie: true);
         var javelins = script.Row(11, "softening_javelins");
@@ -459,7 +459,7 @@ public sealed class ReloadDeterminismTests : IDisposable
         // number ever does.
         foreach (long seed in new[] { FiveDeep, GoldenSeed, 0L })
         {
-            var die = NewCampaign().Enter("spear_hall", seed);
+            var die = NewCampaign().Enter("spear_hall", seed, EnemyPlacer.Unprotected);
             var counts = new Dictionary<int, int>();
             const int Rolls = 20_000;
             for (int i = 0; i < Rolls; i++)
@@ -486,7 +486,8 @@ public sealed class ReloadDeterminismTests : IDisposable
 
         var tree = JsonNode.Parse(Save(script.Campaign))!.AsObject();
         var visit = tree["campaign"]!["visit"]!.AsObject();
-        Assert.Equal(("diceRolled", rolled), (visit.Last().Key, (int)visit["diceRolled"]!));
+        // dungeonsCleared was appended after it, so diceRolled stands last but one.
+        Assert.Equal(("diceRolled", rolled), (visit.ElementAt(visit.Count - 2).Key, (int)visit["diceRolled"]!));
         Assert.Equal(rolled, Load(tree.ToJsonString()).Campaign.Visit!.DiceRolled);
 
         visit.Remove("diceRolled");

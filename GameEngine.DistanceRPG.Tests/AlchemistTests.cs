@@ -211,7 +211,7 @@ public sealed class AlchemistTests : IDisposable
         // door opens. A potion carried in stays where it is.
         var campaign = Arrived();
         Alchemist.Mix(campaign, "A", PotionType.Health, 2);
-        campaign.Enter("long_gallery", FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten);
+        campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected).OpenTurns(campaign.Party, CampaignRuns.Ten);
         Assert.Equal(0, Farm.Batch(campaign));
         Assert.Throws<InvalidOperationException>(() => Alchemist.MixRefusal(campaign, "A", 1));
         Assert.Throws<InvalidOperationException>(() => Alchemist.Mix(campaign, "A", PotionType.Mana, 1));

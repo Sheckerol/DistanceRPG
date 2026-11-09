@@ -162,7 +162,7 @@ public static class StairPlacer
     /// floor, so the tile is never a wall — though it may be occupied.
     /// <para>
     /// <strong>The draw never looks at the floor's enemies.</strong>
-    /// <see cref="EnemyPlacer"/> puts 0–4 dummies on random tiles of the same
+    /// <see cref="EnemyPlacer"/> puts up to 4 dummies on random tiles of the same
     /// room off a stream of its own, so on about one floor in 25 a dummy spawns
     /// on the far tile — the down-stairs, or on the bottom floor the lair
     /// (<c>FloorGenerationTests</c> pins a seed of each, and the rate). That is

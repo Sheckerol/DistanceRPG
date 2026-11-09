@@ -132,12 +132,12 @@ public class TuningSchemaTests
     /// </summary>
     private static readonly string[] ParityNames =
     [
-        "MapGenerator", "Cols", "Rows", "MinRoom", "MaxRoom", "Attempts",
+        "MapGenerator", "Cols", "Rows", "MinRoom", "MaxRoom", "Attempts", "PrototypeCorridorWidth", "CorridorWidth",
         "Mulberry32",
         "Pathfinder", "Dirs", "DiagonalCost",
         "SeedSalt", "FloorSalt", "StairSalt", "BossSalt", "LootSalt", "ReviveSalt", "BossDropSalt", "DiceSalt", "ServiceSalt",
         "SpawnMix", "CycleMix", "DiceMix", "ServiceMix",
-        "EnemyPlacer", "MaxEnemiesPerRoom", "PlacedClasses", "VariantsPerClass", "HealerWeaponId",
+        "EnemyPlacer", "MaxEnemiesPerRoom", "Unprotected", "PlacedClasses", "VariantsPerClass", "HealerWeaponId",
         "StairPlacer", "MilliStepsPerCardinal", "MilliStepsPerDiagonal",
         "MaxBossClassDraws", "MaxClassDraws",
         "Tile", "LogicUnitsPerTile",
@@ -322,8 +322,11 @@ public class TuningSchemaTests
         // the master's number inside its clamp, and the clamp the plan's (1f). What
         // the master sets each to is its own to say (REWORK DECISION 3), so no value
         // is asserted here.
-        var enchanter = TuningSchema.Keys.Where(k => k.Group == TuningGroup.Enchanter).ToArray();
-        Assert.Equal([nameof(Tuning.WearPerHit), .. RulingsEnchanterKeys], enchanter.Select(k => k.Name));
+        // EnchantmentTierScale closes the group, arrived after play (2026-10) and
+        // hashed from version 3: TheEnchantmentTierScale_IsAVersion3Key.
+        var enchanter = TuningSchema.Keys.Where(k => k.Group == TuningGroup.Enchanter && k.Name != nameof(Tuning.EnchantmentTierScale)).ToArray();
+        Assert.Equal([nameof(Tuning.WearPerHit), .. RulingsEnchanterKeys, nameof(Tuning.EnchantmentTierScale)],
+            TuningSchema.Keys.Where(k => k.Group == TuningGroup.Enchanter).Select(k => k.Name));
         var clamps = new Dictionary<string, (int Min, int Max)>
         {
             [nameof(Tuning.WearPerHit)] = (0, 1000),   // 0 wears nothing, a dial; 1000 where a magnitude clamps
@@ -388,6 +391,17 @@ public class TuningSchemaTests
     ];
 
     [Fact]
+    public void TheEnchantmentTierScale_IsAVersion3Key()
+    {
+        // A tier's bar times this (after play, 2026-10): played, hashed from
+        // version 3 so a campaign saved at version 1 or 2 is compared without it,
+        // clamped 1 (§3.3's bar) to 1000, and the only number its Set moves.
+        var k = Assert.IsType<IntKey>(TuningSchema.Find(nameof(Tuning.EnchantmentTierScale)));
+        Assert.Equal((TuningGroup.Enchanter, true, 3, 1, 1000), (k.Group, k.Played, k.HashedFrom, k.Min, k.Max));
+        Assert.Equal([k.Name], TuningValues.Moved(BuiltIn, k.Set(BuiltIn, k.Get(BuiltIn) + 1)));
+    }
+
+    [Fact]
     public void TheConsumablesAreKeys_PlayedFromVersion3()
     {
         // §3.4 and §5.3's Consumables row, arriving with the drink that reads three
@@ -428,7 +442,7 @@ public class TuningSchemaTests
         // And they are all version 3's hash adds: each moves it, and leaves the
         // hashes of versions 1 and 2 where they were (TuningJsonTests'
         // AVersion2SaveIsHashedOnVersion2sKeys).
-        Assert.Equal(TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name), ConsumablesKeys);
+        Assert.Equal(TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name), [nameof(Tuning.EnchantmentTierScale), .. ConsumablesKeys]);
 
         // A file clamps; a tuning built in code is still refused (S:3000): a
         // negative cost would hand movement back for a drink — a count is never

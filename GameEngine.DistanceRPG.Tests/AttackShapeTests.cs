@@ -90,7 +90,7 @@ public sealed class AttackShapeTests : IDisposable
         Assert.Equal(200 - 5, enemy.Hp);   // 8 into Block 3
 
         enemy.X = a.X + 28f + 90f;   // surface 90: the third tile, nothing to pay
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(200 - 5 - 4, enemy.Hp);   // 7 into Block 3
     }
@@ -210,7 +210,7 @@ public sealed class AttackShapeTests : IDisposable
     [Fact]
     public void GreatAxe_TwoExtra()
     {
-        // The Great Axe's Cleave x2 — two extra targets — takes three of the
+        // The Dane Axe's Cleave x2 — two extra targets — takes three of the
         // four dummies around it: the aimed one and the two nearest others in
         // reach; the fourth stands a tile too far. Worked to x5 it takes five.
         var grid = new int[20, 20];
@@ -243,7 +243,7 @@ public sealed class AttackShapeTests : IDisposable
         var e5 = Enemy(4, 5);
         var e6 = Enemy(5, 4);
         var crowd = new TurnSystem(grid, new[] { a }, new[] { e1, e2, e3, e4, e5, e6 }, () => 10);
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(crowd.TryAttack(a, e1));
         Assert.Equal(200 - 30, e1.Hp);
         Assert.Equal(200 - 30, e2.Hp);
@@ -258,7 +258,7 @@ public sealed class AttackShapeTests : IDisposable
     [Fact]
     public void Rout_DisplacesEveryTargetCaught()
     {
-        // The Routing Axe's Rout x1 shoves everything its cleave caught a tile
+        // The Bardiche's Rout x1 shoves everything its cleave caught a tile
         // away from the axe — the aimed target and the fanned one alike — and
         // one swing beside a spear line fires a brace for each body it drives
         // into the spear's reach.
@@ -324,7 +324,7 @@ public sealed class AttackShapeTests : IDisposable
     public void Charges_X1_PermitsTwoThrowsRefusesThird_X2_Three()
     {
         // Charges is a cap: Darts (Charges x1) permit exactly two throws a turn
-        // and refuse a third with plenty of movement left; the Bandolier
+        // and refuse a third with plenty of movement left; the Throwing Knives
         // (Charges x2) permits three. A new turn restores them.
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "darts");   // cost 15 less Light: 13
@@ -392,7 +392,7 @@ public sealed class AttackShapeTests : IDisposable
         Assert.Equal(2, hits);
         Assert.Equal(TestPools.FixtureHp - 18, a.Hp);
 
-        // A Bandolier dummy: three.
+        // A Throwing Knives dummy: three.
         var b = Char("B", 5, 5, "weakspot_stiletto");
         var bandolier = Enemy(5, 8, "bandolier");
         var purity = new TurnSystem(grid, new[] { b }, new[] { bandolier }, () => 10);
@@ -439,9 +439,9 @@ public sealed class AttackShapeTests : IDisposable
     // ── Splitting, Softening, Pin ────────────────────────────────────────────
 
     [Fact]
-    public void Splitting_IgnoresThreeBlockPerStack_Reaver6()
+    public void Splitting_IgnoresThreeBlockPerStack_Pollaxe6()
     {
-        // The Reaver's Splitting x2 ignores 6 of the target's Block, stack for
+        // The Pollaxe's Splitting x2 ignores 6 of the target's Block, stack for
         // stack against the shield it counters: Block x1 and x2 are nothing to
         // it, Block x3 keeps 3, and worked to x7 it ignores 21 of the Bulwark's
         // 24. The minimum-1 and the crit skip are untouched.
@@ -473,14 +473,14 @@ public sealed class AttackShapeTests : IDisposable
         Assert.Equal(0, crit.Absorbed);   // a crit skips Block entirely, split or not
         Assert.Equal(36, crit.Dealt);
 
-        // Splitting lets *your* weapon through: beside the Reaver, a dagger meets the Tower Guard's full Block 6.
+        // Splitting lets *your* weapon through: beside the Pollaxe, a dagger meets the Scutum and Gladius's full Block 6.
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "reaver");
         var b = Char("B", 5, 7, "weakspot_stiletto");
         var guard = Enemy(5, 6, "tower_guard");   // Block x2: 6 absorbed
         var turns = new TurnSystem(grid, new[] { a, b }, new[] { guard }, () => 10);
         Assert.True(turns.TryAttack(a, guard));
-        Assert.Equal(200 - 18, guard.Hp);   // the Reaver's 18 in full
+        Assert.Equal(200 - 18, guard.Hp);   // the Pollaxe's 18 in full
         Assert.True(turns.TryAttack(b, guard));
         Assert.Equal(200 - 18 - 9, guard.Hp);   // the dagger's 15 into the same Block 6
     }
@@ -495,7 +495,7 @@ public sealed class AttackShapeTests : IDisposable
         var grid = new int[20, 20];
         var a = Char("A", 5, 5, "softening_javelins");   // 9, Softening x1, Charges x1
         var b = Char("B", 5, 7, "weakspot_stiletto");    // 15, nothing of its own against Block
-        var enemy = Enemy(5, 6);                         // Arming Sword: Block x1
+        var enemy = Enemy(5, 6);                         // Buckler and Sword: Block x1
         var turns = new TurnSystem(grid, new[] { a, b }, new[] { enemy }, () => 10);
         var hits = new List<AttackResolution>();
         turns.EnemyHit += (_, r) => hits.Add(r);
@@ -528,7 +528,7 @@ public sealed class AttackShapeTests : IDisposable
         Assert.Equal(3, hits[^1].Blocked);
         Assert.Equal(200 - 6 - 15 - 9 - 12, enemy.Hp);
 
-        // Stacks are levels: Softening x3 strips 9 — the Tower Guard's 6 and then some, never below zero.
+        // Stacks are levels: Softening x3 strips 9 — the Scutum and Gladius's 6 and then some, never below zero.
         var c = Char("C", 5, 5, "softening_javelins");
         c.EquippedWeapon!.Acquire(Softening, 2);
         var guard = Enemy(5, 6, "tower_guard");
@@ -541,8 +541,8 @@ public sealed class AttackShapeTests : IDisposable
     [Fact]
     public void Pin_AppliesMirePerStack_OnHitAndOnBrace()
     {
-        // The Pinning Bow's hit lands a Mire level per stack — the existing
-        // Mire, accumulating — and the Pinning Lance's brace lands the same on
+        // The Composite Bow's hit lands a Mire level per stack — the existing
+        // Mire, accumulating — and the Ranseur's brace lands the same on
         // whatever walks or is driven into its reach: the two halves of the
         // kiting pair, delivered by a hit and by a brace.
         var grid = new int[20, 20];
@@ -558,7 +558,7 @@ public sealed class AttackShapeTests : IDisposable
         Assert.Equal(200 - 3, enemy.Hp);   // 5 + 1 at the fourth tile, into Block 3: the pin rides the hit and changes nothing about it
 
         a.EquippedWeapon!.Acquire(Pin, 2);   // x3
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.True(turns.TryAttack(a, enemy));
         Assert.Equal(4, enemy.StatusLevel(Mire));
         Assert.Equal(200 - 6, enemy.Hp);

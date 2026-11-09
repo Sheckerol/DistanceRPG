@@ -333,6 +333,7 @@ public static class TuningSchema
         PlayedFrom2(Int(nameof(Tuning.GraftBaseChance), TuningGroup.Enchanter, 0, 100, t => t.GraftBaseChance, (t, v) => t with { GraftBaseChance = v })),
         PlayedFrom2(Int(nameof(Tuning.GraftSharePercent), TuningGroup.Enchanter, 0, 100, t => t.GraftSharePercent, (t, v) => t with { GraftSharePercent = v })),
         PlayedFrom2(Int(nameof(Tuning.DeepenSignatureWeight), TuningGroup.Enchanter, 1, 1000, t => t.DeepenSignatureWeight, (t, v) => t with { DeepenSignatureWeight = v })),
+        PlayedFrom3(Int(nameof(Tuning.EnchantmentTierScale), TuningGroup.Enchanter, 1, 1000, t => t.EnchantmentTierScale, (t, v) => t with { EnchantmentTierScale = v })),
 
         // Inventory (§4.4)
         Int(nameof(Tuning.PartyCarrySlots), TuningGroup.Inventory, GameConstants.PartySize, GameConstants.PartySize * GameConstants.MaxInventorySlots,

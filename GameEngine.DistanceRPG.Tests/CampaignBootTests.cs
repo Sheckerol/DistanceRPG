@@ -744,7 +744,7 @@ public sealed class CampaignBootTests : IDisposable
             var campaign = NewCampaign();
             CampaignRuns.Clear(campaign, "tutorial", CampaignRuns.GoldenSeed);
             Saved(store, campaign);                             // between runs
-            campaign.Enter("spear_hall", CampaignRuns.FiveDeep);
+            campaign.Enter("spear_hall", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
             Assert.True(SaveGame.IsSafePoint(campaign));        // right after the entry, no floor open yet
             Saved(store, campaign);                             // the entry's own save, as BeginRun asks for it
             string entered = store.Read()!;
@@ -1472,7 +1472,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal(1, SaveListing.Read(slots, DateTimeOffset.UtcNow).NewCampaignSlot);
             var abandoned = CampaignBoot.Abandon(slot, GameContent.Current);
             Assert.False(abandoned.Resumed);
-            abandoned.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);   // its first run begun, then down: nothing saved
+            abandoned.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);   // its first run begun, then down: nothing saved
             var next = LoadIt();
             Assert.False(next.Loaded);
             Assert.Null(next.Campaign);
@@ -1484,7 +1484,7 @@ public sealed class CampaignBootTests : IDisposable
             // one, as it stood when its run began.
             var fresh = CampaignBoot.Abandon(slot, GameContent.Current);
             Assert.Null(CampaignBoot.Save(slot, fresh.Campaign));
-            fresh.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+            fresh.Campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
             var resumed = LoadIt();
             Assert.True(resumed.Loaded);
             Assert.Equal(["CAMPAIGN RESUMED FROM SLOT 1"], resumed.Notices);
@@ -1638,7 +1638,7 @@ public sealed class CampaignBootTests : IDisposable
             // one — the turn ended, the enemies' turn under way — it is a notice and
             // never a throw, and the save between runs is kept.
             string between = store.Read()!;
-            campaign.Enter("spear_hall", CampaignRuns.FiveDeep).OpenTurns(campaign.Party, CampaignRuns.Ten).EndTurn();
+            campaign.Enter("spear_hall", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected).OpenTurns(campaign.Party, CampaignRuns.Ten).EndTurn();
             Assert.False(SaveGame.IsSafePoint(campaign));
             Assert.NotNull(CampaignBoot.Save(AsSlot1(store), campaign));
             Assert.Equal((between, previous), (store.Read(), store.ReadBackup()));

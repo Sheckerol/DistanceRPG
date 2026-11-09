@@ -137,7 +137,7 @@ internal sealed class HubWeapons
         return weapon.ShownName;
     }
 
-    /// <summary>A weapon named with its article, once: <c>THE ARMING SWORD</c>, and <c>THE BULWARK</c> for a name that has its own.</summary>
+    /// <summary>A weapon named with its article, once: <c>THE BUCKLER AND SWORD</c>, and <c>THE BULWARK</c> for a name that has its own.</summary>
     internal static string The(Weapon weapon) => The(Name(weapon));
 
     /// <summary>A weapon's name, as the page says it, with its article once: <c>THE ROTWOOD</c>, and <c>THE BULWARK</c> as it is.</summary>
@@ -449,6 +449,16 @@ internal sealed class HubWeapons
     /// room; while carrying, a place the weapon can be put down on. Headings and
     /// members are passed over.
     /// </summary>
+    /// <summary>A click on row <paramref name="index"/> (after play, 2026-10): the choice moved onto it where W/S could stop — a row a choice stops on browsing, a place carrying — and true; anywhere else, nothing.</summary>
+    public bool Point(int index)
+    {
+        var rows = Rows();
+        if (index < 0 || index >= rows.Count || !(_carried is null ? rows[index].Choosable : rows[index].Target))
+            return false;
+        _chosen = index;
+        return true;
+    }
+
     public void Step(int step)
     {
         Func<Row, bool> stops = _carried is null ? row => row.Choosable : row => row.Target;

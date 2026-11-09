@@ -68,13 +68,13 @@ public sealed class TurnEconomyTests : IDisposable
         Assert.Equal(GameConstants.DummyHp - 12, enemy.Hp);   // 15 into Block 3
 
         // Under 20 the swap is refused and nothing changes; at exactly 20 it goes through.
-        a.DistLeft = 19f;
+        a.Movement.Reset(19f, MoveReason.Restore);
         Assert.False(turns.CanSwap(a, 1));
         Assert.False(turns.TrySwap(a, 1));
         Assert.Equal("weakspot_stiletto", a.EquippedWeapon!.Id);
         Assert.Equal(19f, a.DistLeft);
         Assert.Equal(3, spent.Count);   // a refused swap raises nothing
-        a.DistLeft = 20f;
+        a.Movement.Reset(20f, MoveReason.Restore);
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal("longbow", a.EquippedWeapon!.Id);
         Assert.Equal(0f, a.DistLeft);
@@ -83,7 +83,7 @@ public sealed class TurnEconomyTests : IDisposable
 
         // An empty slot is nothing to swap to (slots 2 and 3 are empty), slot 0 is the equipped slot itself,
         // and there is no slot past the member's last.
-        a.DistLeft = Premise.Budget;
+        a.Movement.Reset(Premise.Budget, MoveReason.Restore);
         Assert.Null(a.Inventory[2]);
         Assert.False(turns.CanSwap(a, 2));
         Assert.False(turns.CanSwap(a, 0));

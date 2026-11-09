@@ -12,7 +12,7 @@ namespace GameEngine.DistanceRPG;
 /// (<see cref="BetweenRunsScene"/>), and the HUD draws it
 /// (<see cref="BetweenRunsHud.PanelRows"/>).
 /// <list type="bullet">
-/// <item><strong>Services</strong>: <c>DEPOSIT THE ARMING SWORD</c>, the weapon's
+/// <item><strong>Services</strong>: <c>DEPOSIT THE BUCKLER AND SWORD</c>, the weapon's
 /// wear, enchantments, open slots and runs in the shop, and the three services on
 /// their number keys — <c>1  ENCHANT</c>, <c>2  REFINE</c> and <c>3  MOVE AN
 /// ENCHANTMENT ONTO IT</c> (Phase 6a.6) — each with the odds its return improves
@@ -35,10 +35,10 @@ namespace GameEngine.DistanceRPG;
 /// hidden, in a window that scrolls with the choice the same way, since a late
 /// stable holds many souls.</item>
 /// <item><strong>Confirm</strong>: the panel's last line becomes the ask —
-/// <c>DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS
+/// <c>DEPOSIT THE BUCKLER AND SWORD TO ENCHANT FLAMING - 2 RUNS - ITS 36 WEAR IS
 /// SPENT</c> — and only ENTER deposits.</item>
 /// <item><strong>Ask</strong>: a take-back's own question, on a weapon in the shop —
-/// <c>TAKE BACK THE ARMING SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK</c>
+/// <c>TAKE BACK THE BUCKLER AND SWORD - ITS SERVICE IS LOST - ITS 36 WEAR COMES BACK</c>
 /// (PHASE 6a DECISION 8: the deposit's cash is reversed), and a transfer's naming
 /// both its weapons — and only ENTER takes it back.</item>
 /// </list>
@@ -112,7 +112,7 @@ internal sealed class DepositPanel
 
     /// <summary>
     /// A deposit's weapon gone from where the panel found it, as the confirm's ENTER
-    /// finds it (<see cref="RefusalNow"/>): <c>THE TOWER GUARD HAS MOVED - NOTHING
+    /// finds it (<see cref="RefusalNow"/>): <c>THE SCUTUM AND GLADIUS HAS MOVED - NOTHING
     /// DEPOSITED</c>. Nothing moves a weapon while a panel is up yet, so it is not
     /// seen in play.
     /// </summary>
@@ -120,7 +120,7 @@ internal sealed class DepositPanel
 
     /// <summary>
     /// A take-back's deposit gone from the shop, as the ask's ENTER finds it
-    /// (<see cref="RefusalNow"/>): <c>THE TOWER GUARD IS NOT IN THE SHOP - NOTHING
+    /// (<see cref="RefusalNow"/>): <c>THE SCUTUM AND GLADIUS IS NOT IN THE SHOP - NOTHING
     /// TAKEN BACK</c>. Nothing empties the shop while the ask is up yet, so it is not
     /// seen in play.
     /// </summary>
@@ -159,7 +159,7 @@ internal sealed class DepositPanel
         _ => throw new ArgumentOutOfRangeException(nameof(service), service, "Not a Service."),
     };
 
-    /// <summary>The panel's heading: <c>DEPOSIT THE ARMING SWORD</c>.</summary>
+    /// <summary>The panel's heading: <c>DEPOSIT THE BUCKLER AND SWORD</c>.</summary>
     internal static string Heading(Weapon weapon) => $"DEPOSIT {HubWeapons.The(weapon)}";
 
     /// <summary>
@@ -204,7 +204,7 @@ internal sealed class DepositPanel
         return $"{Chance(numerator, denominator)} IN 100 TO IMPROVE";
     }
 
-    /// <summary>The offer list's heading: which enchantment the ENCHANT attaches and its runs, <c>ENCHANT THE ARMING SWORD - ENCHANTMENT 2 - 2 RUNS IN THE SHOP</c>.</summary>
+    /// <summary>The offer list's heading: which enchantment the ENCHANT attaches and its runs, <c>ENCHANT THE BUCKLER AND SWORD - ENCHANTMENT 2 - 2 RUNS IN THE SHOP</c>.</summary>
     internal static string OfferHeading(Weapon weapon)
     {
         ArgumentNullException.ThrowIfNull(weapon);
@@ -228,10 +228,10 @@ internal sealed class DepositPanel
 
     /// <summary>
     /// The confirm's ask, the weapon as it stands: what the deposit buys, its runs,
-    /// and the wear it spends — <c>DEPOSIT THE ARMING SWORD TO ENCHANT FLAMING - 2
+    /// and the wear it spends — <c>DEPOSIT THE BUCKLER AND SWORD TO ENCHANT FLAMING - 2
     /// RUNS - ITS 36 WEAR IS SPENT</c>, <c>… TO REFINE - …</c> — or, unworn,
-    /// <c>DEPOSIT THE WEAKSPOT STILETTO TO REFINE - 1 RUN - IT CARRIES NO WEAR</c>. A
-    /// transfer names the soul and where it comes from — <c>DEPOSIT THE ARMING SWORD
+    /// <c>DEPOSIT THE RONDEL TO REFINE - 1 RUN - IT CARRIES NO WEAR</c>. A
+    /// transfer names the soul and where it comes from — <c>DEPOSIT THE BUCKLER AND SWORD
     /// TO TAKE VAMPIRIC FROM THE NAMELESS KNIFE - 2 RUNS - ITS 36 WEAR IS SPENT</c> —
     /// or a reorder <c>… TO MOVE FLAMING TO THE END - 2 RUNS - …</c>; that both weapons
     /// stay in the shop is the heading's over it (<see cref="SourcesHeading"/>), since
@@ -254,11 +254,11 @@ internal sealed class DepositPanel
 
     /// <summary>
     /// A take-back's ask (PHASE 6a DECISION 8): the service forfeit, and the wear
-    /// the deposit cashed coming back — <c>TAKE BACK THE ARMING SWORD - ITS SERVICE IS
+    /// the deposit cashed coming back — <c>TAKE BACK THE BUCKLER AND SWORD - ITS SERVICE IS
     /// LOST - ITS 36 WEAR COMES BACK</c> — or, where it cashed none, <c>… - IT CARRIED
     /// NO WEAR</c>. Its capacity goes back with the wear. A transfer's names both its
     /// weapons, which come back together, the source's wear never cashed:
-    /// <c>TAKE BACK THE ARMING SWORD AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 36
+    /// <c>TAKE BACK THE BUCKLER AND SWORD AND THE NAMELESS KNIFE - THE MOVE IS LOST - ITS 36
     /// WEAR COMES BACK</c>. Named as the weapons are, so it reads nothing of the
     /// content.
     /// </summary>
@@ -275,7 +275,7 @@ internal sealed class DepositPanel
     /// The source list's heading, over the list and over the confirm's ask: the
     /// weapon, and — while the soul <paramref name="chosen"/> is on another weapon —
     /// that a MOVE holds the weapon it takes from in the shop beside it (PHASE 6a
-    /// DECISION 13): <c>MOVE AN ENCHANTMENT ONTO THE ARMING SWORD - BOTH WEAPONS STAY
+    /// DECISION 13): <c>MOVE AN ENCHANTMENT ONTO THE BUCKLER AND SWORD - BOTH WEAPONS STAY
     /// IN THE SHOP</c>. A reorder, the weapon's own soul, puts the weapon alone in the
     /// shop, and the heading says no more than <c>MOVE AN ENCHANTMENT ONTO THE ARMING
     /// SWORD</c>.
@@ -306,7 +306,7 @@ internal sealed class DepositPanel
     /// <summary>
     /// One soul's line on the source list: where it lies, then the tier it arrives
     /// at and the runs — <c>VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] -
-    /// ARRIVES AT T2 - 2 RUNS</c>, or on an Arming Sword carrying Flaming and Vampiric
+    /// ARRIVES AT T2 - 2 RUNS</c>, or on a Buckler and Sword carrying Flaming and Vampiric
     /// <c>FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS</c> (a reorder
     /// moves one of two souls at the least, so it takes 2 runs at the least: PHASE 6a
     /// DECISION 11) — or, refused, its reason in their place (<c>FLAMING ON THE
@@ -465,6 +465,13 @@ internal sealed class DepositPanel
     /// its reorders, was never shown while the choice passed over them (PHASE 6a
     /// DECISION 12). Anywhere else, nothing.
     /// </summary>
+    /// <summary>A click on the offer list's or the source list's row <paramref name="index"/> (after play, 2026-10): the choice moved onto it, as W/S move it — a refused one among them, which ENTER then says why of.</summary>
+    public void Point(int index)
+    {
+        if (_step is Step.Offer or Step.Sources && index >= 0 && index < Listed)
+            _chosen = index;
+    }
+
     public void Move(int step)
     {
         int count = Listed;

@@ -14,6 +14,13 @@ public enum GameMenu
     Inventory,
 
     /// <summary>
+    /// The character sheet (C, after play, 2026-10): the active member's stats,
+    /// pools in real numbers - mana current, spendable, reserved and max - and its
+    /// trained weapon classes. 1-4 switch the member shown; C or ESC close it.
+    /// </summary>
+    Character,
+
+    /// <summary>
     /// The pause menu (<see cref="PauseMenu"/>): 1 closes it, 2 saves the campaign
     /// into its own slot on the party's own turn, asking nothing — and off it says
     /// why not — and 3 quits to the title, the campaign's slot written first. ESC
@@ -272,6 +279,10 @@ public class DungeonScene : Scene
     private FogBoxSet _fogBoxes = null!;
     private FogState _fog = null!;
     private FogOverlayRenderer _fogOverlay = null!;
+    private ReachOverlayRenderer _reachOverlay = null!;
+    private int? _reachKey;   // a hash of what the overlay was last built from besides movement: rebuilt when it changes
+    private bool _reachDirty;  // a watched ledger moved: rebuild whatever the key says
+    private MovementLedger? _watchedMember;   // the active member's ledger, which the overlay listens to
 
     // The floor's turn system: the one the visit's OpenTurns returned for the
     // floor being played (visit.Turns), replaced whole on every arrival.
@@ -493,6 +504,9 @@ public class DungeonScene : Scene
 
     public bool InventoryOpen => ActiveMenu == GameMenu.Inventory;
 
+    /// <summary>Whether the character sheet is up (<see cref="GameMenu.Character"/>).</summary>
+    public bool CharacterOpen => ActiveMenu == GameMenu.Character;
+
     /// <summary>
     /// True while the bag's X has armed "leave" (§4.4): the next bag number puts
     /// that slot's weapon down where the active member stands, rather than
@@ -647,7 +661,7 @@ public class DungeonScene : Scene
     private void EvaluateMarchingForTurn()
     {
         _marchingThisTurn = false;
-        if (_enemies.Any(e => e.State.Alive && e.IsActive)) return;
+        if (LiveEnemyInView) return;
 
         var leader = ActiveCharacter.State;
         foreach (var member in _party)
@@ -708,6 +722,7 @@ public class DungeonScene : Scene
         UpdateMarchingFollowers(deltaTime);
         AutoEndTurnWhenDry();
         UpdateHover();
+        RefreshReachOverlay();
     }
 
     /// <summary>
@@ -777,6 +792,7 @@ public class DungeonScene : Scene
     public override void Shutdown()
     {
         _campaign.RunEnded -= OnRunEnded;   // the campaign outlives this scene: the next run's end is the next scene's to show
+        Watch(ref _watchedMember, null);     // the party outlives it too: let go of its ledger
         _hud.Dispose();
         base.Shutdown();
     }
@@ -906,16 +922,16 @@ public class DungeonScene : Scene
     private void TearDownFloor()
     {
         foreach (var obj in _floorObjects)
-            RemoveGameObject(obj);
+            World.Remove(obj);
         _floorObjects.Clear();
         _stairMarkers.Clear();
         foreach (var enemy in _enemies)
-            RemoveGameObject(enemy);
+            World.Remove(enemy);
         _enemies.Clear();
         // Drops' markers and loose items' alike. A loose item itself is the
         // floor's (Floor.LooseItems) and stays on it, to be laid again on a return.
         foreach (var item in _groundItems)
-            RemoveGameObject(item.Marker);
+            World.Remove(item.Marker);
         _groundItems.Clear();
 
         _pendingMistBursts.Clear();
@@ -944,6 +960,7 @@ public class DungeonScene : Scene
         BuildWalls();
         BuildStairs();
         SpawnEnemies();
+        BuildReachOverlay();
         BuildFogOverlay();
         BuildFogParticles();
     }
@@ -975,6 +992,7 @@ public class DungeonScene : Scene
         foreach (var member in living)
             _lastFogTile[member] = LogicTile(member.State.X, member.State.Y);
         _fogOverlay.MarkDirty();
+        _reachOverlay.MarkDirty();
         UpdateEnemyVisibility(notify: !keepSight);
     }
 
@@ -1011,13 +1029,13 @@ public class DungeonScene : Scene
         float d = MapGenerator.Rows * WorldSpace.UnitsPerTile;
         var floor = new PrimitiveBoxObject(w, FloorThickness, d, FloorColor);
         floor.Position = new Vector3(w / 2f, -FloorThickness / 2f, d / 2f);
-        AddGameObject(floor);
+        World.Add(floor);
     }
 
     /// <summary>An object the floor being played owns: added to the scene, and taken down with the floor.</summary>
     private void AddFloorObject(GameObject obj)
     {
-        AddGameObject(obj);
+        World.Add(obj);
         _floorObjects.Add(obj);
     }
 
@@ -1079,7 +1097,7 @@ public class DungeonScene : Scene
         {
             var character = new CharacterObject(members[i], MemberColor(members[i], i));
             _party.Add(character);
-            AddGameObject(character);
+            World.Add(character);
         }
 
         _activeIdx = 0;
@@ -1120,13 +1138,23 @@ public class DungeonScene : Scene
             if (!state.Alive)
                 enemy.SetDefeatedVisual(true, snap: true);
             _enemies.Add(enemy);
-            AddGameObject(enemy);
+            World.Add(enemy);
         }
         Log.Info($"[Map] {_enemies.Count(e => e.State.Alive)} of {_enemies.Count} enemies standing across {_map.DebugRooms.Count} rooms");
     }
 
     /// <summary>The colour an enemy's stand-in stands in: the boss's stone, every dummy's orange.</summary>
     private Vector4 LiveColor(EnemyState state) => state == _floor.Boss ? BossColor : EnemyColor;
+
+    // Added before the fog overlay, so the shroud blends over it.
+    private void BuildReachOverlay()
+    {
+        var reachObject = new TransformNodeObject();
+        _reachOverlay = reachObject.AddComponent<ReachOverlayRenderer>();
+        _reachOverlay.TileShown = (r, c) => _fog.Seen[r, c];
+        _reachKey = null;
+        AddFloorObject(reachObject);
+    }
 
     private void BuildFogOverlay()
     {
@@ -1490,6 +1518,7 @@ public class DungeonScene : Scene
         // yes to leaving when the way out has asked.
         input.SubscribeToKeyPressed(_ => StairKey(), Keys.E);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
+        input.SubscribeToKeyPressed(_ => ToggleCharacter(), Keys.C);
         // X, in the bag, arms "leave": the next bag number puts that weapon down
         // where the active member stands, rather than equipping it (§4.4).
         input.SubscribeToKeyPressed(_ => LeaveKey(), Keys.X);
@@ -1649,9 +1678,9 @@ public class DungeonScene : Scene
                     EquipSlot(slot);
             }
         }
-        else if (!AnyMenuOpen)
+        else if (!AnyMenuOpen || CharacterOpen)
         {
-            SetActiveCharacter(digit - 1);   // a number past the party selects nobody
+            SetActiveCharacter(digit - 1);   // a number past the party selects nobody; on the sheet, it shows that member
         }
     }
 
@@ -1683,6 +1712,14 @@ public class DungeonScene : Scene
     /// fade or on the defeat screen. Closing it disarms its X
     /// (<see cref="ActiveMenu"/>).
     /// </summary>
+    /// <summary>C opens the character sheet over the floor, or closes it; nothing behind another menu, or once the run is lost.</summary>
+    internal void ToggleCharacter()
+    {
+        if (Transiting || _turns is { Phase: TurnPhase.GameOver }) return;   // no floor open yet is no game over
+        if (ActiveMenu is not (GameMenu.None or GameMenu.Character)) return;
+        ActiveMenu = CharacterOpen ? GameMenu.None : GameMenu.Character;
+    }
+
     private void ToggleInventory()
     {
         if (Transiting || _turns.Phase == TurnPhase.GameOver) return;
@@ -1870,26 +1907,18 @@ public class DungeonScene : Scene
             dy *= scale;
         }
 
-        // Walls and live enemies always block. In combat the party body-blocks
-        // too — blockers are immovable circles here, so this is safe from the
-        // two-body wall shoves that made the prototype drop inter-party
-        // colliders. While marching, followers never block the leader, or
-        // reversing through your own line would deadlock it.
-        var blockers = LiveEnemyBlockers();
-        if (!Marching)
-        {
-            foreach (var member in _party)
-                if (member != ActiveCharacter && member.State.Alive)
-                    blockers.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
-        }
-        var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, blockers);
+        // Walls and live enemies block; the party never blocks itself (after
+        // play, 2026-10: two members stacked on one spot shoved one through a
+        // wall — GridCollision now lets walls win, and members walk through each
+        // other in combat as they always did marching).
+        var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, LiveEnemyBlockers());
 
         // Budget depletes by distance actually travelled, so pushing into a
         // wall costs nothing while sliding along it costs the slide.
         float movedX = nx - state.X;
         float movedY = ny - state.Y;
         float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
-        state.DistLeft = MathF.Max(0f, state.DistLeft - moved);
+        state.Movement.SpendUpTo(moved, MoveReason.Walk);
 
         state.X = nx;
         state.Y = ny;
@@ -1936,6 +1965,40 @@ public class DungeonScene : Scene
             ActiveMenu = GameMenu.ConfirmLeave;
         else
             BeginTransit(stair);
+    }
+
+    /// <summary>
+    /// A click on the way out, its tile or its label (after play, 2026-10: "a
+    /// click on the way out opens the dialogue to retreat"): E for it, so the
+    /// same prompt asks first. The stair is taken by the member standing on it,
+    /// so a click with someone else leading hands the lead to whoever stands
+    /// there; with nobody on it, it says so over the leader. Nothing with a menu
+    /// open, during a fade, or outside the player phase, as E.
+    /// </summary>
+    internal void ClickWayOut()
+    {
+        if (Transiting || AnyMenuOpen || _turns.Phase != TurnPhase.Player) return;
+        if (WayOutLeader(_visit, _campaign.Party, _activeIdx) is not { } leader)
+        {
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.StandOnWayOut, false));
+            return;
+        }
+        SetActiveCharacter(leader);
+        StairKey();
+    }
+
+    /// <summary>Who takes the way out for a click on it (<see cref="ClickWayOut"/>): the leader <paramref name="active"/> when they stand on it, else the first member who does; null with nobody on it.</summary>
+    internal static int? WayOutLeader(DungeonState visit, IReadOnlyList<PartyMemberState> party, int active)
+    {
+        ArgumentNullException.ThrowIfNull(visit);
+        ArgumentNullException.ThrowIfNull(party);
+        bool OnIt(int i) => visit.StairUnder(party[i]) is { Kind: Stair.Exit };
+        if (active >= 0 && active < party.Count && OnIt(active))
+            return active;
+        for (int i = 0; i < party.Count; i++)
+            if (OnIt(i))
+                return i;
+        return null;
     }
 
     /// <summary>ENTER, routed by the menu that is open: on to the screen between runs from the run's summary, the yes to leaving under the way out's prompt, the end of the turn with no menu, nothing behind any other menu or during a fade.</summary>
@@ -2101,7 +2164,7 @@ public class DungeonScene : Scene
     /// </summary>
     private void ContinueAfterRun()
     {
-        if (_endedRun is null || _runOverSent || _transit == Transit.Leaving || SceneManager.Instance.IsTransitioning) return;
+        if (_endedRun is null || _runOverSent || _transit == Transit.Leaving || Manager?.IsTransitioning == true) return;
         Log.Info("[Run] On to the screen between runs");
         StartFadeOut(Transit.Leaving);
     }
@@ -2207,7 +2270,7 @@ public class DungeonScene : Scene
         float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
         if (moved <= 0f) return;
 
-        state.DistLeft = MathF.Max(0f, state.DistLeft - moved);
+        state.Movement.SpendUpTo(moved, MoveReason.Walk);
         state.X = nx;
         state.Y = ny;
         member.SyncTransform();
@@ -2219,7 +2282,20 @@ public class DungeonScene : Scene
 
     private void HandleClick()
     {
-        if (AnyMenuOpen || Transiting) return;
+        if (Transiting) return;
+
+        // The menus and the keys lines as last drawn come first (after play,
+        // 2026-10): a key's words click as the key, a bag slot as its number
+        // (ClickZones), so a click there does only what its key would. On the
+        // character sheet, a row of the party list shows that member, as its
+        // number does.
+        if (_hud.Clicks.Click(_mousePos)) return;
+        if (CharacterOpen && DungeonHud.HitPartySelector(_mousePos, _party.Count, out int shown))
+        {
+            SetActiveCharacter(shown);
+            return;
+        }
+        if (AnyMenuOpen) return;
 
         // The HUD party list doubles as buttons and wins over world picking.
         if (DungeonHud.HitPartySelector(_mousePos, _party.Count, out int hudIdx))
@@ -2266,9 +2342,17 @@ public class DungeonScene : Scene
             return;
         }
 
+        // The way out under the cursor: its prompt, as E on it (ClickWayOut).
+        var floorPoint = FloorPointOf(origin, dir);
+        if (floorPoint is { } at && _visit.StairAt(at) is { Kind: Stair.Exit })
+        {
+            ClickWayOut();
+            return;
+        }
+
         // Nothing under the cursor: a wand aimed by a point (a Blast's centre,
         // a Cone's or Beam's direction) casts at the floor point the ray meets.
-        if (held?.AreaShape is { Kind: not AreaShapeKind.Nova } && FloorPointOf(origin, dir) is { } aim)
+        if (held?.AreaShape is { Kind: not AreaShapeKind.Nova } && floorPoint is { } aim)
             CastArea(caster, aim);
     }
 
@@ -2466,6 +2550,157 @@ public class DungeonScene : Scene
                 AimCaught = caught;
             }
         }
+    }
+
+    // The reach overlay's colours: the active member's walk in blue, its reach
+    // in amber, a gold ring under each enemy it can hit now; a hovered enemy's
+    // walk and reach in red.
+    private static readonly ReachStyle MemberWalk = new(new(0.30f, 0.75f, 1.00f, 0.14f), new(0.45f, 0.85f, 1.00f, 0.65f), 0.000f);
+    private static readonly ReachStyle MemberReach = new(new(1.00f, 0.65f, 0.15f, 0.06f), new(1.00f, 0.70f, 0.20f, 0.75f), 0.004f);
+    private static readonly ReachStyle EnemyWalk = new(new(1.00f, 0.30f, 0.30f, 0.10f), new(1.00f, 0.40f, 0.40f, 0.55f), 0.008f);
+    private static readonly ReachStyle EnemyReach = new(new(1.00f, 0.15f, 0.15f, 0.05f), new(1.00f, 0.20f, 0.20f, 0.80f), 0.012f);
+    private static readonly Vector4 HittableRing = new(1.00f, 0.87f, 0.25f, 0.90f);
+    private static readonly Vector4 RulerColor = new(0.95f, 0.95f, 0.95f, 0.70f);
+    private const float RulerWidth = 1.5f;     // logic units: the ruler's line
+    private const float TickHalf = 5f;         // logic units either side of the line
+    private const float TickWidth = 2f;
+
+    private readonly record struct ReachStyle(Vector4 Fill, Vector4 Edge, float Lift)
+    {
+        public ReachOverlayRenderer.Layer On(ReachArea area) => new(area, Fill, Edge, Lift);
+    }
+
+    /// <summary>
+    /// The reach overlay, in combat during the party's phase with no menu open
+    /// (hidden otherwise): where the active member can walk with the movement it
+    /// has left, around walls and live enemies — the very blockers its steps collide
+    /// with (<see cref="LiveEnemyBlockers"/>) — and where a target would be in
+    /// its weapon's reach and sight from where it stands; a ring under each
+    /// visible enemy a click would hit now (<see cref="EnemyCue"/> ready); and,
+    /// for the enemy under the mouse, its own walk on its next turn's budget
+    /// (after Mire, as the turn system pays it) and its weapon's reach.
+    /// Rebuilt only when something it reads has changed.
+    /// </summary>
+    private void RefreshReachOverlay()
+    {
+        var active = ActiveCharacter.State;
+        bool show = ReachOverlayOn(Transiting, _turns.Phase, AnyMenuOpen, active.Alive, _turns.AnyLiveEnemySeenThisTurn, LiveEnemyInView);
+        if (!show)
+        {
+            Watch(ref _watchedMember, null);
+            if (_reachKey != null) { _reachOverlay.Clear(); _reachKey = null; }
+            return;
+        }
+
+        var held = active.EquippedWeapon;
+        var hovered = HoveredEnemy is { IsActive: true } h && h.State.Alive ? h.State : null;
+        // Movement is heard, not polled: whatever changes the balance goes
+        // through the ledger, which says so (OnWatchedMovement).
+        Watch(ref _watchedMember, active.Movement);
+        var hittable = _enemies
+            .Where(e => e.IsActive && e.State.Alive && EnemyCue(active, held, e.State) is { Ready: true })
+            .Select(e => e.State)
+            .ToList();
+
+        var key = new HashCode();
+        key.Add(active); key.Add(active.X); key.Add(active.Y);
+        key.Add(held); key.Add(held?.Range); key.Add(held == null ? 0 : active.MovementCost(held));
+        key.Add(hovered);
+        // A hovered enemy's walk is its next turn's budget, not its ledger's
+        // leftover: Mire landing on it this turn is what can change it.
+        key.Add(hovered == null ? 0f : StatusBehaviours.MiredBudget(hovered, hovered.MoveBudget));
+        foreach (var member in _party) { key.Add(member.State.Alive); key.Add(member.State.X); key.Add(member.State.Y); }
+        foreach (var enemy in _enemies) { key.Add(enemy.State.Alive); key.Add(enemy.State.X); key.Add(enemy.State.Y); }
+        foreach (var enemy in hittable) key.Add(enemy);
+        int hash = key.ToHashCode();
+        if (_reachKey == hash && !_reachDirty) return;
+        _reachKey = hash;
+        _reachDirty = false;
+
+        var grid = _map.Grid;
+        float enemyRadius = _enemies.Count > 0 ? _enemies[0].State.Radius : active.Radius;
+        var layers = new List<ReachOverlayRenderer.Layer>
+        {
+            MemberWalk.On(ReachFields.Walkable(grid, active.X, active.Y, active.Radius, active.DistLeft, LiveEnemyBlockers())),
+        };
+        if (held != null)
+            layers.Add(MemberReach.On(ReachFields.InReach(grid, active.X, active.Y, active.Radius, enemyRadius, held.Range)));
+
+        if (hovered != null)
+        {
+            var bodies = new List<GridCollision.Circle>();
+            foreach (var member in _party)
+                if (member.State.Alive) bodies.Add(new GridCollision.Circle(member.State.X, member.State.Y, member.State.Radius));
+            foreach (var enemy in _enemies)
+                if (enemy.State.Alive && enemy.State != hovered) bodies.Add(new GridCollision.Circle(enemy.State.X, enemy.State.Y, enemy.State.Radius));
+            float budget = StatusBehaviours.MiredBudget(hovered, hovered.MoveBudget);   // what StartEnemyAction will refill it to
+            layers.Add(EnemyWalk.On(ReachFields.Walkable(grid, hovered.X, hovered.Y, hovered.Radius, budget, bodies)));
+            layers.Add(EnemyReach.On(ReachFields.InReach(grid, hovered.X, hovered.Y, hovered.Radius, GameConstants.PlayerHalf, hovered.Weapon.Range)));
+        }
+
+        var rings = hittable
+            .Select(e => new ReachOverlayRenderer.Ring(e.X, e.Y, e.Radius + 2f, e.Radius + 5f, HittableRing))
+            .ToList();
+        _reachOverlay.Show(layers, rings, AttackCostRuler(active, held));
+    }
+
+    /// <summary>
+    /// Whether the reach overlay shows: the party's phase, nothing in the way, and
+    /// a fight on — a live enemy seen this turn, or one in view now. Both, because
+    /// the turn's sightings start empty and fill only when sight is next asked, as
+    /// someone crosses a tile: with the second alone a fight that has just lost
+    /// sight of its enemy would drop the overlay, and with the first alone an enemy
+    /// standing in plain view at the turn's start would not bring it back.
+    /// </summary>
+    internal static bool ReachOverlayOn(bool transiting, TurnPhase phase, bool menuOpen, bool memberAlive, bool enemySeenThisTurn, bool liveEnemyInView)
+        => !transiting && phase == TurnPhase.Player && !menuOpen && memberAlive && (enemySeenThisTurn || liveEnemyInView);
+
+    /// <summary>Is a live enemy on a tile the party can see right now?</summary>
+    private bool LiveEnemyInView => _enemies.Any(e => e.State.Alive && e.IsActive);
+
+    /// <summary>
+    /// Listen to <paramref name="next"/> in place of what <paramref name="slot"/>
+    /// held (null: to nothing), so the overlay rebuilds whenever that ledger
+    /// moves; a change of ledger rebuilds it too.
+    /// </summary>
+    private void Watch(ref MovementLedger? slot, MovementLedger? next)
+    {
+        if (ReferenceEquals(slot, next)) return;
+        if (slot != null) slot.Changed -= OnWatchedMovement;
+        slot = next;
+        if (slot != null) slot.Changed += OnWatchedMovement;
+        _reachDirty = true;
+    }
+
+    private void OnWatchedMovement(MovementChange change) => _reachDirty = true;
+
+    /// <summary>
+    /// The attack-cost ruler: four lines from the member along the map's axes,
+    /// each as long as the movement it has left — a pure ruler, straight through
+    /// walls — crossed by a tick every attack cost counted back from the far end
+    /// (<see cref="ReachFields.AttackTicks"/>), so stopping on the k-th tick
+    /// inward leaves k attacks' worth of movement. The cost is the one a swing
+    /// or cast charges (<see cref="ActorState.MovementCost"/>); nothing with an
+    /// empty hand.
+    /// </summary>
+    private static List<ReachOverlayRenderer.Segment> AttackCostRuler(PartyMemberState member, Weapon? held)
+    {
+        var segments = new List<ReachOverlayRenderer.Segment>();
+        float left = member.DistLeft;
+        if (held == null || left <= 0f) return segments;
+
+        var ticks = ReachFields.AttackTicks(left, member.MovementCost(held));
+        foreach (var (ux, uy) in new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) })
+        {
+            segments.Add(new(member.X, member.Y, member.X + ux * left, member.Y + uy * left, RulerWidth, RulerColor));
+            foreach (float d in ticks)
+            {
+                float cx = member.X + ux * d, cy = member.Y + uy * d;
+                // Across the line: swap the axis.
+                segments.Add(new(cx - uy * TickHalf, cy - ux * TickHalf, cx + uy * TickHalf, cy + ux * TickHalf, TickWidth, RulerColor));
+            }
+        }
+        return segments;
     }
 
     /// <summary>
@@ -2678,7 +2913,7 @@ public class DungeonScene : Scene
         {
             Position = WorldSpace.FromLogic(corpse.X, corpse.Y, GroundItemHeight / 2f),
         };
-        AddGameObject(marker);
+        World.Add(marker);
         var laid = new GroundItem(corpse, drop, marker, LogicTile(corpse.X, corpse.Y));
         _groundItems.Add(laid);
         UpdateGroundItemVisibility();
@@ -2702,7 +2937,7 @@ public class DungeonScene : Scene
         {
             Position = WorldSpace.FromLogic(x, y, GroundItemHeight / 2f),
         };
-        AddGameObject(marker);
+        World.Add(marker);
         var laid = new GroundItem(null, null, marker, loose.Tile, loose);
         _groundItems.Add(laid);
         UpdateGroundItemVisibility();
@@ -2804,7 +3039,7 @@ public class DungeonScene : Scene
         }
 
         _groundItems.Remove(item);
-        RemoveGameObject(item.Marker);
+        World.Remove(item.Marker);
         if (slot == 0)
             _turns.NotifyWeaponChanged(member);   // an empty hand filled is a reach changed
 
@@ -2835,6 +3070,7 @@ public class DungeonScene : Scene
         if (newly.Count > 0)
         {
             _fogOverlay.MarkDirty();
+            _reachOverlay.MarkDirty();
             if (animate)
             {
                 _fogOverlay.AnimateReveal(newly, tile);

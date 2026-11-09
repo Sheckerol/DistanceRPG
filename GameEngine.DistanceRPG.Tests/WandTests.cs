@@ -176,9 +176,9 @@ public sealed class WandTests : IDisposable
         var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
         var aim = (a.X, a.Y);
 
-        a.DistLeft = 44f;
+        a.Movement.Reset(44f, MoveReason.Restore);
         Assert.False(turns.CanCastArea(a, aim));   // 45 to cast
-        a.DistLeft = 45f;
+        a.Movement.Reset(45f, MoveReason.Restore);
         Assert.True(turns.CanCastArea(a, aim));
         a.Mana = 17;
         Assert.False(turns.CanCastArea(a, aim));   // 18 for the cast; the trigger is no gate
@@ -322,7 +322,7 @@ public sealed class WandTests : IDisposable
         Assert.True(crit.IsCrit);
         Assert.Equal((8, 0, 8, 8, false), (crit.WeaponShare, crit.Absorbed, crit.Dealt, crit.Taken, crit.Blocked));   // 16 halved, Block skipped
 
-        // Through the turn system, the same: a resisted crit into a Tower Guard dummy (Block 6) lands 8.
+        // Through the turn system, the same: a resisted crit into a Scutum and Gladius dummy (Block 6) lands 8.
         var grid = new int[20, 20];
         var b = Char("B", 5, 5, "wand_of_the_nova", Flaming);
         var guard = Enemy(5, 7, TestWeapons.Get("tower_guard"));
@@ -709,7 +709,7 @@ public sealed class WandTests : IDisposable
         };
 
     /// <summary>
-    /// A test unique derived from the Flensing Knife in the Light shape (§1.5): the Dagger signature raised
+    /// A test unique derived from the Seax in the Light shape (§1.5): the Dagger signature raised
     /// to x3 buys two souls, the first arriving at tier 3 — the one martial shape that carries catalogue
     /// entries, since every other martial unique carries exactly one unique enchantment. Its statline is the
     /// variant's row under the premise, as a unique's is its variant's.

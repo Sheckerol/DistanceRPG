@@ -167,7 +167,7 @@ public class DungeonContentTests
             Assert.All(DropVariants(cls), v => Assert.False(TakesForged(Brace, v), v.Id));
         }
 
-        // Every variant of the three it keeps can take it -- the Phalanx Spear too,
+        // Every variant of the three it keeps can take it -- the Sarissa too,
         // its own class, whose graft deepens it to the forge limit.
         foreach (var cls in new[] { Dagger, Sword, Spear })
             Assert.All(DropVariants(cls), v => Assert.True(TakesForged(Brace, v), v.Id));
@@ -191,7 +191,7 @@ public class DungeonContentTests
         Assert.Equal(AllEight.Where(cls => DropVariants(cls).All(v => v.Forged.GetValueOrDefault(Cleave) < Rules.MaxForged(Cleave))),
             Dungeons.ThemeClasses(Cleave));
 
-        // The one variant that could have refused it is Tower Guard, forged Block x2:
+        // The one variant that could have refused it is Scutum and Gladius, forged Block x2:
         // the golem's graft lands it on exactly MaxForged, and not past it.
         var towerGuard = Spread(Weapons["tower_guard"]);
         Assert.Equal(2, towerGuard.Stacks(Block));
@@ -338,7 +338,7 @@ public class DungeonContentTests
         Assert.DoesNotContain(Ranged, EnemyPlacer.PlacedClasses);
         Assert.Contains(Ranged, Dungeons.ThemeClasses(Longshot));
 
-        // Cleave is a signature, but the Great Axe has no unique: refused until one is authored.
+        // Cleave is a signature, but the Dane Axe has no unique: refused until one is authored.
         Assert.Null(Weapons.UniqueDerivedFrom(Weapons.Variant(Axe, VariantRole.Purity).Id));
         Refused(Plus(Themed("axe_pit", Cleave)), "axe_pit", ContentValidator.RuleThemeHasAUnique);
 
@@ -380,7 +380,7 @@ public class DungeonContentTests
             Assert.Equal(Rules.MaxForged(def.Theme), unique.Forged[def.Theme]);       // and the unique sits there
         }
 
-        // Block's limit tuned to x4. The graft is still legal -- a Tower Guard takes
+        // Block's limit tuned to x4. The graft is still legal -- a Scutum and Gladius takes
         // it, so the golem's table is still all eight -- but it stops at x3, a stack
         // short of the limit, and no weapon check notices: nothing is forged past
         // x4. No golem drop could ever become The Bulwark, so the tutorial, the
@@ -622,7 +622,7 @@ public class DungeonContentTests
     {
         // A forged Light graft past Light's forge limit is refused; the same graft
         // acquired is not (PHASE4-036: one question, the source's choice the only
-        // difference). The Flensing Knife's Light x1, forged to the limit
+        // difference). The Seax's Light x1, forged to the limit
         // tuning.json sets — the knife as it is forged, as shipped.
         var knife = Spread(Weapons["flensing_knife"]);
         Assert.Equal(1, knife.Stacks(Light));
@@ -631,7 +631,7 @@ public class DungeonContentTests
         Assert.True(Rules.CanGraft(Light, WeaponKind.Melee, atLimit, atLimit, asForged: false));
 
         // The forge limit counts the forged spread, never what was acquired on top:
-        // a Tower Guard farmed to Block x5 still takes one forged stack.
+        // a Scutum and Gladius farmed to Block x5 still takes one forged stack.
         var farmed = ModifierSet.Of((Block, 5), (Push, 1));
         var forged = ModifierSet.Of((Block, 2), (Push, 1));
         Assert.True(Rules.CanGraft(Block, WeaponKind.Melee, farmed, forged, asForged: true));

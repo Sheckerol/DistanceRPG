@@ -73,8 +73,15 @@ public sealed class TitleHud : IDisposable
     /// <summary>How a slot's markers' row is indented under its slot's row.</summary>
     private const string MarkerIndent = "    ";
 
-    /// <summary>One row as the screen draws it: its text, how far down, its scale and colour, and where its left edge is — null for a row centred on the window.</summary>
-    internal readonly record struct TitleRow(string Text, float Y, float Scale, Vector4 Color, float? Left = null)
+    /// <summary>
+    /// One row as the screen draws it: its text, how far down, its scale and colour,
+    /// and where its left edge is — null for a row centred on the window. And what a
+    /// click on it takes (after play, 2026-10): <paramref name="Choice"/>, the option
+    /// it is (<see cref="TitleMenu.Options"/>) or the slot list's row it says — its
+    /// markers' row too — and <paramref name="KeyLine"/>, a row of keys whose words
+    /// click as their keys (<see cref="ClickZones.KeySpans"/>).
+    /// </summary>
+    internal readonly record struct TitleRow(string Text, float Y, float Scale, Vector4 Color, float? Left = null, int? Choice = null, bool KeyLine = false)
     {
         /// <summary>The row's width in pixels.</summary>
         public float Width => Text.Length * GlyphAdvance * Scale;
@@ -85,11 +92,16 @@ public sealed class TitleHud : IDisposable
 
     private readonly Game _game;
     private readonly TextRenderer _text = new();
+    private readonly ClickZones _clicks;
     private bool _glReady;
+
+    /// <summary>Where a click lands on the screen as it was last drawn (<see cref="ClickZones"/>), and the mouse it lights under.</summary>
+    internal ClickZones Clicks => _clicks;
 
     public TitleHud(Game game)
     {
         _game = game;
+        _clicks = new ClickZones(() => game.InputEvents);
     }
 
     /// <summary>
@@ -124,7 +136,7 @@ public sealed class TitleHud : IDisposable
         {
             var (what, keys) = AskRows(menu, dungeons);
             rows.Add(new TitleRow(what, keysY - BottomPitch, KeysScale, DungeonHud.Yellow));
-            rows.Add(new TitleRow(keys, keysY, KeysScale, DungeonHud.Yellow));
+            rows.Add(new TitleRow(keys, keysY, KeysScale, DungeonHud.Yellow, KeyLine: true));
             return rows;
         }
         if (menu.List?.Said is { } said)
@@ -135,7 +147,7 @@ public sealed class TitleHud : IDisposable
             { Mode: SlotMenuMode.NewCampaign, Count: var count } => TitleText.NewCampaignKeysLine(count),
             { Rows: var slots } => TitleText.LoadKeysLine(oldAutosave: slots.Any(slot => slot.Number == SaveSlots.OldAutosave)),
         };
-        rows.Add(new TitleRow(keysLine, keysY, KeysScale, DungeonHud.Grey));
+        rows.Add(new TitleRow(keysLine, keysY, KeysScale, DungeonHud.Grey, KeyLine: true));
         return rows;
     }
 
@@ -181,7 +193,7 @@ public sealed class TitleHud : IDisposable
             var color = chosen ? DungeonHud.Yellow
                 : option == TitleOption.Continue && !menu.ContinueOn ? DungeonHud.DarkGrey
                 : DungeonHud.White;
-            yield return new TitleRow(chosen ? $"> {text} <" : text, top + i * OptionPitch, OptionScale, color);
+            yield return new TitleRow(chosen ? $"> {text} <" : text, top + i * OptionPitch, OptionScale, color, Choice: i);
         }
     }
 
@@ -213,16 +225,16 @@ public sealed class TitleHud : IDisposable
     internal static IReadOnlyList<TitleRow> SlotRows(SlotMenu list, float width, float top, DungeonCatalogue dungeons, TimeZoneInfo zone)
     {
         ArgumentNullException.ThrowIfNull(list);
-        var block = new List<(string Text, Vector4 Color, bool Marker)>();
+        var block = new List<(string Text, Vector4 Color, bool Marker, int Row)>();
         for (int i = 0; i < list.Rows.Count; i++)
         {
             var entry = list.Rows[i];
             var texts = SlotText.Rows(entry, list.Count, dungeons, zone);
             bool chosen = i == list.Cursor;
             var color = chosen ? DungeonHud.Yellow : list.Choosable(entry) ? DungeonHud.White : DungeonHud.DarkGrey;
-            block.Add((chosen ? $"> {texts[0]} <" : Unmarked + texts[0], color, false));
+            block.Add((chosen ? $"> {texts[0]} <" : Unmarked + texts[0], color, false, i));
             foreach (string marker in texts.Skip(1))
-                block.Add((MarkerIndent + marker, DungeonHud.Grey, true));
+                block.Add((MarkerIndent + marker, DungeonHud.Grey, true, i));
         }
 
         int widest = block.Select(row => row.Text.Length).DefaultIfEmpty(0).Max();
@@ -232,7 +244,7 @@ public sealed class TitleHud : IDisposable
         for (int i = 0; i < block.Count; i++)
         {
             var row = block[i];
-            rows.Add(new TitleRow(row.Text, y, SlotText.Scale, row.Color, left));
+            rows.Add(new TitleRow(row.Text, y, SlotText.Scale, row.Color, left, row.Row));
             bool markerNext = i + 1 < block.Count && block[i + 1].Marker;
             y += markerNext ? MarkerOffset : SlotPitch;
         }
@@ -251,10 +263,40 @@ public sealed class TitleHud : IDisposable
 
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
-        foreach (var row in Layout(scene.Menu, scene.NoticeRows, w, h, GameContent.Current.Dungeons, TimeZoneInfo.Local))
-            _text.DrawText(row.Text, row.Left ?? w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+        _clicks.BeginFrame(_game.ShaderManager, w, h);
+        var rows = Layout(scene.Menu, scene.NoticeRows, w, h, GameContent.Current.Dungeons, TimeZoneInfo.Local);
+        for (int i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            float x = row.Left ?? w / 2f - row.Width / 2f;
+            _text.DrawText(row.Text, x, row.Y, row.Scale, row.Color);
+            if (row.KeyLine)
+                _clicks.AddKeys(row.Text, x, row.Y, row.Scale);
+            else if (row.Choice is { } choice && (i == 0 || rows[i - 1].Choice != choice))
+                AddChoice(scene, rows, i, choice, x);
+        }
         _text.Flush(_game.ShaderManager);
     }
 
-    public void Dispose() => _text.Dispose();
+    /// <summary>
+    /// A zone over an option, or over a slot's rows — its markers' row with it — as
+    /// wide as the widest of them: a click there takes it (<see cref="TitleScene.Click"/>).
+    /// </summary>
+    private void AddChoice(TitleScene scene, IReadOnlyList<TitleRow> rows, int first, int choice, float x)
+    {
+        int last = first;
+        while (last + 1 < rows.Count && rows[last + 1].Choice == choice)
+            last++;
+        float width = 0f;
+        for (int i = first; i <= last; i++)
+            width = MathF.Max(width, rows[i].Width);
+        float top = rows[first].Y - ClickZones.Pad;
+        _clicks.Add(x - ClickZones.Pad, top, width + 2f * ClickZones.Pad, rows[last].Bottom + ClickZones.Pad - top, () => scene.Click(choice));
+    }
+
+    public void Dispose()
+    {
+        _text.Dispose();
+        _clicks.Dispose();
+    }
 }

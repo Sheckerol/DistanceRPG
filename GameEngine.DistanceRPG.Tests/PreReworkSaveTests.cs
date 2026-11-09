@@ -71,6 +71,7 @@ public class PreReworkSaveTests
         ("$.campaign.lastResult", "farmClears", JsonValue.Create(0)),
         ("$.campaign.lastResult", "firstClear", JsonValue.Create(false)),
         ("$.campaign.lastResult", "spoiled", null),
+        ("$.campaign.visit", "dungeonsCleared", JsonValue.Create(EnemyPlacer.Unprotected)),   // beginner protection: an older visit was placed uncapped
     ];
 
     /// <summary>Whether <paramref name="value"/> is <paramref name="expected"/>'s default as a capture writes it, compared as JSON: null, a number, a word.</summary>
@@ -111,7 +112,7 @@ public class PreReworkSaveTests
         nameof(Tuning.WearPerHit),
         nameof(Tuning.WearCapacityPerBar), nameof(Tuning.FirstSlotCapacity), nameof(Tuning.SlotCapacityStep),
         nameof(Tuning.EnchantmentSlots), nameof(Tuning.FirstEnchantmentWear), nameof(Tuning.EnchantmentWearStep),
-        nameof(Tuning.EnchanterWorksOn), nameof(Tuning.GraftBaseChance), nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight),
+        nameof(Tuning.EnchanterWorksOn), nameof(Tuning.GraftBaseChance), nameof(Tuning.GraftSharePercent), nameof(Tuning.DeepenSignatureWeight), nameof(Tuning.EnchantmentTierScale),
         nameof(Tuning.PotionUseCost), nameof(Tuning.HealthPotionPercent), nameof(Tuning.ManaPotionPercent), nameof(Tuning.FarmYieldPerClear),
         nameof(Tuning.SaveSlots),
     ];
@@ -317,6 +318,7 @@ public class PreReworkSaveTests
             {
                 "$.campaign" => [tree["campaign"] as JsonObject],
                 "$.campaign.lastResult" => [tree["campaign"]?["lastResult"] as JsonObject],
+                "$.campaign.visit" => [tree["campaign"]?["visit"] as JsonObject],
                 "$.campaign.party[*]" => (tree["campaign"]?["party"] as JsonArray ?? []).Select(row => row as JsonObject).ToList(),
                 _ => throw new ArgumentOutOfRangeException(nameof(at), at, "a place the test does not walk"),
             };

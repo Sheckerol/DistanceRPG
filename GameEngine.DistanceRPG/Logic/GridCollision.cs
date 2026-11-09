@@ -5,6 +5,15 @@ namespace GameEngine.DistanceRPG.Logic;
 /// physics. Movement is resolved one axis at a time (X then Y), which gives
 /// the classic wall-sliding feel: a head-on push stops at the wall, a diagonal
 /// push slides along it. Other actors block as circles the same way.
+/// <para>
+/// <strong>Walls win</strong> (after play, 2026-10: two members stacked on one
+/// spot, one went through a wall). A blocker's push-out can be as long as both
+/// radii — 28 units, most of a 32-unit wall tile — so it used to shove a circle
+/// pressed to a wall deep into it, and the next move "backed out" of the far
+/// side. Now a pass's blocker push is followed by its walls again, backed out
+/// the way the push came; and a move that would still end with the centre in
+/// a wall tile does not happen.
+/// </para>
 /// </summary>
 public static class GridCollision
 {
@@ -21,20 +30,43 @@ public static class GridCollision
     {
         float worldW = grid.GetLength(1) * GameConstants.Tile;
         float worldH = grid.GetLength(0) * GameConstants.Tile;
+        float startX = x, startY = y;
 
         // X pass
         x += dx;
         x = Math.Clamp(x, r, worldW - r);
         x = ResolveWalls(grid, x, y, r, alongX: true, movedPositive: dx > 0);
-        if (blockers != null) x = ResolveBlockersX(blockers, x, y, r);
+        if (blockers != null)
+        {
+            float before = x;
+            x = ResolveBlockersX(blockers, x, y, r);
+            if (x != before) x = ResolveWalls(grid, x, y, r, alongX: true, movedPositive: x > before);
+        }
 
         // Y pass
         y += dy;
         y = Math.Clamp(y, r, worldH - r);
         y = ResolveWalls(grid, x, y, r, alongX: false, movedPositive: dy > 0);
-        if (blockers != null) y = ResolveBlockersY(blockers, x, y, r);
+        if (blockers != null)
+        {
+            float before = y;
+            y = ResolveBlockersY(blockers, x, y, r);
+            if (y != before) y = ResolveWalls(grid, x, y, r, alongX: false, movedPositive: y > before);
+        }
 
+        // Never into a wall: a move that ends with the centre in one stays put —
+        // unless it started in one, which only a move can get it out of.
+        if (InWall(grid, x, y) && !InWall(grid, startX, startY))
+            return (startX, startY);
         return (x, y);
+    }
+
+    /// <summary>Whether the point (<paramref name="x"/>, <paramref name="y"/>) lies in a wall tile.</summary>
+    internal static bool InWall(int[,] grid, float x, float y)
+    {
+        int r = (int)MathF.Floor(y / GameConstants.Tile);
+        int c = (int)MathF.Floor(x / GameConstants.Tile);
+        return r >= 0 && c >= 0 && r < grid.GetLength(0) && c < grid.GetLength(1) && grid[r, c] == 1;
     }
 
     /// <summary>

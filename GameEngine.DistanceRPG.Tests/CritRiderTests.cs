@@ -164,7 +164,7 @@ public sealed class CritRiderTests : IDisposable
     [Fact]
     public void BlockWeaken_AppliesToAttackerOnSuccessfulBlock_NotOnCrit()
     {
-        // The Warden's Shield: Block x1 and BlockWeaken x1. A blocked dagger swing leaves
+        // The Targe and Claymore: Block x1 and BlockWeaken x1. A blocked dagger swing leaves
         // Weakened on the attacker; a crit is never blocked, so it leaves nothing.
         var (turns, a, enemy) = Duel(TestWeapons.Get("weakspot_stiletto"), "wardens_shield", () => 10);
         AttackResolution? hit = null;

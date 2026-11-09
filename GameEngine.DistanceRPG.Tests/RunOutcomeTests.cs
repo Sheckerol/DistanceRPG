@@ -34,7 +34,7 @@ public sealed class RunOutcomeTests : IDisposable
 
     public void Dispose() => _premise.Dispose();
 
-    /// <summary>The shipped seed: the tutorial's golem holds a Pinning Lance on floor 2, and floor 1's spawn 23 is a hatchet dummy.</summary>
+    /// <summary>The shipped seed: the tutorial's golem holds a Ranseur on floor 2, and floor 1's spawn 23 is a hatchet dummy.</summary>
     private const long GoldenSeed = 2762136374;
 
     /// <summary>Seeds a dungeon on the tuning's 5–10 range rolls five, six, seven and ten floors on — every such dungeon alike, since the roll reads only the seed and the range.</summary>
@@ -55,7 +55,7 @@ public sealed class RunOutcomeTests : IDisposable
     /// <summary>A blow that goes through any Block a boss stands behind: a dummy in one swing, any boss in two.</summary>
     private static Weapon Sledge() => TestWeapons.Make("Sledge", range: 60, damage: 120, cost: 30);
 
-    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Weakspot Stiletto where none is named.</summary>
+    /// <summary>Four fixture members in roster order, each holding the weapon at its place — a Rondel where none is named.</summary>
     private static PartyMemberState[] Party(params Weapon[] held)
         => Ids.Select((id, i) => TestPools.Holding(id, i < held.Length ? held[i] : TestWeapons.Get("weakspot_stiletto"), colorIndex: i))
             .ToArray();
@@ -203,7 +203,7 @@ public sealed class RunOutcomeTests : IDisposable
     /// <summary>Enter <paramref name="dungeonId"/>, beat its boss and walk out: a clear.</summary>
     private static RunResult Clear(CampaignState campaign, string dungeonId, long seed)
     {
-        var visit = campaign.Enter(dungeonId, seed);
+        var visit = campaign.Enter(dungeonId, seed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, Ten);
         BeatTheBoss(visit, campaign.Party);
         var result = Exit(campaign);
@@ -214,7 +214,7 @@ public sealed class RunOutcomeTests : IDisposable
     /// <summary>Enter <paramref name="dungeonId"/> five floors deep, go three floors down and walk back out: a retreat that counts, as a mercy.</summary>
     private static RunResult DeepRetreat(CampaignState campaign, string dungeonId)
     {
-        var visit = campaign.Enter(dungeonId, FiveDeep);
+        var visit = campaign.Enter(dungeonId, FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal(5, visit.BossFloor);
         visit.OpenTurns(campaign.Party, Ten);
         Down(visit, campaign.Party);
@@ -227,7 +227,7 @@ public sealed class RunOutcomeTests : IDisposable
     /// <summary>Enter <paramref name="dungeonId"/> and walk straight back out of the first floor: a retreat that counts nothing.</summary>
     private static RunResult ShallowRetreat(CampaignState campaign, string dungeonId)
     {
-        campaign.Enter(dungeonId, FiveDeep).OpenTurns(campaign.Party, Ten);
+        campaign.Enter(dungeonId, FiveDeep, EnemyPlacer.Unprotected).OpenTurns(campaign.Party, Ten);
         var result = Exit(campaign);
         Assert.Equal((RunOutcome.Retreat, 1, false), (result.Outcome, result.DeepestFloor, result.ServiceTick));
         return result;
@@ -247,7 +247,7 @@ public sealed class RunOutcomeTests : IDisposable
         {
             var campaign = Campaign();
             var party = campaign.Party;
-            var visit = campaign.Enter("spear_hall", seed);
+            var visit = campaign.Enter("spear_hall", seed, EnemyPlacer.Unprotected);
             Assert.Equal(floors, visit.BossFloor);
             visit.OpenTurns(party, Ten);
             Assert.Equal(0, campaign.RunCounter);   // entering counts nothing
@@ -295,7 +295,7 @@ public sealed class RunOutcomeTests : IDisposable
         foreach (var (depth, counts) in new[] { (1, false), (2, false), (3, true), (5, true) })
         {
             int before = campaign.RunCounter;
-            var visit = campaign.Enter("spear_hall", FiveDeep);
+            var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
             Assert.Equal(5, visit.BossFloor);   // 5 is the boss floor: the last case stands on it
             visit.OpenTurns(party, Ten);
             while (visit.FloorIndex + 1 < depth)
@@ -335,10 +335,10 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Equal(50, GameContent.Current.Tuning.DeathXpLossPercent);
         var tower = TestWeapons.Get("tower_guard");
         var party = Party(Sledge());
-        party[3].Inventory[1] = tower;          // D carries a Tower Guard in: gear, never a spoil
+        party[3].Inventory[1] = tower;          // D carries a Scutum and Gladius in: gear, never a spoil
         party[2].WeaponXp[Axe] = 200;           // and C has swung an axe before this run
         var campaign = new CampaignState(party);
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         var gear = party.Select(m => m.Inventory.ToArray()).ToArray();
         visit.OpenTurns(party, Ten);
 
@@ -398,9 +398,9 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Contains(new XpClawback("D", XpSnapshot.ManaPool, entry.Members[3].ManaXp + 7, entry.Members[3].ManaXp + 7 - 3), result.Clawbacks);
 
         // The run's end rests nobody; the next entry does, and it arms the hand the
-        // wipe emptied from the bag: D walks into the next dungeon holding its Tower Guard.
+        // wipe emptied from the bag: D walks into the next dungeon holding its Scutum and Gladius.
         Assert.All(party, m => Assert.False(m.Alive));
-        campaign.Enter("spear_hall", FiveDeep);
+        campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Same(tower, party[3].Inventory[0]);
         Assert.Null(party[3].Inventory[1]);
         Assert.Same(dagger, party[3].Inventory[2]);
@@ -421,7 +421,7 @@ public sealed class RunOutcomeTests : IDisposable
             var a = party[0];
             a.WeaponXp[Dagger] = 300;   // before the run: never clawed
             var campaign = new CampaignState(party);
-            var visit = campaign.Enter("tutorial", GoldenSeed);
+            var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
             var turns = visit.OpenTurns(party, Ten);
             var (hp, mana) = (a.HpXp, a.ManaXp);
             Assert.Equal((300, 0, hp, mana), (visit.EntrySnapshot.Members[0].WeaponXp[(int)Dagger], visit.EntrySnapshot.Members[0].WeaponXp[(int)Axe],
@@ -472,7 +472,7 @@ public sealed class RunOutcomeTests : IDisposable
         party[1].WeaponXp[Staff] = 30;
         party[2].WeaponXp[Wand] = 5;
         var campaign = new CampaignState(party);
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         var snapshot = visit.EntrySnapshot;
 
         Assert.Equal(Ids, snapshot.Members.Select(m => m.MemberId));
@@ -511,7 +511,7 @@ public sealed class RunOutcomeTests : IDisposable
 
         foreach (bool beatTheBoss in new[] { false, true })
         {
-            var visit = campaign.Enter("spear_hall", FiveDeep);
+            var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
             var snapshot = visit.EntrySnapshot;
             var atTheDoor = snapshot.Members.Select(m => (m.MemberId, string.Join(",", m.WeaponXp), m.HpXp, m.ManaXp)).ToArray();
             visit.OpenTurns(party, Ten);
@@ -528,7 +528,7 @@ public sealed class RunOutcomeTests : IDisposable
             Assert.Equal(atTheDoor, snapshot.Members.Select(m => (m.MemberId, string.Join(",", m.WeaponXp), m.HpXp, m.ManaXp)));   // untouched
 
             if (beatTheBoss) break;
-            var next = campaign.Enter("long_gallery", FiveDeep);
+            var next = campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected);
             Assert.NotSame(snapshot, next.EntrySnapshot);
             Assert.Equal(earned, next.EntrySnapshot.Members.Select(m => (m.MemberId, string.Join(",", m.WeaponXp), m.HpXp, m.ManaXp)));
             next.OpenTurns(party, Ten);
@@ -548,7 +548,7 @@ public sealed class RunOutcomeTests : IDisposable
         // run is over the campaign's subscription is gone from the visit's event.
         var party = Party();
         var campaign = new CampaignState(party);
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(party, Ten);
         foreach (var member in party)
             member.WeaponXp[Dagger] += 40;
@@ -593,7 +593,7 @@ public sealed class RunOutcomeTests : IDisposable
         // of the XP, go down with the party.
         var campaign = Campaign();
         var party = campaign.Party;
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal(5, visit.BossFloor);
         visit.OpenTurns(party, Ten);
         var bottom = BeatTheBoss(visit, party);
@@ -635,7 +635,7 @@ public sealed class RunOutcomeTests : IDisposable
         // killing the boss and dying makes it: the success tick, the lock, the clear.
         var campaign = Campaign();
         var party = campaign.Party;
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal(5, visit.BossFloor);
         var turns = visit.OpenTurns(party, Ten);
         while (visit.Current.DownStairs is not null)
@@ -705,18 +705,18 @@ public sealed class RunOutcomeTests : IDisposable
         var party = campaign.Party;
         var results = new List<RunResult>();
 
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal(0, campaign.RunCounter);
         visit.OpenTurns(party, Ten);
         results.Add(Exit(campaign));                    // straight back out
 
-        visit = campaign.Enter("spear_hall", FiveDeep);
+        visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(party, Ten);
         results.Add(Wipe(campaign, Down(visit, party)));   // dead on floor 2
 
         foreach (bool die in new[] { false, true })
         {
-            visit = campaign.Enter("tutorial", GoldenSeed);
+            visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
             Assert.Equal(2, visit.BossFloor);
             visit.OpenTurns(party, Ten);
             var bottom = Down(visit, party);            // as deep as it goes, the golem standing
@@ -752,12 +752,12 @@ public sealed class RunOutcomeTests : IDisposable
         for (int run = 1; run <= 5; run++)
         {
             Assert.False(campaign.IsSelectable(SpearHall));
-            Assert.Throws<InvalidOperationException>(() => campaign.Enter("spear_hall", SixDeep));
+            Assert.Throws<InvalidOperationException>(() => campaign.Enter("spear_hall", SixDeep, EnemyPlacer.Unprotected));
             DeepRetreat(campaign, "long_gallery");   // a run that counts, somewhere else
             Assert.Equal(1 + run, campaign.RunCounter);
         }
         Assert.True(campaign.IsSelectable(SpearHall));
-        var back = campaign.Enter("spear_hall", SixDeep);
+        var back = campaign.Enter("spear_hall", SixDeep, EnemyPlacer.Unprotected);
         Assert.Same(back, campaign.Visit);
     }
 
@@ -778,7 +778,7 @@ public sealed class RunOutcomeTests : IDisposable
         ShallowRetreat(campaign, "tutorial");
         Assert.Equal(5, Waiting());
 
-        var visit = campaign.Enter("knife_warrens", FiveDeep);
+        var visit = campaign.Enter("knife_warrens", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal(5, Waiting());   // entering is not a run's end
         visit.OpenTurns(party, Ten);
         Wipe(campaign, Down(visit, party));
@@ -799,7 +799,7 @@ public sealed class RunOutcomeTests : IDisposable
 
         for (int attempt = 0; attempt < 2; attempt++)
         {
-            var visit = campaign.Enter("spear_hall", FiveDeep);
+            var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
             visit.OpenTurns(party, Ten);
             TurnSystem bottom = visit.Turns!;
             while (visit.Current.DownStairs is not null)
@@ -814,7 +814,7 @@ public sealed class RunOutcomeTests : IDisposable
             Assert.False(campaign.HasCleared("spear_hall"));
             Assert.True(campaign.IsSelectable(SpearHall));
         }
-        Assert.NotNull(campaign.Enter("spear_hall", SevenDeep));   // and in again at once
+        Assert.NotNull(campaign.Enter("spear_hall", SevenDeep, EnemyPlacer.Unprotected));   // and in again at once
     }
 
     // ── The tutorial, and the hub ────────────────────────────────────────────
@@ -835,7 +835,7 @@ public sealed class RunOutcomeTests : IDisposable
 
         // Failed, by retreat and by death: still there.
         ShallowRetreat(campaign, "tutorial");
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         visit.OpenTurns(party, Ten);
         Wipe(campaign, Down(visit, party));
         Assert.False(campaign.IsRetired("tutorial"));
@@ -851,7 +851,7 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Empty(campaign.LockedInOrder);
         Assert.True(campaign.HasCleared("tutorial"));
         Assert.False(campaign.IsSelectable(tutorial));
-        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", GoldenSeed));
+        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected));
 
         // And the hub is open: every other dungeon can be picked, and the next run
         // goes to the first of them.
@@ -862,7 +862,7 @@ public sealed class RunOutcomeTests : IDisposable
         // Nothing reopens it: not runs that count, not the early offer.
         DeepRetreat(campaign, "long_gallery");
         Assert.True(campaign.IsRetired("tutorial"));
-        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", 1));
+        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", 1, EnemyPlacer.Unprotected));
     }
 
     [Fact]
@@ -908,12 +908,12 @@ public sealed class RunOutcomeTests : IDisposable
         Clear(campaign, "spear_hall", SixDeep);
 
         party[0].Hp = 7;   // the way the last run left A
-        Assert.Throws<InvalidOperationException>(() => campaign.Enter("spear_hall", FiveDeep));
-        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", FiveDeep));
+        Assert.Throws<InvalidOperationException>(() => campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected));
+        Assert.Throws<InvalidOperationException>(() => campaign.Enter("tutorial", FiveDeep, EnemyPlacer.Unprotected));
         Assert.Null(campaign.Visit);
         Assert.Equal(7, party[0].Hp);   // nobody rested: nothing was entered
 
-        var other = campaign.Enter("long_gallery", FiveDeep);
+        var other = campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Same(other, campaign.Visit);
         Assert.Equal(party[0].MaxHp, party[0].Hp);
     }
@@ -929,7 +929,7 @@ public sealed class RunOutcomeTests : IDisposable
         var campaign = Campaign();
         var party = campaign.Party;
 
-        var first = campaign.Enter("spear_hall", FiveDeep);
+        var first = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Equal(5, first.BossFloor);
         first.OpenTurns(party, Ten);
         while (first.Current.DownStairs is not null)
@@ -940,7 +940,7 @@ public sealed class RunOutcomeTests : IDisposable
 
         foreach (var (seed, floors) in new[] { (TenDeep, 10), (SevenDeep, 7), (SixDeep, 6) })
         {
-            var again = campaign.Enter("spear_hall", seed);
+            var again = campaign.Enter("spear_hall", seed, EnemyPlacer.Unprotected);
             Assert.NotSame(first, again);
             Assert.Equal(floors, again.BossFloor);
             Assert.Equal(DungeonState.RollBossFloor(seed, SpearHall), again.BossFloor);
@@ -1004,11 +1004,11 @@ public sealed class RunOutcomeTests : IDisposable
         // the Long Gallery, lifting as soon, is still refused.
         Assert.Equal("spear_hall", campaign.EarlyOffer());
         Assert.Equal("spear_hall", campaign.DefaultNext());
-        Assert.Throws<InvalidOperationException>(() => campaign.Enter("long_gallery", FiveDeep));
+        Assert.Throws<InvalidOperationException>(() => campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected));
 
         var cleared = campaign.ClearedInOrder;
         var retired = campaign.RetiredInOrder;
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Same(visit, campaign.Visit);
         Assert.Equal(5, campaign.LockedUntilRun("spear_hall"));   // the counter: lifted now, and the entry stays
         Assert.Equal(new[] { ("knife_warrens", 11), ("long_gallery", 8), ("quiver_pits", 12), ("spear_hall", 5) }, campaign.LockedInOrder);
@@ -1033,7 +1033,7 @@ public sealed class RunOutcomeTests : IDisposable
         var campaign = Campaign();
         var party = campaign.Party;
 
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(party, Ten);
         var farmed = Row(visit.Current, 23, "hatchet");
         Kill(turns, visit.Current, party[0], farmed);
@@ -1043,7 +1043,7 @@ public sealed class RunOutcomeTests : IDisposable
         Exit(campaign);
         Assert.Null(campaign.Visit);
 
-        var again = campaign.Enter("tutorial", GoldenSeed);
+        var again = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Empty(again.Floors.Intersect(visit.Floors));
         var twin = Row(again.Current, 23, "hatchet");
         Assert.NotSame(farmed, twin);
@@ -1053,7 +1053,7 @@ public sealed class RunOutcomeTests : IDisposable
         Exit(campaign);
 
         // A clear, leaving the boss's drop on its floor and a permanent kill's on the first.
-        var hall = campaign.Enter("spear_hall", FiveDeep);
+        var hall = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         hall.OpenTurns(party, Ten);
         var bottom = BeatTheBoss(hall, party);
         Assert.NotNull(bottom.GroundItemOf(hall.Current.Boss!));
@@ -1097,7 +1097,7 @@ public sealed class RunOutcomeTests : IDisposable
         // permanent kills drop on the way out is carried home, with the golem's own.
         var campaign = Campaign();
         var party = campaign.Party;
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         Assert.Equal(2, visit.BossFloor);
         var first = visit.OpenTurns(party, Ten);
 
@@ -1153,12 +1153,12 @@ public sealed class RunOutcomeTests : IDisposable
 
         Assert.Null(DeepRetreat(campaign, "spear_hall").BossFloorRevealed);   // floor 3 of 5
 
-        var visit = campaign.Enter("spear_hall", SevenDeep);
+        var visit = campaign.Enter("spear_hall", SevenDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(party, Ten);
         var died = Wipe(campaign, Down(visit, party));
         Assert.Equal((2, (int?)null), (died.DeepestFloor, died.BossFloorRevealed));   // floor 2 of 7
 
-        visit = campaign.Enter("spear_hall", FiveDeep);
+        visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(party, Ten);
         while (visit.Current.DownStairs is not null)
             Down(visit, party);
@@ -1180,7 +1180,7 @@ public sealed class RunOutcomeTests : IDisposable
         var party = campaign.Party;
         Assert.Throws<InvalidOperationException>(() => campaign.EndRun(RunEnding.Exited));   // no run at all
 
-        var visit = campaign.Enter("spear_hall", FiveDeep);
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         Assert.Throws<InvalidOperationException>(() => campaign.EndRun(RunEnding.Exited));   // no floor open yet
         visit.OpenTurns(party, Ten);
         Down(visit, party);
@@ -1207,7 +1207,7 @@ public sealed class RunOutcomeTests : IDisposable
         // visit in progress's.
         var campaign = Campaign();
         var party = campaign.Party;
-        var visit = campaign.Enter("tutorial", GoldenSeed);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
         visit.OpenTurns(party, Ten);
         Assert.Empty(visit.Spoils);
 
@@ -1251,7 +1251,7 @@ public sealed class RunOutcomeTests : IDisposable
             var gear = TestWeapons.Get("longbow");
             party[3].Inventory[1] = gear;   // D carries its own longbow in
             var campaign = new CampaignState(party);
-            var visit = campaign.Enter("tutorial", GoldenSeed);
+            var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
             var turns = visit.OpenTurns(party, Ten);
             var floor = visit.Current;
 
@@ -1270,7 +1270,7 @@ public sealed class RunOutcomeTests : IDisposable
             Assert.Equal(new Weapon?[] { kept, dropped, retaken }, party[1].Inventory[1..4]);
             Assert.Equal(new[] { kept, dropped, retaken }, visit.Spoils);
 
-            // B puts two down: the sword stays down, and the Tower Guard B takes
+            // B puts two down: the sword stays down, and the Scutum and Gladius B takes
             // back, into slot 2, the first empty. D puts its own longbow down and
             // takes it back. The spoils are the three they were: taking a weapon
             // back records nothing.

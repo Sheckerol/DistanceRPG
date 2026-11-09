@@ -196,7 +196,7 @@ public sealed class StableTests : IDisposable
         // the door refuses, and nothing moves.
         var campaign = NewCampaign();
         campaign.Move(Slot("A", 1), Stable(0));
-        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         var bags = campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
         var refused = Assert.Throws<InvalidOperationException>(() => campaign.Move(Stable(0), Slot("A", 1)));
         Assert.Contains("between runs", refused.Message, StringComparison.Ordinal);
@@ -262,7 +262,7 @@ public sealed class StableTests : IDisposable
         Assert.Equal((false, false), (potion.Choosable, potion.Target));
         Assert.Equal([new DungeonHud.Run("  BAG   HEALTH POTION Q2", DungeonHud.Grey)], HubWeapons.Runs(potion));
         int at = rows.ToList().IndexOf(potion);
-        Assert.Equal(["[A]", "  HAND  WEAKSPOT STILETTO", "  BAG   STAFF OF RENEWAL", "  BAG   HEALTH POTION Q2", HubWeapons.BagRoom(3)],
+        Assert.Equal(["[A]", "  HAND  RONDEL", "  BAG   STAFF OF RENEWAL", "  BAG   HEALTH POTION Q2", HubWeapons.BagRoom(3)],
             rows.Skip(at - 3).Take(5).Select(row => row.Kind == HubWeapons.RowKind.Weapon ? $"{row.Label}{HubWeapons.Name(row.Weapon!)}" : row.Text));
         Assert.Equal(Slot("A", 3), rows[at + 1].Place);
         Assert.Same(a, campaign.Party[0]);
@@ -387,7 +387,7 @@ public sealed class StableTests : IDisposable
         }
 
         // And the enchanter's shop, the same way (Phase 6a.3a): a version-1 save a hand
-        // gave a queue — a deposit of B's Riposte Blade, a count, a run's report on it —
+        // gave a queue — a deposit of B's Rapier and Dagger, a count, a run's report on it —
         // reads as a campaign with nothing in the shop and no deposit ever made, and
         // its last run as one with nothing at the enchanter.
         var deposit = new JsonObject
@@ -423,7 +423,7 @@ public sealed class StableTests : IDisposable
         var campaign = NewCampaign();
         campaign.Move(Slot("A", 1), Stable(0));
         campaign.Move(Slot("D", 1), Stable(1));
-        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed);
+        var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
 
         string text = Save(campaign);

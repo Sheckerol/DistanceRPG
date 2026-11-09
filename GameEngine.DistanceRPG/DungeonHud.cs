@@ -2,6 +2,7 @@ using GameEngine.Core;
 using GameEngine.Core.UI;
 using GameEngine.DistanceRPG.Logic;
 using OpenTK.Mathematics;
+using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace GameEngine.DistanceRPG;
 
@@ -65,7 +66,12 @@ public sealed class DungeonHud
     private readonly Game _game;
     private readonly TextRenderer _text = new();
     private readonly FullscreenFade _fade = new();
+    private readonly HudRects _rects = new();
+    private readonly ClickZones _clicks;
     private bool _glReady;
+
+    /// <summary>Where a click lands on the menus and keys as they were last drawn (<see cref="ClickZones"/>): the scene asks it before the floor.</summary>
+    internal ClickZones Clicks => _clicks;
 
     /// <summary>One coloured piece of HUD text; runs drawn side by side read as one line.</summary>
     public readonly record struct Run(string Text, Vector4 Color);
@@ -158,6 +164,7 @@ public sealed class DungeonHud
     public DungeonHud(Game game)
     {
         _game = game;
+        _clicks = new ClickZones(() => game.InputEvents);
     }
 
     /// <summary>
@@ -488,11 +495,14 @@ public sealed class DungeonHud
         {
             _text.Initialize();
             _fade.Initialize();
+            _rects.Initialize();
             _glReady = true;
         }
 
         int w = _game.ClientSize.X;
         int h = _game.ClientSize.Y;
+        _clicks.Mouse = scene.MousePos;
+        _clicks.BeginFrame(_game.ShaderManager, w, h);
         var turns = scene.Turns;
         var active = scene.ActiveCharacter.State;
         var ended = scene.ActiveMenu == GameMenu.RunSummary ? scene.EndedRun : null;
@@ -542,6 +552,9 @@ public sealed class DungeonHud
         if (scene.PauseMenuOpen)
             DrawMenu(w, h, scene);
 
+        if (scene.CharacterOpen)
+            DrawCharacterSheet(w, active);
+
         if (scene.ActiveMenu == GameMenu.ConfirmLeave)
             DrawConfirmLeave(w, h, scene.Visit, scene.Party.Sum(member => member.State.Potions.Count()));
 
@@ -552,11 +565,11 @@ public sealed class DungeonHud
         else if (turns.Phase == TurnPhase.GameOver)
         {
             DrawCentered(w, h / 2f - 60f, DefeatHeadline, 6f, Red);
-            DrawCentered(w, h / 2f + 20f, ContinueHint, 2f, Grey);
+            DrawKeysCentered(w, h / 2f + 20f, ContinueHint, 2f, Grey);
         }
         else
         {
-            DrawCentered(w, h - 24f, HelpLine(active), 1.2f, Grey);
+            DrawKeysCentered(w, h - 24f, HelpLine(active), 1.2f, Grey);
         }
 
         _text.Flush(_game.ShaderManager);
@@ -794,7 +807,7 @@ public sealed class DungeonHud
 
     /// <summary>
     /// What the boss left on the floor, as its fall states it (§4.3): the weapon,
-    /// and what makes it the boss's — <c>DROPPED: HUNTING BOW - FORGED WITH
+    /// and what makes it the boss's — <c>DROPPED: SHORTBOW - FORGED WITH
     /// BLOCK</c>, the theme forged onto whatever class it came as. When the graft
     /// made it its class's unique the line says that instead — <c>DROPPED: THE
     /// BULWARK - UNIQUE</c> — the unique being the theme at its deepest.
@@ -892,6 +905,9 @@ public sealed class DungeonHud
     /// </summary>
     internal static string LeavePrompt() => "LEAVE THE DUNGEON? E OR ENTER: YES - ESC: NO";
 
+    /// <summary>What a click on the way out says with nobody standing on it: the stair is taken from its tile.</summary>
+    internal const string StandOnWayOut = "STAND ON THE WAY OUT TO LEAVE";
+
     // A stair's label and its cue hang under the near edge of its tile — the
     // edge toward the camera, which looks up the map (-Z) — so at any zoom they
     // clear the slab, whoever stands on it, the nameplate of a dummy standing
@@ -918,9 +934,22 @@ public sealed class DungeonHud
             var nearEdge = marker.Slab.Position + Vector3.UnitZ * (WorldSpace.UnitsPerTile / 2f);
             if (!WorldToScreen(camera, nearEdge, w, h, out var px)) continue;
 
-            DrawCenteredAt(px.X, px.Y + StairLabelOffset, StairLabel(marker.Stair.Kind), 1.4f, DungeonScene.StairColor(marker.Stair.Kind));
-            if (prompt is { } p && p.Stair == marker.Stair)
-                DrawCenteredAt(px.X, px.Y + StairCueOffset, p.Cue, 1.4f, p.Ready ? White : Grey);
+            string label = StairLabel(marker.Stair.Kind);
+            DrawCenteredAt(px.X, px.Y + StairLabelOffset, label, 1.4f, DungeonScene.StairColor(marker.Stair.Kind));
+            bool cued = prompt is { } p && p.Stair == marker.Stair;
+            if (cued)
+                DrawCenteredAt(px.X, px.Y + StairCueOffset, prompt!.Value.Cue, 1.4f, prompt.Value.Ready ? White : Grey);
+
+            // The way out's label and cue click as the way out (after play, 2026-10).
+            if (marker.Stair.Kind == Stair.Exit)
+            {
+                _clicks.AddText(px.X - label.Length * GlyphAdvance * 1.4f / 2f, px.Y + StairLabelOffset, label.Length, 1.4f, scene.ClickWayOut);
+                if (cued)
+                {
+                    string cue = prompt!.Value.Cue;
+                    _clicks.AddText(px.X - cue.Length * GlyphAdvance * 1.4f / 2f, px.Y + StairCueOffset, cue.Length, 1.4f, scene.ClickWayOut);
+                }
+            }
         }
     }
 
@@ -928,7 +957,7 @@ public sealed class DungeonHud
     private void DrawConfirmLeave(int w, int h, DungeonState visit, int potionsCarried)
     {
         float top = h / 2f - 60f;
-        DrawCentered(w, top, LeavePrompt(), 2.5f, Yellow);
+        DrawKeysCentered(w, top, LeavePrompt(), 2.5f, Yellow);
         var lines = LeavePreview(visit, potionsCarried);
         float y = top + 44f;
         for (int i = 0; i < lines.Count; i++)
@@ -1108,7 +1137,10 @@ public sealed class DungeonHud
         {
             bool last = i == lines.Count - 1;
             if (last) y += SummaryKeyGap;
-            DrawCentered(w, y, lines[i].Text, last ? SummaryKeyScale : SummaryLineScale, lines[i].Color);
+            if (last)
+                DrawKeysCentered(w, y, lines[i].Text, SummaryKeyScale, lines[i].Color);
+            else
+                DrawCentered(w, y, lines[i].Text, SummaryLineScale, lines[i].Color);
             y += step;
         }
     }
@@ -1167,7 +1199,7 @@ public sealed class DungeonHud
     private const float SelectorTop = 130f;
     private const float SelectorRowPitch = 30f;
     private const float SelectorRowBand = 26f; // clickable height within each row's pitch
-    private const float SelectorWidth = 150f;
+    private const float SelectorWidth = 216f; // the widest row, >1 A 999 HP 100 MP, at scale 2
 
     /// <summary>
     /// Hit-test the party selector rows against a mouse position in window
@@ -1185,6 +1217,141 @@ public sealed class DungeonHud
         return true;
     }
 
+    /// <summary>
+    /// A party selector row: <c>&gt;1 A 30 HP 13 MP</c> — the marker, the number
+    /// the key selects it by, the member, its HP in its own colour and its mana
+    /// in the casters' cyan, so a member short of a cast is seen without
+    /// selecting it (added after play, 2026-10). The dead row is grey throughout.
+    /// </summary>
+    internal static IReadOnlyList<Run> SelectorRowRuns(int index, PartyMemberState state, bool isActive, Vector4 color)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        string marker = isActive ? ">" : " ";
+        return
+        [
+            new Run($"{marker}{index + 1} {state.Id} {state.Hp} HP", color),
+            new Run($" {state.Mana} MP", state.Alive ? Cyan : color),
+        ];
+    }
+
+    // The selector's bars: how far under a row's text they start, how tall each
+    // is, the gap between the two, and how long, in pixels.
+    private const float BarTop = 16f;
+    private const float BarHeight = 4f;
+    private const float BarGap = 2f;
+    internal const float BarLength = 120f;
+
+    /// <summary>What a bar has run out of: a dark, so the part left reads against the whole.</summary>
+    internal static readonly Vector4 BarEmpty = new(0.18f, 0.18f, 0.22f, 0.9f);
+
+    /// <summary>Spendable mana not yet regained: the mana colour, dimmed.</summary>
+    internal static readonly Vector4 ManaEmpty = new(0.08f, 0.22f, 0.32f, 0.9f);
+
+    /// <summary>Mana an equipped enchantment reserves (§3.3): no regen reaches it, so it reads apart from both.</summary>
+    internal static readonly Vector4 Reserved = new(0.45f, 0.38f, 0.6f, 0.9f);
+
+    /// <summary>One part of a bar, as shares of its length from the left.</summary>
+    internal readonly record struct BarPart(float From, float To, Vector4 Color);
+
+    /// <summary>HP left against the whole: green, then the dark it has lost. A dead member's bar is empty.</summary>
+    internal static IReadOnlyList<BarPart> HpBar(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        float left = Share(actor.Alive ? actor.Hp : 0, actor.MaxHp);
+        return [new(0f, left, Green), new(left, 1f, BarEmpty)];
+    }
+
+    /// <summary>
+    /// Mana against the whole pool (after play, 2026-10): what is in it, in cyan;
+    /// what a rest could still bring back, the cyan dimmed; and what the equipped
+    /// enchantments reserve, which no rest reaches (<see cref="ActorState.UsableMaxMana"/>),
+    /// in its own colour at the end - so a member capped by its staff reads capped,
+    /// not empty.
+    /// </summary>
+    internal static IReadOnlyList<BarPart> ManaBar(ActorState actor)
+    {
+        ArgumentNullException.ThrowIfNull(actor);
+        float current = Share(actor.Mana, actor.MaxMana);
+        float spendable = Math.Max(current, Share(actor.UsableMaxMana, actor.MaxMana));
+        return [new(0f, current, Cyan), new(current, spendable, ManaEmpty), new(spendable, 1f, Reserved)];
+    }
+
+    /// <summary><paramref name="part"/> of <paramref name="whole"/>, 0 to 1; nothing of an empty whole.</summary>
+    private static float Share(int part, int whole) => whole <= 0 ? 0f : Math.Clamp((float)part / whole, 0f, 1f);
+
+    private void DrawBar(float x, float y, IReadOnlyList<BarPart> parts)
+    {
+        foreach (var part in parts)
+            _rects.Fill(_game.ShaderManager, _game.ClientSize.X, _game.ClientSize.Y,
+                x + part.From * BarLength, y, (part.To - part.From) * BarLength, BarHeight, part.Color);
+    }
+
+    // ── The character sheet ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// The character sheet (C, after play, 2026-10): the active member's stats,
+    /// its pools as the real numbers - mana current, spendable, reserved and max,
+    /// and what reserves it - and every weapon class it has trained, with what
+    /// its level is worth. One line a list entry, each in its colour.
+    /// </summary>
+    internal static IReadOnlyList<Run> CharacterSheetLines(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var lines = new List<Run>
+        {
+            new($"[{member.Id}] CHARACTER", Yellow),
+            new($"STR {member.Stats.STR}   DEX {member.Stats.DEX}   CON {member.Stats.CON}   INT {member.Stats.INT}", White),
+            new("", White),
+        };
+
+        var health = member.HealthPool;
+        lines.Add(new($"HP {member.Hp} / {member.MaxHp}{Gap}NEXT MAX HP: XP {health.XpIntoNext}/{health.XpToNext}", Green));
+
+        var mana = member.ManaPool;
+        int reserved = member.MaxMana - member.UsableMaxMana;
+        lines.Add(new($"MANA {member.Mana} CURRENT - {member.UsableMaxMana} SPENDABLE - {reserved} RESERVED - {member.MaxMana} MAX", Cyan));
+        if (member.EquippedWeapon is { } weapon)
+            for (int i = 0; i < weapon.Enchantments.Count; i++)
+            {
+                var entry = weapon.Enchantments[i];
+                string name = entry.Def.Name.ToUpperInvariant() + (entry.Tier > 1 ? $" T{entry.Tier}" : "");
+                lines.Add(member.IsDormant(i)
+                    ? new($"  {name} ASLEEP - ITS {entry.EffectiveLock} DOES NOT FIT IN MAX MANA", Grey)
+                    : new($"  {name} RESERVES {entry.EffectiveLock}", Reserved));
+            }
+        lines.Add(new($"NEXT MAX MANA: XP {mana.XpIntoNext}/{mana.XpToNext}{Gap}MOVE {MathF.Ceiling(member.DistLeft)} / {member.EffectiveMax:0}", Cyan));
+
+        lines.Add(new("", White));
+        lines.Add(new("SKILLS", Yellow));
+        foreach (var cls in Enum.GetValues<WeaponClass>())
+        {
+            var level = member.Proficiency(cls);
+            if (level.Level <= Progression.StartingLevel && level.XpIntoNext == 0 && member.EquippedWeapon?.Class != cls)
+                continue;   // never trained, and not in hand: nothing to say
+            int damage = level.Level / Progression.DamagePerLevels;
+            int discount = level.Level / Progression.MovementDiscountPerLevels;
+            lines.Add(new($"{cls.ToString().ToUpperInvariant()} LV {level.Level}{Gap}XP {level.XpIntoNext}/{level.XpToNext}{Gap}+{damage} DMG{Gap}-{discount} MOVE COST", White));
+        }
+
+        lines.Add(new("", White));
+        lines.Add(new("1-4 SWITCH MEMBER - C OR ESC CLOSE", Grey));
+        return lines;
+    }
+
+    private void DrawCharacterSheet(int w, PartyMemberState member)
+    {
+        float y = InventoryTopMargin;
+        var lines = CharacterSheetLines(member);
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (i == lines.Count - 1)
+                DrawKeysCentered(w, y, lines[i].Text, 2f, lines[i].Color);   // its keys: C closes it
+            else
+                DrawCentered(w, y, lines[i].Text, 2f, lines[i].Color);
+            y += 20f;
+        }
+    }
+
     private void DrawPartySelector(DungeonScene scene)
     {
         int hovered = -1;
@@ -1198,16 +1365,20 @@ public sealed class DungeonHud
             var color = !state.Alive ? DarkGrey : scene.PartyColor(i);
             if (hasHover && hovered == i && state.Alive)
                 color = Vector4.Lerp(color, White, 0.5f);
-            string marker = isActive ? ">" : " ";
-            string row = $"{marker}{i + 1} {state.Id} {state.Hp}";
+            var row = SelectorRowRuns(i, state, isActive, color);
             float y = SelectorTop + i * SelectorRowPitch;
-            _text.DrawText(row, SelectorX, y, 2f, color);
+            DrawRuns(SelectorX, y, 2f, row);
+            int rowLength = row.Sum(run => run.Text.Length);
 
             // Its effect badges beside it, and a banked Overwatch shot, which fires on the enemy's turn.
             var badges = new List<Run>(StatusBadgeRuns(state));
             if (state.HeldShots > 0)
                 badges.Add(new Run($"HOLD {state.HeldShots}", Cyan));
-            DrawRuns(SelectorX + (row.Length + 1) * GlyphAdvance * 2f, y + 2f, 1.5f, badges);
+            DrawRuns(SelectorX + (rowLength + 1) * GlyphAdvance * 2f, y + 2f, 1.5f, badges);
+
+            // Its HP and mana as bars under the row: what is left, against the whole.
+            DrawBar(SelectorX, y + BarTop, HpBar(state));
+            DrawBar(SelectorX, y + BarTop + BarHeight + BarGap, ManaBar(state));
         }
 
         // Hovering a member's row spells out what each of its statuses does to
@@ -1265,7 +1436,7 @@ public sealed class DungeonHud
 
     /// <summary>
     /// The title line over an enemy's plate: what it is, and what it is holding
-    /// in brackets — <c>DUMMY [Arming Sword]</c>, <c>HEALER [Staff of Renewal]</c>,
+    /// in brackets — <c>DUMMY [Buckler and Sword]</c>, <c>HEALER [Staff of Renewal]</c>,
     /// and a boss by its own name, <c>STONE GOLEM [Hatchet]</c> (§4.3: it wields
     /// a weapon like a dummy does). HEALER is what mends (the innate's status
     /// restores HP); every other caster, warding or debuffing, is CASTER.
@@ -1567,12 +1738,20 @@ public sealed class DungeonHud
             string hint = potions ? PourKeyHint : LeaveKeyHint;
             float width = hint.Length * GlyphAdvance * InventoryHeaderScale;
             _text.DrawText(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
+            _clicks.AddKeys(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale);
         }
 
         float y = top + InventorySlotsTop;
         for (int slot = 0; slot < active.Inventory.Length; slot++)
         {
             var item = active.Inventory[slot];
+            float height = InventorySlotPitch + (item == null ? 0 : Math.Max(0, details[slot].Count - 1) * InventoryDetailPitch);
+            if (slot > 0 && slot < DungeonScene.HighestSlotKey)
+            {
+                // The whole slot, its statline under its name with it, clicks as its number: equip, drink, or with X armed, leave.
+                var key = Keys.D1 + slot;
+                _clicks.Add(left - ClickZones.Pad, y - ClickZones.Pad, 2f * InventoryHalfWidth + 2f * ClickZones.Pad, height, () => _clicks.Press(key));
+            }
             if (item == null)
             {
                 _text.DrawText($"{slot + 1}  - EMPTY -", left, y, 2f, DarkGrey);
@@ -1617,9 +1796,9 @@ public sealed class DungeonHud
         }
 
         if (leaving)
-            DrawCentered(w, hintY, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
+            DrawKeysCentered(w, hintY, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
         else
-            DrawCentered(w, hintY, EquipHint(active.Inventory.Length, potions), 1.5f, Grey);
+            DrawKeysCentered(w, hintY, EquipHint(active.Inventory.Length, potions), 1.5f, Grey);
     }
 
     /// <summary>
@@ -1944,7 +2123,15 @@ public sealed class DungeonHud
     private void DrawMenu(int w, int h, DungeonScene scene)
     {
         foreach (var row in PauseMenuLayout(w, h, PauseMenu.Options(scene.HasTitle), scene.CanSaveNow, PauseSavesLine(scene.SavesInto), scene.MenuAnswer))
-            _text.DrawText(row.Text, w / 2f - row.Width / 2f, row.Y, row.Scale, row.Color);
+            DrawMenuRow(_text, _clicks, w, row);
+    }
+
+    /// <summary>A pause-menu row, centred, its key's words clicking as the key (<see cref="ClickZones.AddKeys"/>): an option as its number, ESC TO CLOSE as ESC. The hub's menu is drawn through it too.</summary>
+    internal static void DrawMenuRow(TextRenderer text, ClickZones clicks, int w, MenuRow row)
+    {
+        float x = w / 2f - row.Width / 2f;
+        text.DrawText(row.Text, x, row.Y, row.Scale, row.Color);
+        clicks.AddKeys(row.Text, x, row.Y, row.Scale, leadOnly: true);
     }
 
     // ── Weapon readouts ──────────────────────────────────────────────────────
@@ -2231,7 +2418,6 @@ public sealed class DungeonHud
     {
         ArgumentNullException.ThrowIfNull(weapon);
         bool equipped = wielder != null && ReferenceEquals(wielder.EquippedWeapon, weapon);
-        int stat = (wielder as PartyMemberState)?.Stats.INT ?? InnateStats.Low;
         var parts = new List<string>();
         for (int i = 0; i < weapon.Enchantments.Count; i++)
         {
@@ -2242,7 +2428,7 @@ public sealed class DungeonHud
             {
                 text += $" LOCK {entry.EffectiveLock}";
                 if (!entry.Unique)
-                    text += $" XP {entry.Xp}/{entry.TierCost(stat)}";
+                    text += $" XP {entry.Xp}/{entry.TierCost()}";
                 else if (entry.Xp > 0)
                     text += $" XP {entry.Xp}";
                 if (wielder!.IsDormant(i)) text += " (ASLEEP)";
@@ -2295,7 +2481,7 @@ public sealed class DungeonHud
             parts.Add("CLICK ENEMY: ATTACK");
         if (weapon is { Kind: WeaponKind.Ranged } && active.Value(ModifierType.Overwatch) > 0)
             parts.Add("O: HOLD FIRE");
-        parts.Add("SPACE END TURN - E STAIRS - I BAG - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
+        parts.Add("SPACE END TURN - E STAIRS - I BAG - C CHARACTER - TAB/1-4 SWITCH - SCROLL ZOOM - ESC MENU");
         return string.Join(" - ", parts);
     }
 
@@ -2436,7 +2622,7 @@ public sealed class DungeonHud
     /// What an actor carries on itself whatever it holds (§4.3's innate
     /// modifiers — the golem's Block), resolved as a hit meets it: weapon plus
     /// innate, in the readout's own words, so a golem holding a hatchet reads
-    /// <c>BLOCK 9</c> and one holding a Tower Guard <c>BLOCK 15</c> — the Block its
+    /// <c>BLOCK 9</c> and one holding a Scutum and Gladius <c>BLOCK 15</c> — the Block its
     /// blows are absorbed by, never its innate stacks alone. Empty for an actor
     /// with nothing innate, which is every dummy.
     /// </summary>
@@ -2556,6 +2742,13 @@ public sealed class DungeonHud
     private void DrawCentered(int viewportW, float y, string text, float scale, Vector4 color)
         => DrawCenteredAt(viewportW / 2f, y, text, scale, color);
 
+    /// <summary>A keys line, centred, its keys' words clicking as their keys (<see cref="ClickZones.AddKeys"/>).</summary>
+    private void DrawKeysCentered(int viewportW, float y, string text, float scale, Vector4 color)
+    {
+        DrawCentered(viewportW, y, text, scale, color);
+        _clicks.AddKeys(text, viewportW / 2f - text.Length * GlyphAdvance * scale / 2f, y, scale);
+    }
+
     private void DrawCenteredAt(float cx, float y, string text, float scale, Vector4 color)
     {
         float width = text.Length * GlyphAdvance * scale;
@@ -2595,5 +2788,7 @@ public sealed class DungeonHud
     {
         _text.Dispose();
         _fade.Dispose();
+        _rects.Dispose();
+        _clicks.Dispose();
     }
 }

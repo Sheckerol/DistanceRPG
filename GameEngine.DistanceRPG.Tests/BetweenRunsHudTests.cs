@@ -669,7 +669,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         TestShop.Give(campaign, "B", 2, guard);
         var (hub, asked) = Hub(campaign);
         hub.OnKey(Keys.Tab);
-        ChooseRow(hub, "  BAG   TOWER GUARD - WEAR 30/30 FULL");
+        ChooseRow(hub, "  BAG   SCUTUM AND GLADIUS - WEAR 30/30 FULL");
         hub.OnKey(Keys.D);
         Assert.Equal((BetweenRunsScene.HubMode.Deposit, DepositPanel.Step.Services), (hub.Mode, hub.Panel!.Current));
         foreach (var key in new[] { Keys.Tab, Keys.D, Keys.T, Keys.W, Keys.S, Keys.Up, Keys.Down, Keys.Enter, Keys.KeyPadEnter, Keys.D3, Keys.N, Keys.Space })
@@ -735,13 +735,13 @@ public sealed class BetweenRunsHudTests : IDisposable
         // opens the ask; carrying, neither opens anything.
         var (scene, _) = Hub(campaign);
         scene.OnKey(Keys.Tab);
-        ChooseRow(scene, "  WORKING  TOWER GUARD - 0 OF 1 RUN");
+        ChooseRow(scene, "  WORKING  SCUTUM AND GLADIUS - 0 OF 1 RUN");
         scene.OnKey(Keys.D);
         Assert.Null(scene.Panel);   // a weapon in the shop is deposited already
         scene.OnKey(Keys.T);
         Assert.Equal(BetweenRunsScene.HubMode.Ask, scene.Mode);
         Assert.True(scene.HandleEscape());
-        ChooseRow(scene, "  HAND  WEAKSPOT STILETTO - WEAR 0/30");
+        ChooseRow(scene, "  HAND  RONDEL - WEAR 0/30");
         scene.OnKey(Keys.T);
         Assert.Null(scene.Panel);   // nothing to take back out of the shop
         scene.OnKey(Keys.Enter);
@@ -767,14 +767,14 @@ public sealed class BetweenRunsHudTests : IDisposable
         {
             "THE PARTY AND THE STABLE",
             "[A]",
-            "  HAND  WEAKSPOT STILETTO - WEAR 0/30",
+            "  HAND  RONDEL - WEAR 0/30",
             "  BAG   - ROOM FOR 5 MORE -",
             "[B]",
-            "  HAND  TOWER GUARD - WEAR 0/30",
+            "  HAND  SCUTUM AND GLADIUS - WEAR 0/30",
             "  BAG   STAFF OF RENEWAL - WEAR 0/30",
             "  BAG   - ROOM FOR 4 MORE -",
             "[C]",
-            "  HAND  GREAT AXE - WEAR 0/30",
+            "  HAND  DANE AXE - WEAR 0/30",
             "  BAG   STAFF OF RENEWAL - WEAR 0/30",
             "  BAG   - ROOM FOR 4 MORE -",
             "[D]",
@@ -800,7 +800,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         a.Inventory[0] = null;
         a.Inventory[2] = full;
         var rows = HubWeapons.Rows(campaign);
-        Assert.Equal(new[] { "[A]", "  HAND  - EMPTY -", "  BAG   WEAKSPOT STILETTO - WEAR 30/30 FULL", "  BAG   - ROOM FOR 4 MORE -" },
+        Assert.Equal(new[] { "[A]", "  HAND  - EMPTY -", "  BAG   RONDEL - WEAR 30/30 FULL", "  BAG   - ROOM FOR 4 MORE -" },
             rows.Skip(1).Take(4).Select(row => row.Text));
         Assert.DoesNotContain(rows, row => row.Place?.MemberId == "B" && row.Kind == HubWeapons.RowKind.Room);
         Assert.Equal(new WeaponPlace("A", 0), rows[2].Place);
@@ -817,7 +817,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(("  BAG   ", DungeonHud.White), (fullRuns[0].Text, fullRuns[0].Color));
         Assert.Equal(("WEAR 30/30 FULL", DungeonHud.Green), (fullRuns[^1].Text, fullRuns[^1].Color));
         var chosen = HubWeapons.Runs(rows[3], chosen: true);
-        Assert.Equal("> BAG   WEAKSPOT STILETTO - WEAR 30/30 FULL <", string.Concat(chosen.Select(run => run.Text)));
+        Assert.Equal("> BAG   RONDEL - WEAR 30/30 FULL <", string.Concat(chosen.Select(run => run.Text)));
         Assert.Equal((DungeonHud.Yellow, DungeonHud.Green), (chosen[0].Color, chosen[3].Color));
         Assert.Equal("> HAND  - EMPTY - <", Assert.Single(HubWeapons.Runs(rows[2], chosen: true)).Text);
         Assert.Equal(DungeonHud.Cyan, HubWeapons.Runs(rows[3], carried: true)[0].Color);
@@ -836,7 +836,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(new[]
         {
             "IN THE HAND OF [A]",
-            "WEAKSPOT STILETTO",
+            "RONDEL",
             DungeonHud.WeaponStats(stiletto),
             $"* {DungeonHud.ModifierReadout(stiletto)}",
             "WEAR 0 OF 30 - 30 MORE FILLS IT",
@@ -1030,7 +1030,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         while (walked.Weapons.Chosen != 7)
             Assert.Equal(6, Press(Keys.W));   // up to B's bag weapon, the window where it was
         Assert.Equal(5, Press(Keys.W));   // B's hand, the first under [B]: [B] comes in over it
-        Assert.Equal(("[B]", "  HAND  TOWER GUARD - WEAR 0/30"), (walked.Weapons.Rows()[5].Text, ChosenText(walked)));
+        Assert.Equal(("[B]", "  HAND  SCUTUM AND GLADIUS - WEAR 0/30"), (walked.Weapons.Rows()[5].Text, ChosenText(walked)));
         Assert.Equal(5, Press(Keys.S));   // and stays in
         Assert.Equal(5, Press(Keys.W));
         Assert.Equal(4, Press(Keys.W));   // A's room, out of view above: just far enough
@@ -1115,7 +1115,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         // the axe going to the stable where the staff was.
         var axe = campaign.Party[2].EquippedWeapon!;
         scene.OnKey(Keys.Enter);
-        ChooseRow(scene, "  HAND  GREAT AXE - WEAR 0/30");
+        ChooseRow(scene, "  HAND  DANE AXE - WEAR 0/30");
         scene.OnKey(Keys.Enter);
         Assert.Same(staff, campaign.Party[2].EquippedWeapon);
         Assert.Equal([axe], campaign.Stable);
@@ -1143,7 +1143,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         // A's stiletto, its last weapon, to the stable: refused, said in the refusal
         // row — PHASE 6a DECISION 7 — and still taken up; nothing moved, nothing asked.
         var bags = Bags(campaign);
-        ChooseRow(scene, "  HAND  WEAKSPOT STILETTO - WEAR 0/30");
+        ChooseRow(scene, "  HAND  RONDEL - WEAR 0/30");
         scene.OnKey(Keys.Enter);
         ChooseRow(scene, HubWeapons.StableRoom);
         scene.OnKey(Keys.Enter);
@@ -1170,7 +1170,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
         Assert.Equal(bags, Bags(campaign));
         Assert.Equal(1, host.HubSavesAsked);
-        Assert.DoesNotContain(GameEngine.Core.Diagnostics.Log.RecentEntries, entry => entry.Message.StartsWith("[Hub] Moved Weakspot Stiletto", StringComparison.Ordinal));
+        Assert.DoesNotContain(GameEngine.Core.Diagnostics.Log.RecentEntries, entry => entry.Message.StartsWith("[Hub] Moved Rondel", StringComparison.Ordinal));
 
         // Onto the stable's staff instead: a swap, which leaves A armed — asked again.
         ChooseRow(scene, "  STAFF OF RENEWAL - WEAR 0/30");
@@ -1469,7 +1469,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         var campaign = AlchemistTests.Arrived();
         var (scene, _) = Hub(campaign);
         scene.OnKey(Keys.Tab);
-        ChooseRow(scene, "  HAND  TOWER GUARD - WEAR 0/30");
+        ChooseRow(scene, "  HAND  SCUTUM AND GLADIUS - WEAR 0/30");
         int was = scene.Weapons.Chosen;
 
         scene.OnKey(Keys.Tab);
@@ -1479,7 +1479,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
         Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
-        Assert.Equal("  HAND  TOWER GUARD - WEAR 0/30", ChosenText(scene));
+        Assert.Equal("  HAND  SCUTUM AND GLADIUS - WEAR 0/30", ChosenText(scene));
         Assert.Equal(was + 3, scene.Weapons.Chosen);
 
         // A pour-back from the full bag takes a potion row away over it and brings
@@ -1490,13 +1490,13 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.T);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
-        Assert.Equal(("  HAND  TOWER GUARD - WEAR 0/30", was + 3), (ChosenText(scene), scene.Weapons.Chosen));
+        Assert.Equal(("  HAND  SCUTUM AND GLADIUS - WEAR 0/30", was + 3), (ChosenText(scene), scene.Weapons.Chosen));
         scene.OnKey(Keys.Tab);
         ChooseAlchemistRow(scene, "  BAG 4  HEALTH POTION Q1");
         scene.OnKey(Keys.T);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
-        Assert.Equal(("  HAND  TOWER GUARD - WEAR 0/30", was + 2), (ChosenText(scene), scene.Weapons.Chosen));
+        Assert.Equal(("  HAND  SCUTUM AND GLADIUS - WEAR 0/30", was + 2), (ChosenText(scene), scene.Weapons.Chosen));
         Assert.Equal(5, Farm.Batch(campaign));
 
         // On A's room, which a mix moves to its next empty slot: the choice with it.
@@ -1581,7 +1581,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         {
             "  - ROOM -",
             "THE ENCHANTER - WORKS ON THE 2 NEWEST",
-            "  WORKING  TOWER GUARD - 0 OF 1 RUN",
+            "  WORKING  SCUTUM AND GLADIUS - 0 OF 1 RUN",
             "  WORKING  STAFF OF RENEWAL - 1 OF 2 RUNS",
             "  STALLED  STAFF OF RENEWAL - 1 OF 2 RUNS",
         }, rows.TakeLast(5).Select(row => row.Text));
@@ -1674,7 +1674,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.W);
         Assert.Equal(HubWeapons.StableRoom, ChosenText(scene));
         scene.OnKey(Keys.Enter);   // the stable is empty: its room holds nothing to take up
-        ChooseRow(scene, "  HAND  WEAKSPOT STILETTO - WEAR 0/30");
+        ChooseRow(scene, "  HAND  RONDEL - WEAR 0/30");
         scene.OnKey(Keys.Enter);
         for (int step = 0; step < scene.Weapons.Rows().Count; step++)
         {
@@ -1759,14 +1759,14 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("THE ENCHANTER WORKED NOTHING - THE RUN DID NOT COUNT", BetweenRunsHud.WorkedNothing);
         Assert.Equal(notCounted + 2, nothing.Count);
 
-        // A counted run: the Tower Guard's refinement and the staff's Vampiric back,
+        // A counted run: the Scutum and Gladius's refinement and the staff's Vampiric back,
         // what they came back with and what their improvement rolls did — nothing,
         // on these draws (Phase 6a.4) — and A's staff, older, stalled in yellow.
         var back = TestShop.Counted(campaign);
         Assert.Equal(new[]
         {
             "STAFF OF RENEWAL IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - NO CHANGE",
-            "TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED - NO CHANGE",
+            "SCUTUM AND GLADIUS IS BACK FROM THE ENCHANTER - REFINED - NO CHANGE",
             "STALLED AT THE ENCHANTER: STAFF OF RENEWAL",
         }, Texts(BetweenRunsHud.SummaryLines(back)).SkipWhile(line => !line.StartsWith("RUN COUNTED", StringComparison.Ordinal)).Skip(1));
         Assert.Equal(DungeonHud.Yellow, BetweenRunsHud.SummaryLines(back)[^1].Color);
@@ -1866,7 +1866,7 @@ public sealed class BetweenRunsHudTests : IDisposable
 
         CampaignRuns.DeepRetreat(campaign, "long_gallery");
         TestPotions.Carrying(campaign, "C", (4, TestPotions.Health(1)));
-        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep);
+        var visit = campaign.Enter("long_gallery", CampaignRuns.FiveDeep, EnemyPlacer.Unprotected);
         var wiped = BetweenRunsHud.SummaryLines(CampaignRuns.Wipe(campaign, visit.OpenTurns(campaign.Party, CampaignRuns.Ten)));
         Assert.Equal(new[] { "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS", "1 POTION SPOILED - A POTION KEEPS FOR ONE TRIP" }, Texts(wiped).Skip(3).Take(2));
         Assert.Equal(DungeonHud.Yellow, wiped[4].Color);
@@ -1896,9 +1896,9 @@ public sealed class BetweenRunsHudTests : IDisposable
             ],
         };
         var lines = BetweenRunsHud.SummaryLines(back).SkipWhile(line => !line.Text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).Skip(1).ToArray();
-        var grafted = new DungeonHud.Run("TOWER GUARD IS BACK FROM THE ENCHANTER - REFINED - GRAFTED RIPOSTE", DungeonHud.Green);
-        var deepened = new DungeonHud.Run("GREAT AXE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - DEEPENED CRIT WINDOW", DungeonHud.Cyan);
-        Assert.Equal([grafted, deepened, new("WEAKSPOT STILETTO IS BACK FROM THE ENCHANTER - REFINED - NO CHANGE", DungeonHud.Cyan)], lines);
+        var grafted = new DungeonHud.Run("SCUTUM AND GLADIUS IS BACK FROM THE ENCHANTER - REFINED - GRAFTED RIPOSTE", DungeonHud.Green);
+        var deepened = new DungeonHud.Run("DANE AXE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - DEEPENED CRIT WINDOW", DungeonHud.Cyan);
+        Assert.Equal([grafted, deepened, new("RONDEL IS BACK FROM THE ENCHANTER - REFINED - NO CHANGE", DungeonHud.Cyan)], lines);
         Assert.Equal(("GRAFTED BLOCK", "DEEPENED CRIT WINDOW", "NO CHANGE"),
             (BetweenRunsHud.Outcome(new Improvement(ImprovementKind.Graft, ModifierType.Block)),
                 BetweenRunsHud.Outcome(new Improvement(ImprovementKind.Deepen, ModifierType.CritWindow)), BetweenRunsHud.Outcome(null)));
@@ -1928,14 +1928,14 @@ public sealed class BetweenRunsHudTests : IDisposable
         var refine = new ServiceReport("weakspot_stiletto", Service.Refine, 1, 2);
         RunResult Ran(params ServiceReport[] reports) => new("spear_hall", RunOutcome.Retreat, false, 3, null, true, true, 4, null, false, [], [], [], reports);
         static string[] Told(IEnumerable<DungeonHud.Run> lines) => Texts(lines).Where(text => text.Contains("ENCHANTER", StringComparison.Ordinal)).ToArray();
-        const string Axe = "GREAT AXE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - NO CHANGE";
-        const string Blade = "RIPOSTE BLADE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE";
+        const string Axe = "DANE AXE IS BACK FROM THE ENCHANTER - ATTACHED VAMPIRIC - NO CHANGE";
+        const string Blade = "RAPIER AND DAGGER IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED ON AT T2 - NO CHANGE";
         const string Knife = "NAMELESS KNIFE IS BACK FROM THE ENCHANTER - VAMPIRIC MOVED OFF";
 
         Assert.Equal([Axe, "AND 1 MORE AT THE ENCHANTER"], Told(DungeonHud.RunSummaryLines(Ran(enchant, transfer))));
         Assert.Equal([Blade, Knife, "AND 2 MORE AT THE ENCHANTER"], Told(DungeonHud.RunSummaryLines(Ran(transfer, enchant, refine))));
         Assert.Equal([Blade, Knife, Axe, "AND 1 MORE AT THE ENCHANTER - TAB WEAPONS"], Told(BetweenRunsHud.HubSummaryLines(Ran(transfer, enchant, refine))));
-        Assert.Equal([Axe, "TOWER GUARD IS BACK FROM THE ENCHANTER - ATTACHED COLD - NO CHANGE", "AND 2 MORE AT THE ENCHANTER - TAB WEAPONS"],
+        Assert.Equal([Axe, "SCUTUM AND GLADIUS IS BACK FROM THE ENCHANTER - ATTACHED COLD - NO CHANGE", "AND 2 MORE AT THE ENCHANTER - TAB WEAPONS"],
             Told(BetweenRunsHud.HubSummaryLines(Ran(enchant, again, transfer, refine))));
     }
 

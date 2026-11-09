@@ -369,7 +369,16 @@ public sealed class CampaignState
     /// nothing is entered.
     /// </exception>
     /// <exception cref="KeyNotFoundException"><paramref name="dungeonId"/> names no dungeon in the current content.</exception>
-    public DungeonState Enter(string dungeonId, long mapSeed)
+    public DungeonState Enter(string dungeonId, long mapSeed) => Enter(dungeonId, mapSeed, _cleared.Count);
+
+    /// <summary>
+    /// <see cref="Enter(string, long)"/> with the room cap's clear count given
+    /// rather than the campaign's own (<see cref="EnemyPlacer.RoomCap"/>): for a
+    /// test scripted against the golden dungeon's full placement, which enters
+    /// <see cref="EnemyPlacer.Unprotected"/>. Play enters through the overload
+    /// above, beginner protection and all.
+    /// </summary>
+    internal DungeonState Enter(string dungeonId, long mapSeed, int dungeonsCleared)
     {
         ArgumentNullException.ThrowIfNull(dungeonId);
         if (Visit is not null)
@@ -394,7 +403,7 @@ public sealed class CampaignState
         foreach (var member in _party)
             member.Rest();
 
-        var visit = DungeonState.Enter(def, mapSeed, _party);
+        var visit = DungeonState.Enter(def, mapSeed, _party, dungeonsCleared);
         if (early)
             _lockedUntilRun[def.Id] = RunCounter;   // the lock lifted now: the entry stays, and nothing else moves
 
