@@ -1386,3 +1386,55 @@ the movement/reach overlay (PR #17) are integrated** — not before.
     active member's `MovementLedger.Changed` the way the reach overlay does.
   - How does the tree's levelling relate to the weapon and stat progression of
     Phase 2?
+
+## One combat/movement mode, and exploring without the pause (§1.2) — not yet planned
+
+Raised by the user on 2026-11-08, after play: the reach overlay turned off at a
+turn's end and did not come back at the next one's start. A large structural
+change, to plan **after the Phase 7 death mechanics** — not before.
+
+**Why.** Phase 7 (§7.2) speaks of combat and movement mode, but no such state
+exists. Three checks stand in for it and can disagree. With an enemy in plain view
+at a turn's start, `EvaluateMarchingForTurn` sees a fight, while
+`AnyLiveEnemySeenThisTurn` (swap cost) and each enemy's `_mayReact` (its reactions)
+do not until sight is next asked, as someone crosses a tile. So until then a swap
+is free and that enemy cannot react. PR #18's `ReachOverlayOn` patches only the
+overlay, and this replaces it.
+
+**Ruled by the user:**
+
+- **Leaving combat is checked at the start of the player turn only.** If the party
+  can see any live enemy then, it stays in combat mode; if not, it drops to movement
+  mode. Killing the last enemy in view mid-turn changes nothing until the next
+  turn's start. One moment a turn is what keeps the mode from looping back and
+  forth, and it is the moment Phase 7 already ends an encounter (PHASE 7 DECISION 5).
+- **Exploration changes:** remove the turn from movement mode, or make it easier, so
+  there is no awkward pause every couple of spaces. Which of the two is open, below.
+
+**Proposed, not yet ruled:**
+
+- A live enemy coming into view enters combat at once, including at a turn's start.
+- The mode decides the swap cost and the reach overlay. Marching needs movement mode
+  and still the spacing test.
+- Reactions stay per enemy ("no ambushes from the fog"), with an enemy in view at a
+  turn's start counting as seen. Following the mode alone would let an enemy unseen
+  in the fog react during a fight with another.
+- Opening moves near enemies get dearer: a real balance change, to be played.
+
+**What it builds on.** Phase 7's step 7.1 adds the in-view set to `TurnSystem` and
+the turn-start check. As planned it raises `CombatEnded` only when a member is down;
+the mode needs the check's answer every turn.
+
+**Open:**
+
+- Where the pause comes from today: `AutoEndTurnWhenDry` ends the turn whenever the
+  slowest living member runs dry, and the enemies' whole phase plays out before the
+  party can walk on. Is it enough to shorten that (run the phase with no wait, a
+  larger budget), or does movement mode lose turns altogether?
+- If turns go, what keeps counting them while exploring? `TurnCount` drives enemy
+  resurrection timers, and turn boundaries drive status ticks and `TurnsSinceSeen`.
+  Do unseen enemies still walk and revive as the party explores, and on what clock?
+- Does a save need a new field, or is the mode derived from what it already holds?
+  `MarchingThisTurn` is saved today, and removing turns may change what that means.
+- How does this sit with the action bar and talent tree above? Both are queued after
+  Phase 7, and neither has been ordered against the other.
