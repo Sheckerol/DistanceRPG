@@ -144,15 +144,16 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   that fails is set aside, never restored. A new field of the save gets its
   checks in the same change, and everything play writes must still load
   (`SaveConsistencyTests`).
-- The save is versioned (`SaveCodec.CurrentVersion`: 3 since Phase 6b, 2 since
-  Phase 6a), and every older save must still load. A member appended with a
+- The save is versioned (`SaveCodec.CurrentVersion`: 4 since Phase 7, 3 since
+  Phase 6b, 2 since Phase 6a), and every older save must still load. A member appended with a
   default needs no step (`Logic/Save/SaveFile.cs`' header rule; a list written
   `null` while empty); a member every document must carry bumps the version, with
   a step in `SaveCodec.Migrations` that writes it into every older document —
   pure, walking the document by name, never throwing on a hand edit, removing a
   stray of a later version's member a hand gave an older document. Version 3's
   step writes nothing but the version, so a Phase 6a build refuses a Phase 6b save
-  rather than drop its potions (PHASE 6a DECISION 14). Pinned by the two saves the
+  rather than drop its potions (PHASE 6a DECISION 14); version 4's renames a wipe's
+  outcome, `Death` to `PartyWipe` (PHASE 7 DECISION 2). Pinned by the two saves the
   pre-rework code wrote (`PreReworkSaveTests`) and the one the Phase 6a build wrote,
   with the tuning it was played under frozen beside it (`Phase6aSaveTests`); their
   `TestData/saves` are never edited.

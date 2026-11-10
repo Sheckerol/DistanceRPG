@@ -105,7 +105,22 @@ internal sealed class VisitScript
     /// sight the save kept rather than lighting it afresh: what the party could
     /// see this turn is part of the turn (Phase 5.8's resume keeps it too).
     /// </summary>
-    public TurnSystem Resume() => Visit.OpenTurns(Party, Die);
+    /// <para>
+    /// The kept sight then tells the system who is in view, as the scene's resume
+    /// does (<see cref="TurnSystem.NotifyEnemyInView"/>): in view, never a
+    /// sighting, since the turn's sightings came back with its counters.
+    /// </para>
+    public TurnSystem Resume()
+    {
+        var turns = Visit.OpenTurns(Party, Die);
+        var floor = Floor;
+        foreach (var row in floor.Enemies)
+        {
+            var (r, c) = Displacer.TileOf(row);
+            turns.NotifyEnemyInView(row, floor.Fog.Visible[r, c]);
+        }
+        return turns;
+    }
 
     // ── Moving ───────────────────────────────────────────────────────────────
 
@@ -245,21 +260,39 @@ internal sealed class VisitScript
     /// the game plays. The turn's end resets the sight to where the party
     /// stands, as the scene's does.
     /// </summary>
-    public void EndTurn(float step = Step)
+    /// <param name="step">The frame step the enemies' turn is run at.</param>
+    /// <param name="unseen">
+    /// End it unseen: the sight reset and left dark, every enemy out of view, so
+    /// nothing in sight is woken by the turn — see <see cref="PassTurns"/>.
+    /// </param>
+    public void EndTurn(float step = Step, bool unseen = false)
     {
         var turns = Turns;
         turns.EndTurn();
         Floor.Fog.ResetVisibility();
-        Look();
+        if (unseen)
+            foreach (var row in Floor.Enemies)
+                turns.NotifyEnemyVisible(row, false);
+        else
+            Look();
         for (float t = 0f; t < TurnSeconds && turns.Phase is not (TurnPhase.Player or TurnPhase.GameOver); t += step)
             turns.Update(step);
         Assert.Equal(TurnPhase.Player, turns.Phase);
     }
 
-    /// <summary>End <paramref name="count"/> turns, each one run to the next player phase.</summary>
+    /// <summary>
+    /// Wait out <paramref name="count"/> turns, each run to the next player phase,
+    /// <em>unseen</em>: the party waits where no enemy is in view, so the farm's
+    /// timers run and nothing in sight is woken by the wait. A script's wait is
+    /// bookkeeping, never a fight — and a floor's arrival room is no hiding place,
+    /// its fog boxes running down long halls: an enemy standing in view as the
+    /// enemies' turn begins counts as seen (TurnSystem's seen bookkeeping) and
+    /// comes for the party. A recently sighted enemy still acts for the turn or two
+    /// before it goes passive, as one out of view always has.
+    /// </summary>
     public void PassTurns(int count)
     {
         for (int i = 0; i < count; i++)
-            EndTurn();
+            EndTurn(unseen: true);
     }
 }

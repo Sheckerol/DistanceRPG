@@ -1524,6 +1524,24 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void ARevive_FloatsTheLevelsItsDeathTook()
+    {
+        // §7.6: REVIVED, and each pool's levels the cut took back — a class's ladder
+        // levels, the health and mana pools' points — in the cut's order; REVIVED
+        // alone when the cut crossed no level, or there was nothing to take.
+        var member = Holding("arming_sword");
+        int swordStat = Progression.GoverningStat(WeaponClass.Sword, member.Stats);
+        int swordLost = Progression.Ladder(2000, swordStat).Level - Progression.Ladder(0, swordStat).Level;
+        int hpLost = Progression.Pool(900, member.Stats.CON).Points - Progression.Pool(100, member.Stats.CON).Points;
+        Assert.True(swordLost > 0 && hpLost > 0);   // the cuts below cross levels, so the text has something to say
+
+        Assert.Equal($"REVIVED  -{swordLost} SWORD  -{hpLost} HP", DungeonHud.RevivedText(member,
+            [new XpClawback("A", "Sword", 2000, 0), new XpClawback("A", XpSnapshot.HpPool, 900, 100)]));
+        Assert.Equal("REVIVED", DungeonHud.RevivedText(member, []));
+        Assert.Equal("REVIVED", DungeonHud.RevivedText(member, [new XpClawback("A", XpSnapshot.ManaPool, 1, 0)]));   // XP, but no level crossed
+    }
+
+    [Fact]
     public void TheRunSummaryNamesTheOutcome()
     {
         // 4.4's three outcomes, as the run's end shows them: what the run was, where
@@ -1565,37 +1583,52 @@ public sealed class HudTextTests : IDisposable
         }, Lines(retreat));
         Assert.DoesNotContain(Lines(retreat), line => line.Contains('7'));
 
-        // Killed the boss and died on the way out: the clear stands, the spoils
-        // and a share of the XP do not.
-        var died = new RunResult("spear_hall", RunOutcome.Death, true, 5, 5, true, false, 3, 8, false, [], [tower],
-            [new XpClawback("A", "Dagger", 345, 323), new XpClawback("A", XpSnapshot.HpPool, 90, 84), new XpClawback("C", "Axe", 30, 15)]);
+        // Killed the boss and wiped on the way out: the clear stands, the spoils
+        // and the run's XP do not. The deaths paid before the wipe are told first,
+        // a member a line in the order each first died, its deaths' cost together.
+        var died = new RunResult("spear_hall", RunOutcome.PartyWipe, true, 5, 5, true, false, 3, 8, false, [], [tower],
+            [new XpClawback("A", "Dagger", 345, 323), new XpClawback("A", XpSnapshot.HpPool, 90, 84), new XpClawback("C", "Axe", 30, 15)],
+            Deaths:
+            [
+                new RunDeath("C", [new XpClawback("C", "Axe", 50, 30), new XpClawback("C", XpSnapshot.HpPool, 20, 16)]),
+                new RunDeath("A", []),
+                new RunDeath("C", [new XpClawback("C", "Axe", 40, 35)]),
+            ]);
         Assert.Equal(new[]
         {
             DungeonHud.DefeatHeadline,
             "THE SPEAR HALL - DEEPEST FLOOR 5",
             "THE SPEAR WARDEN FELL ON FLOOR 5",
             "SPOILS LOST: SCUTUM AND GLADIUS",
-            "XP CLAWED BACK:",
+            "C DIED 2 TIMES: AXE -25, HP -4",
+            "A DIED ONCE - NOTHING GAINED TO LOSE",
+            "XP RESET TO THE DUNGEON DOOR:",
             "A: DAGGER -22, HP -6",
             "C: AXE -15",
             "RUN COUNTED - 3 RUNS SO FAR",
             "THE SPEAR HALL IS LOCKED FOR 5 RUNS",
             "ENTER TO CONTINUE",
         }, Lines(died));
-        Assert.Equal("DEFEATED", DungeonHud.DefeatHeadline);
+        Assert.Equal("PARTY WIPE", DungeonHud.DefeatHeadline);
+
+        // Walked out with a death paid along the way: told, and the XP otherwise kept.
+        var paid = retreat with { Deaths = [new RunDeath("B", [new XpClawback("B", "Sword", 30, 20)])] };
+        var told = Lines(paid);
+        Assert.Contains("B DIED ONCE: SWORD -10", told);
+        Assert.Equal(Array.IndexOf(told, "XP KEPT") - 1, Array.IndexOf(told, "B DIED ONCE: SWORD -10"));
 
         // Dead in the tutorial, the golem standing: nothing counted, and nothing
         // clawed back, the run having gained nothing (or the share being 0). Its two
         // floors never reach the mercy floor and never change, so the summary points
         // at no floor 3 it does not have and promises no new depth.
-        var shallow = new RunResult("tutorial", RunOutcome.Death, false, 2, null, false, false, 0, null, false, [], [], []);
+        var shallow = new RunResult("tutorial", RunOutcome.PartyWipe, false, 2, null, false, false, 0, null, false, [], [], []);
         Assert.Equal(new[]
         {
-            "DEFEATED",
+            "PARTY WIPE",
             "THE TUTORIAL - DEEPEST FLOOR 2",
             "THE STONE GOLEM STILL STANDS",
             "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
-            "XP KEPT - NOTHING CLAWED BACK",
+            "XP RESET - NOTHING GAINED TO LOSE",
             "RUN NOT COUNTED - 0 RUNS SO FAR",
             "ENTER TO CONTINUE",
         }, Lines(shallow));
@@ -1696,7 +1729,7 @@ public sealed class HudTextTests : IDisposable
         // split of the slots makes more lines.
         int carry = GameContent.Current.Tuning.PartyCarrySlots;
         int bagSlots = carry - members.Length;   // the hand keeps a weapon
-        RunResult Split(int potions) => new("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul[..(carry - potions)],
+        RunResult Split(int potions) => new("spear_hall", RunOutcome.PartyWipe, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul[..(carry - potions)],
             members.SelectMany(Pools).ToArray(), reports, FarmYield: 2 * ContentBounds.MostYieldPerClear, FarmClears: 2, FirstClear: true,
             Spoiled: potions == 0 ? null : Enumerable.Repeat(TestPotions.Health(1), potions).ToArray());
         var worst = Split(1);
@@ -1733,7 +1766,7 @@ public sealed class HudTextTests : IDisposable
         Assert.Contains(BetweenRunsHud.MoreAtTheEnchanter(ContentBounds.MostWorked - DungeonHud.DungeonServiceLines), texts);
         Assert.Contains(texts, text => text.StartsWith(BetweenRunsHud.StalledHeading, StringComparison.Ordinal));
         int pools = Enum.GetNames<WeaponClass>().Length + 2;
-        var clawed = texts.SkipWhile(text => text != "XP CLAWED BACK:").Skip(1).TakeWhile(text => !text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).ToArray();
+        var clawed = texts.SkipWhile(text => text != "XP RESET TO THE DUNGEON DOOR:").Skip(1).TakeWhile(text => !text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).ToArray();
         Assert.Equal(members.Length * pools, clawed.Sum(text => text.Split(" -").Length - 1));   // every pool named once
         Assert.True(clawed.Length >= 3 * members.Length, $"the claw-backs wrap to {clawed.Length} lines");
         Assert.StartsWith(DungeonHud.ContinueHint, texts[^1], StringComparison.Ordinal);

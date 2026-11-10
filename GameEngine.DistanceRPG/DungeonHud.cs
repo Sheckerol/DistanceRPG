@@ -1035,10 +1035,48 @@ public sealed class DungeonHud
     /// <summary>A number of runs as the HUD says it: <c>1 RUN</c>, <c>7 RUNS</c>.</summary>
     internal static string Runs(int n) => $"{n} {(n == 1 ? "RUN" : "RUNS")}";
 
+    // ── A revive ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// What floats over a member who gets back up (§7.6): <c>REVIVED</c>, and the
+    /// levels its death's cut took — a weapon class's ladder levels by the class,
+    /// and the health and mana pools' points as <c>HP</c> and <c>MANA</c>, each the
+    /// level the pool's XP replayed to before the cut less the level after it, in
+    /// the cut's order (<c>REVIVED  -1 SWORD  -2 HP</c>). <c>REVIVED</c> alone when
+    /// the cut crossed no level back, or found no run gain to take.
+    /// </summary>
+    /// <param name="member">The member who got up: its stats are what each pool's XP replays against.</param>
+    /// <param name="clawbacks">What the cut took from each pool (<see cref="TurnSystem.CharacterRevived"/>).</param>
+    internal static string RevivedText(PartyMemberState member, IReadOnlyList<XpClawback> clawbacks)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        ArgumentNullException.ThrowIfNull(clawbacks);
+        var lost = new List<string>();
+        foreach (var cut in clawbacks)
+        {
+            int levels = cut.Pool switch
+            {
+                XpSnapshot.HpPool => Progression.Pool(cut.Before, member.Stats.CON).Points - Progression.Pool(cut.After, member.Stats.CON).Points,
+                XpSnapshot.ManaPool => Progression.Pool(cut.Before, member.Stats.INT).Points - Progression.Pool(cut.After, member.Stats.INT).Points,
+                _ when Enum.TryParse<WeaponClass>(cut.Pool, out var cls) =>
+                    Progression.Ladder(cut.Before, Progression.GoverningStat(cls, member.Stats)).Level
+                    - Progression.Ladder(cut.After, Progression.GoverningStat(cls, member.Stats)).Level,
+                _ => 0,
+            };
+            if (levels > 0)
+                lost.Add($"-{levels} {cut.Pool.ToUpperInvariant()}");
+        }
+        return lost.Count == 0 ? "REVIVED" : $"REVIVED  {string.Join("  ", lost)}";
+    }
+
     // ── The run's end ────────────────────────────────────────────────────────
 
-    /// <summary>A wiped run's headline (§4.4), on its summary and on the defeat screen: the run is over, not the game.</summary>
-    internal const string DefeatHeadline = "DEFEATED";
+    /// <summary>
+    /// A wiped run's headline (§4.4, §7.6), on its summary and on the defeat
+    /// screen: the whole party down in one encounter — one member's death is no
+    /// longer the run's end (PHASE 7 DECISION 2) — and the run is over, not the game.
+    /// </summary>
+    internal const string DefeatHeadline = "PARTY WIPE";
 
     /// <summary>
     /// The one key a run's end answers: the summary is modal, ENTER moves on to

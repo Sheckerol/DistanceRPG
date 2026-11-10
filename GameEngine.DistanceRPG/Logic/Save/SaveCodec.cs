@@ -42,14 +42,16 @@ public sealed record SaveMigration(int From, Func<JsonObject, JsonObject> Apply)
 public static class SaveCodec
 {
     /// <summary>
-    /// The version this build writes, and the newest it reads. 3 since Phase 6b
-    /// (a member's potions, and what the farm did at a run's end, appended:
-    /// <see cref="LiftToVersion3"/> writes nothing, and is there so a Phase 6a build
-    /// refuses a version-3 save rather than drop its potions). Version 2 was Phase 6a's: a weapon's wear, and the version its
-    /// tuning hash is of. A version-1 document is lifted through both steps
-    /// (<see cref="LiftToVersion2"/>, then <see cref="LiftToVersion3"/>).
+    /// The version this build writes, and the newest it reads. 4 since Phase 7 (a
+    /// wipe's outcome renamed <c>PartyWipe</c>, and the run's death record appended:
+    /// <see cref="LiftToVersion4"/>). Version 3 was Phase 6b's (a member's potions,
+    /// and what the farm did at a run's end, appended: <see cref="LiftToVersion3"/>
+    /// writes nothing, and is there so a Phase 6a build refuses a version-3 save
+    /// rather than drop its potions). Version 2 was Phase 6a's: a weapon's wear,
+    /// and the version its tuning hash is of. An older document is lifted through
+    /// every step from its own (<see cref="Migrations"/>).
     /// </summary>
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     /// <summary>The member every version of the document carries its version in.</summary>
     internal const string VersionMember = "version";
@@ -86,6 +88,15 @@ public static class SaveCodec
     /// </summary>
     internal static readonly IReadOnlyList<string> FarmMembers = ["farmYield", "farmClears", "firstClear", "spoiled"];
 
+    /// <summary>The deaths a run paid for (<see cref="VisitDto.Deaths"/>, <see cref="RunResultDto.Deaths"/>): version 4's, from Phase 7.5.</summary>
+    internal const string DeathsMember = "deaths";
+
+    /// <summary>A run result's outcome (<see cref="RunResultDto.Outcome"/>), which version 4 renames for a wipe.</summary>
+    internal const string OutcomeMember = "outcome";
+
+    /// <summary>A wipe's outcome as version 3 and before wrote it.</summary>
+    internal const string OldWipeOutcome = "Death";
+
     /// <summary>The root member a save's time is written in (<see cref="SaveFile.SavedAt"/>): the document's last.</summary>
     internal const string SavedAtMember = "savedAt";
 
@@ -97,11 +108,12 @@ public static class SaveCodec
 
     /// <summary>
     /// The migrations this build ships, one per version it can lift, in order:
-    /// version 1, the first, to 2 (<see cref="LiftToVersion2"/>), Phase 6a's; and
-    /// version 2 to 3 (<see cref="LiftToVersion3"/>), Phase 6b's.
+    /// version 1, the first, to 2 (<see cref="LiftToVersion2"/>), Phase 6a's;
+    /// version 2 to 3 (<see cref="LiftToVersion3"/>), Phase 6b's; and version 3 to
+    /// 4 (<see cref="LiftToVersion4"/>), Phase 7's.
     /// </summary>
     public static IReadOnlyList<SaveMigration> Migrations { get; } =
-        [new SaveMigration(From: 1, LiftToVersion2), new SaveMigration(From: 2, LiftToVersion3)];
+        [new SaveMigration(From: 1, LiftToVersion2), new SaveMigration(From: 2, LiftToVersion3), new SaveMigration(From: 3, LiftToVersion4)];
 
     /// <summary>
     /// Version 1 to 2 (Phase 6a.1; the v2 hand-off, settled.md): a weapon wears
@@ -241,6 +253,44 @@ public static class SaveCodec
         if (campaign["lastResult"] is JsonObject last)
             foreach (string farm in FarmMembers)
                 last.Remove(farm);   // nor a farm: to version 2 a run's end yielded nothing and spoiled nothing
+        return document;
+    }
+
+    /// <summary>
+    /// Version 3 to 4 (Phase 7.5): one member's death no longer ends the run — the
+    /// fallen get up when the encounter ends — so a wipe's outcome is renamed from
+    /// <c>Death</c> to <see cref="RunOutcome.PartyWipe"/> (PHASE 7 DECISION 2), and
+    /// the deaths a run paid for are recorded, on the visit and on the last result
+    /// (<see cref="DeathsMember"/>), appended with their default. So the step:
+    /// <list type="bullet">
+    /// <item><strong>Renames the outcome</strong> of the campaign's last result, the
+    /// one place a run result is kept: a <c>"Death"</c> string becomes
+    /// <c>"PartyWipe"</c>. Any other value is left as written — a hand's
+    /// <c>"Wibble"</c> is refused by the reader at version 4 by its path, as it
+    /// would have been at version 3.</item>
+    /// <item><strong>Removes the strays</strong>: a <c>deaths</c> a hand gave a
+    /// version-3 visit or last result meant nothing to version 3, where a death
+    /// ended the run, and read at version 4 it would be deaths no run paid for.</item>
+    /// </list>
+    /// The root's <c>tuningHashVersion</c> is left as written, the hash having been
+    /// taken on that version's keys. Pure, and <strong>it never throws on a
+    /// hand-edited document</strong>: a campaign, a last result or a visit that is
+    /// missing or the wrong kind of thing is passed over, and an outcome that is
+    /// no string is left for the reader to refuse where it is.
+    /// </summary>
+    internal static JsonObject LiftToVersion4(JsonObject document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (document["campaign"] is not JsonObject campaign)
+            return document;
+        if (campaign["lastResult"] is JsonObject last)
+        {
+            if (last[OutcomeMember] is JsonValue outcome && outcome.TryGetValue(out string? named) && named == OldWipeOutcome)
+                last[OutcomeMember] = nameof(RunOutcome.PartyWipe);
+            last.Remove(DeathsMember);   // version 3 recorded no death: a death ended the run
+        }
+        if (campaign["visit"] is JsonObject visit)
+            visit.Remove(DeathsMember);
         return document;
     }
 

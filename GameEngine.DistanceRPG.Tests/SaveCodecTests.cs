@@ -59,14 +59,15 @@ public class SaveCodecTests
     public void TheDocumentCarriesItsVersion()
     {
         // PHASE5-027: System.Text.Json "with an explicit version field". This build
-        // writes version 3 (Phase 6b: a member's potions; version 2 was Phase 6a's,
-        // a weapon's wear), first in the document, and reads it back.
-        Assert.Equal(3, SaveCodec.CurrentVersion);
+        // writes version 4 (Phase 7: a wipe's outcome renamed and the run's deaths;
+        // version 3 was Phase 6b's, a member's potions; version 2 Phase 6a's, a
+        // weapon's wear), first in the document, and reads it back.
+        Assert.Equal(4, SaveCodec.CurrentVersion);
         string text = SaveCodec.Write(Sample());
         using (var document = JsonDocument.Parse(text))
         {
             var first = document.RootElement.EnumerateObject().First();
-            Assert.Equal(("version", 3), (first.Name, first.Value.GetInt32()));
+            Assert.Equal(("version", 4), (first.Name, first.Value.GetInt32()));
         }
         Assert.Equal(SaveCodec.CurrentVersion, SaveCodec.Read(text).Version);
 
@@ -114,8 +115,8 @@ public class SaveCodecTests
         campaign.Remove("runCounter");
         string versionZero = old.ToJsonString();
         // Version 1 is the first: this build ships a step from each version since,
-        // 1 to 2 (Phase 6a) and 2 to 3 (Phase 6b), and none from 0.
-        Assert.Equal([1, 2], SaveCodec.Migrations.Select(step => step.From));
+        // 1 to 2 (Phase 6a), 2 to 3 (Phase 6b) and 3 to 4 (Phase 7), and none from 0.
+        Assert.Equal([1, 2, 3], SaveCodec.Migrations.Select(step => step.From));
         var unlifted = Refused(versionZero);
         Assert.Equal("version", unlifted.Where);
         Assert.Contains("no migration", unlifted.Problem, StringComparison.Ordinal);
@@ -175,7 +176,7 @@ public class SaveCodecTests
         var floor = new FloorDto(0, [enemy], ["01"], [new LooseItemDto(Row("tower_guard"), Row: 3, Col: 4)]);
         var visit = new VisitDto("spear_hall", MapSeed: 4, BossFloor: 5, PromisedStacks: 1, FloorIndex: 0, DeepestFloorIndex: 0, Turn: 3,
             BossDefeated: false, BossDefeatedAtTurn: -1, new XpSnapshotDto([]), [], Carry: null, [floor]);
-        var last = new RunResultDto("knife_warrens", "Death", BossDefeated: false, DeepestFloor: 1, BossFloorRevealed: null, ServiceTick: false,
+        var last = new RunResultDto("knife_warrens", "PartyWipe", BossDefeated: false, DeepestFloor: 1, BossFloorRevealed: null, ServiceTick: false,
             MercyTick: false, RunCounter: 2, LockedUntilRun: null, Retired: false, [Row("longbow")], [Row("great_axe")], []);
         var sample = Sample();
         return sample with { Campaign = sample.Campaign with { LastResult = last, Visit = visit } };
@@ -202,14 +203,17 @@ public class SaveCodecTests
     }
 
     /// <summary>
-    /// <paramref name="text"/>, a version-2 document, as version 1 wrote the same
-    /// campaign: version 1, no tuning hash version, and no wear on any weapon row.
+    /// <paramref name="text"/>, a current document, as version 1 wrote the same
+    /// campaign: version 1, no tuning hash version, no wear on any weapon row, and
+    /// a wipe's outcome by version 3's name, <c>Death</c>.
     /// </summary>
     private static JsonObject AsVersion1(string text)
     {
         var tree = Tree(text);
         tree["version"] = 1;
         Assert.True(tree.Remove("tuningHashVersion"));
+        if (Campaign(tree)["lastResult"] is JsonObject last && (string?)last["outcome"] == nameof(RunOutcome.PartyWipe))
+            last["outcome"] = SaveCodec.OldWipeOutcome;
         foreach (var row in WeaponRows(tree).ToList())
         {
             Assert.True(row.Remove("wear"));
@@ -372,7 +376,7 @@ public class SaveCodecTests
         var stepped = SaveCodec.LiftToVersion3(v2.DeepClone().AsObject());
         Assert.True(JsonNode.DeepEquals(v2, stepped), "the step writes nothing: the codec stamps the version");
         var read = SaveCodec.Read(v2.ToJsonString());
-        Assert.Equal((3, 1), (read.Version, read.TuningHashVersion));
+        Assert.Equal((SaveCodec.CurrentVersion, 1), (read.Version, read.TuningHashVersion));
         Assert.Equal(text, SaveCodec.Write(read));
         v2["tuningHashVersion"] = 2;
         Assert.Equal(2, SaveCodec.Read(v2.ToJsonString()).TuningHashVersion);
@@ -744,6 +748,8 @@ public class SaveCodecTests
             typeof(DepositDto), typeof(ServiceDto),
             // Phase 6b: the potions, and those that spoiled at a run's end.
             typeof(PotionDto), typeof(SpoiledPotionDto),
+            // Phase 7: the deaths a run paid for.
+            typeof(RunDeathDto), typeof(PoolCutDto),
         ];
         Assert.Equal(expected.Select(t => t.Name).Order(StringComparer.Ordinal), dtos.Select(t => t.Name).Order(StringComparer.Ordinal));
         Assert.All(dtos, dto =>

@@ -54,7 +54,8 @@ public class PreReworkSaveTests
     /// service reports (Phase 6a.3a) null, the count of deposits made 0, every
     /// member's potions (Phase 6b.1) null, and what the farm did at the last run's
     /// end (Phase 6b.3): nothing yielded at no clears, no first clear and nothing
-    /// spoiled — so the saves have none and the capture
+    /// spoiled, and the deaths a run paid for (Phase 7.5) null on the visit and the
+    /// last result — so the saves have none and the capture
     /// of one restored from them has each at its default. Set aside there, and only
     /// at its default: a capture that wrote one with anything in it differs. A place
     /// ending <c>[*]</c> is every row of that list: <c>$.campaign.party[*]</c> is each
@@ -72,6 +73,8 @@ public class PreReworkSaveTests
         ("$.campaign.lastResult", "firstClear", JsonValue.Create(false)),
         ("$.campaign.lastResult", "spoiled", null),
         ("$.campaign.visit", "dungeonsCleared", JsonValue.Create(EnemyPlacer.Unprotected)),   // beginner protection: an older visit was placed uncapped
+        ("$.campaign.lastResult", "deaths", null),   // Phase 7.5: before it, a death ended the run, so none was recorded
+        ("$.campaign.visit", "deaths", null),
     ];
 
     /// <summary>Whether <paramref name="value"/> is <paramref name="expected"/>'s default as a capture writes it, compared as JSON: null, a number, a word.</summary>

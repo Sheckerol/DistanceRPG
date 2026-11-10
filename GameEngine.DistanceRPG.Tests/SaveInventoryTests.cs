@@ -163,6 +163,8 @@ public class SaveInventoryTests
             new("EntrySnapshot", Kept.Saved, "visit.entrySnapshot: weapon XP by class name, HP XP, mana XP — PHASE4-114"),
             new("_spoils", Kept.Saved, "visit.spoils[] in the order taken, each a locator: a bag slot, or a floor's loose item"),
             new("Spoils", Kept.Derived, "the read-only view of _spoils"),
+            new("_deaths", Kept.Saved, "visit.deaths[] in the order paid, each the member and its cut pool by pool — null for none"),
+            new("Deaths", Kept.Derived, "the read-only view of _deaths"),
             new("DiceRolled", Kept.Saved, "visit.diceRolled: the visit's own die's position, so a reload rolls on exactly where play left off (Phase 5.7)"),
             new("Floors", Kept.Saved, "visit.floors[]: the visited ones restored on their regenerated terrain, the rest generated from the seed"),
             new("Turns", Kept.NotSaved, "reopened by OpenTurns on load, which imports the carry and catches the floor up as an arrival does"),
@@ -224,6 +226,8 @@ public class SaveInventoryTests
             new("TurnCount", Kept.Saved, "visit.turn: OpenTurns opens on it"),
             new("ResurrectionActive", Kept.Derived, "!visit.bossDefeated, set by OpenTurns"),
             new("_seenThisTurn", Kept.Saved, "carry.seen[], sorted"),
+            new("_inView", Kept.Derived, "the saved sight (the current floor's visible tiles), told the system on resume by NotifyEnemyInView"),
+            new("_encounterOpen", Kept.NotSaved, "a reload loses only the end of an encounter nobody fell in; a member saved down still ends it (PHASE 7 DECISION 3)"),
             new("_attacksThisTurn", Kept.Saved, "carry.attacks[], sorted"),
             new("_partyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived by SnapshotZones from where everyone stands, kept true continuously"),
             new("_enemyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived as the party's are"),
@@ -283,6 +287,10 @@ public class SaveInventoryTests
             new("WeaponWornFull", Kept.NotSaved, "an event"),
             new("PotionDrunk", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh for the drink's beat and log line"),
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
+            new("CombatEnded", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
+            new("CharacterRevived", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
+            new("Leader", Kept.NotSaved, "wiring: the scene hands in its active member; the active member is saved in the view"),
+            new("DeathCost", Kept.Derived, "set by OpenTurns: the cut against the visit's saved entry snapshot at the tuning's DeathXpLossPercent"),
         ],
     };
 

@@ -166,6 +166,34 @@ public sealed class TurnSystemTests : IDisposable
     }
 
     [Fact]
+    public void AnEnemyInView_StaysSeen_WhileThePartyStandsStill()
+    {
+        // Sighted once, then never again — nobody crosses a tile — but standing in
+        // view as each enemy turn begins: it counts as seen every turn, so it never
+        // goes passive in plain sight (a member down and the party waiting it out
+        // froze one in place by the way out). Out of view again, it counts up.
+        var grid = new int[20, 30];
+        var a = Char("A", 2 * Tile, 5 * Tile);
+        var enemy = new EnemyState { X = 25 * Tile, Y = 5 * Tile };
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+        turns.NotifyEnemyVisible(enemy, true);
+
+        for (int turn = 0; turn < 3; turn++)
+        {
+            float before = enemy.X;
+            turns.EndTurn();
+            Advance(turns, 4f);
+            Assert.Equal(0, enemy.TurnsSinceSeen);
+            Assert.True(enemy.X < before, $"turn {turn}: the enemy in view stood still");
+        }
+
+        turns.NotifyEnemyVisible(enemy, false);
+        turns.EndTurn();
+        Advance(turns, 4f);
+        Assert.Equal(1, enemy.TurnsSinceSeen);
+    }
+
+    [Fact]
     public void EnemyTurn_UnseenForTwoTurns_DoesNotMove()
     {
         var grid = new int[20, 30];

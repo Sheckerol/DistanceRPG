@@ -1,15 +1,18 @@
 # Phase 7 — Death, revives and the wipe
 
+**Shipped 2026-11-09** (steps 7.1–7.6, each with an *As built* note below where
+it departed from the plan; save version 4).
+
 A new plan on top of the shipped Phases 0–6b. It **replaces the death rules
 §4.4 shipped** — a fallen member stays down for the rest of the run, and only a
 whole-party wipe costs XP (`DeathXpLossPercent` of the run's gain) — with a
 death that costs the fight you are in and a share of the run's XP, and a wipe
 that costs all of it. The decision and its reasons are recorded in
 [settled](settled.md) under *Death, revives and the wipe*, with the user's
-rulings on it (PHASE 7 DECISIONS 1–5, 2026-11-03).
+rulings on it (PHASE 7 DECISIONS 1–5, 2026-11-03, and 6, 2026-11-09).
 
-The older documents keep describing what shipped, with a pointer here at each
-rule this phase changes (§4.4, §5.1, §5.3, §6.1, §6.3).
+The older documents keep their reasoning, with a note at each rule this phase
+changed saying what shipped (§4.4, §5.1, §5.3, §6.1, §6.3).
 
 | | Shipped (Phase 4) | Phase 7 |
 | --- | --- | --- |
@@ -25,8 +28,9 @@ of the turn order, unable to act, a body on the floor, exactly as today. A
 death mid-fight stays a real tactical loss: the fight you are in has to be
 finished, or escaped, three-handed.
 
-**When the encounter ends, they revive** at full HP — mana as it was when they
-fell, capped at their new maximum (PHASE 7 DECISION 4) — and pay for it in XP:
+**When the encounter ends, they revive** at **1 HP** (PHASE 7 DECISION 6) — mana
+as it was when they fell, capped at their new maximum (PHASE 7 DECISION 4) — and
+pay for it in XP:
 
 ```
 runGain    = currentXp − snapshotXp        # per pool, per member
@@ -44,9 +48,24 @@ Only the member who fell pays. The rest of the party keeps everything.
 
 **Why:** "dead for the rest of the run" was a death spiral the player could not
 climb out of — one member down makes every later fight harder, which makes the
-next death likelier. A cost in XP keeps the party at full strength and puts the
-cost where §4.4 already puts its risk: the deeper and longer the run, the more a
-death costs, because there is more run gain to halve.
+next death likelier. A cost in XP keeps the party whole and puts the cost where
+§4.4 already puts its risk: the deeper and longer the run, the more a death
+costs, because there is more run gain to halve.
+
+### Getting up at 1 HP
+
+A revived member stands, but barely (PHASE 7 DECISION 6). Death isn't a free
+heal: the party has to spend something to bring them back up — a Renewal cast, a
+health potion, or the next entry's rest — before the next fight, or walk into it
+with a member one hit from going down again. Two things follow from the rules
+already in place:
+
+- **Healing them back feeds HP XP** (§2.2: `hpXp += hpRestored`), so part of
+  what the death cut took is earned back by doing the healing. That's a small
+  consolation, and it goes to the member who needed the healing.
+- **A second death in a row costs less** because the first cut already halved
+  the run gain (§7.1, below). A member left at 1 HP who falls again pays half of
+  what is left, not half of the original.
 
 ### Repeat deaths get cheaper, and that is accepted
 
@@ -84,6 +103,13 @@ free tile beside the active character (the march leader), preferring a point
 *behind* the leader along the trail just walked (`MarchingLine.PointBehind`),
 spiralling out to the nearest tile that clears `GridCollision` if that is
 blocked.
+
+*As built (step 3):* the march trail is the scene's and restarts the moment
+marching does, so after a fight there is no trail to read. A revived member gets
+up on the nearest free floor tile to the leader instead: breadth-first from the
+leader's tile, crossing floor only, so it is never through a wall. Members
+revived together fill tiles in roster order. The march's "tuck in behind"
+closes the line up from there.
 
 This matters most for a retreat: the bodies are back in the fight the party ran
 from. Reviving in place would put a member there, and marching would drag the
@@ -147,7 +173,7 @@ save's `ActorDto.Alive`, which already records a member down mid-encounter.
   same check runs on floor arrival. The scene subscribes to grant marching and
   play the revive, instead of deciding "no enemy in view" itself.
 - **The revive** (`TurnSystem`, on `CombatEnded`): for each fallen member — HP to
-  the (new) full, `Alive = true`, mana clamped to `UsableMaxMana`, status effects
+  1 (never above the new maximum, which is always at least 1), `Alive = true`, mana clamped to `UsableMaxMana`, status effects
   already shed at death, XP cut through a per-member `XpSnapshot.ClawBack`
   overload at `DeathXpLossPercent`, position from `MarchingLine.PointBehind` (the
   scene hands the leader's trail point in, or Logic finds the nearest free tile
@@ -184,7 +210,7 @@ touches `MapGenerator`, `Mulberry32` or `Pathfinder`, and no RNG stream is added
    marching grant reads it (spacing test kept for marching only). No revive yet:
    behaviour is unchanged, and existing marching tests still pass.
 2. **7.2 — The per-death cut.** Per-member `XpSnapshot.ClawBack`; the revive on
-   `CombatEnded` (HP, alive, mana clamp, XP cut); `CharacterRevived`. Tests: half
+   `CombatEnded` (HP to 1, alive, mana clamp, XP cut); `CharacterRevived`. Tests: revived at exactly 1 HP; half
    the gain per pool, truncation, repeat deaths halving what is left, nothing
    below the snapshot, only the fallen pay, `DeathXpLossPercent` 0 and 100.
 3. **7.3 — Where they get up.** Revive position behind the leader with the
@@ -200,6 +226,22 @@ touches `MapGenerator`, `Mulberry32` or `Pathfinder`, and no RNG stream is added
    save with a fallen member round-trips and revives on the next turn start. The
    pinned pre-rework and Phase 6a saves, and a version 3 save with a `"Death"`
    result, still load.
+   *As built (step 5):* every death goes through one door, `DungeonState.PayDeath`
+   (the encounter's end through `TurnSystem.DeathCost`, and a body carried out
+   through `CampaignState.EndRun`), which cuts and records a `RunDeath` — the
+   member and its pool cuts — on `DungeonState.Deaths`; the run's result carries
+   them all (`RunResult.Deaths`, a wipe's reset staying `Clawbacks`). Saved as
+   `deaths` on the visit and the last result, each `{ memberId, cuts: [{ pool,
+   before, after }] }`, null while empty. `SaveConsistency` check 36 holds the
+   visit's to the door and the pools now, and check 37 the last result's to
+   themselves; both chain pool by pool (a member's next death finds at least what
+   its last left). The summary tells a line a member who died
+   (`B DIED 2 TIMES: SWORD -10, HP -4`), and the wipe's headline is `PARTY WIPE`.
+   *As built (step 6):* the revive floats `REVIVED` and the levels the cut took
+   (`DungeonHud.RevivedText`: a class's ladder levels and the pools' points,
+   each replayed before and after the cut), or `REVIVED` alone when it crossed
+   none; settled.md's Phase 7 section is marked shipped, and §4.4, §5.1, §5.3,
+   §6.1 and §6.3 say what shipped.
 6. **7.6 — HUD and docs.** The `REVIVED` float text; settled.md's PHASE 7
    decisions marked shipped; the pointers in §4.4, §5.1, §5.3, §6.1, §6.3 updated
    from "Phase 7 replaces this" to the shipped wording.

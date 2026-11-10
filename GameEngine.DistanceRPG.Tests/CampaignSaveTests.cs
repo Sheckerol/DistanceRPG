@@ -841,7 +841,7 @@ public sealed class CampaignSaveTests : IDisposable
             campaign = restored;
         }
 
-        Assert.Equal([RunOutcome.BossKill, RunOutcome.BossKill, RunOutcome.Retreat, RunOutcome.Death], outcomes.Select(r => r.Outcome));
+        Assert.Equal([RunOutcome.BossKill, RunOutcome.BossKill, RunOutcome.Retreat, RunOutcome.PartyWipe], outcomes.Select(r => r.Outcome));
         Assert.True(outcomes[0].Retired);
         Assert.Single(outcomes[1].SpoilsKept);
         Assert.NotNull(outcomes[1].LockedUntilRun);

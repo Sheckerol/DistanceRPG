@@ -84,6 +84,59 @@ public sealed class TurnSystem
     /// <summary>True once any still-living enemy has been seen this turn — the combat-footing signal.</summary>
     public bool AnyLiveEnemySeenThisTurn => _seenThisTurn.Any(e => e.Alive);
 
+    /// <summary>
+    /// Enemies standing on a lit tile right now, kept on both edges
+    /// (<see cref="NotifyEnemyInView"/>) — unlike <see cref="_seenThisTurn"/>,
+    /// which only ever grows within a turn. The scene's fog is the only thing that
+    /// knows what is lit, so this is what it last said.
+    /// </summary>
+    private readonly HashSet<EnemyState> _inView = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A live enemy is in view now: the party is in combat mode (§7.2).</summary>
+    public bool AnyLiveEnemyInView => _inView.Any(e => e.Alive);
+
+    /// <summary>
+    /// A live enemy has been sighted since the last encounter check
+    /// (<see cref="CheckEncounterEnd"/>): an encounter is open. Not saved — a
+    /// reload only loses the end of an encounter nobody fell in, which nothing
+    /// acts on; a member saved down still has the check find them.
+    /// </summary>
+    private bool _encounterOpen;
+
+    /// <summary>
+    /// The encounter is over (§7.2): raised by <see cref="CheckEncounterEnd"/> at
+    /// a player turn's start, or on a floor arrival, when no live enemy is in
+    /// view and either an enemy was sighted since the last check or a member is
+    /// down. Raised before the members' budgets refill and before
+    /// <see cref="PlayerTurnStarted"/>.
+    /// </summary>
+    public event Action? CombatEnded;
+
+    /// <summary>
+    /// A fallen member got up as the encounter ended (§7.1): at 1 HP (PHASE 7
+    /// DECISION 6), mana as it was capped at the new maximum, and the XP the
+    /// revive cost — every pool that lost anything (<see cref="DeathCost"/>), empty
+    /// when there was no run gain left to lose. Raised before
+    /// <see cref="CombatEnded"/>, one member at a time, in roster order.
+    /// </summary>
+    public event Action<PartyMemberState, IReadOnlyList<XpClawback>>? CharacterRevived;
+
+    /// <summary>
+    /// What a revive costs the member (§7.1): the visit's per-death cut, a share
+    /// of each pool's gain since the entry snapshot, applied and returned
+    /// (<see cref="DungeonState.OpenTurns"/> sets it). Null — a system built
+    /// outside a visit — and a revive costs nothing.
+    /// </summary>
+    public Func<PartyMemberState, IReadOnlyList<XpClawback>>? DeathCost { get; set; }
+
+    /// <summary>
+    /// Who leads the party (§7.3): the member the player is moving, which only the
+    /// scene knows, so it hands this in. A revived member gets up beside them. Null,
+    /// or a leader who is down, and the first living member in roster order leads —
+    /// the member a turn's start hands the lead to.
+    /// </summary>
+    public Func<PartyMemberState?>? Leader { get; set; }
+
     // ── Events for the presentation layer ────────────────────────────────────
     public event Action<float>? TurnEnded;                                 // total movement banked
     public event Action? PlayerTurnStarted;
@@ -518,14 +571,139 @@ public sealed class TurnSystem
             RefreshZoneOf(actor);
     }
 
-    /// <summary>Scene calls this whenever an enemy's tile visibility changes.</summary>
+    /// <summary>
+    /// Scene calls this whenever an enemy's tile visibility changes: a sighting,
+    /// counted as seen this turn, and the in-view set on both edges.
+    /// </summary>
     public void NotifyEnemyVisible(EnemyState enemy, bool visible)
     {
+        NotifyEnemyInView(enemy, visible);
         if (!visible) return;
         // Seeing an enemy during the enemy turn also counts (the prototype
         // updates visibility while enemies walk).
         if (Phase is TurnPhase.Player or TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking)
             _seenThisTurn.Add(enemy);
+    }
+
+    /// <summary>
+    /// Whether an enemy stands on a lit tile now, without counting it as a
+    /// sighting: the in-view set alone. The scene's lighting of a resumed turn
+    /// says this much and no more, since the turn's sightings came back with its
+    /// counters (<see cref="NotifyEnemyVisible"/> is the sighting).
+    /// </summary>
+    public void NotifyEnemyInView(EnemyState enemy, bool visible)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        if (!visible)
+        {
+            _inView.Remove(enemy);
+            return;
+        }
+        _inView.Add(enemy);
+        if (enemy.Alive)
+            _encounterOpen = true;
+    }
+
+    /// <summary>
+    /// The encounter's end (§7.2): no live enemy in view, and an encounter open
+    /// or a member down — then every fallen member revives (<see cref="Revive"/>),
+    /// the zones are re-read with them standing, <see cref="CombatEnded"/> is
+    /// raised, and the encounter is closed. Runs at every player turn's start (<see cref="StartPlayerTurn"/>)
+    /// and is called by the scene on a floor arrival once the arrival's lighting
+    /// has told this system who is in view; a resumed turn is not an arrival, so
+    /// a member saved down revives at the next turn's start (PHASE 7 DECISION 3).
+    /// Ignores marching's spacing test, which decides whether the line forms,
+    /// not whether the fight is over.
+    /// </summary>
+    /// <returns>True if the encounter ended here.</returns>
+    public bool CheckEncounterEnd()
+    {
+        if (Phase == TurnPhase.GameOver || AnyLiveEnemyInView) return false;
+        bool anyDown = _party.Any(member => !member.Alive);
+        if (!_encounterOpen && !anyDown) return false;
+
+        _encounterOpen = false;
+        if (anyDown)
+        {
+            foreach (var member in _party)
+                if (!member.Alive)
+                    Revive(member);
+            SnapshotZones();   // a member back up is in reach again, on both sides; standing inside never fires
+        }
+        CombatEnded?.Invoke();
+        return true;
+    }
+
+    /// <summary>
+    /// A fallen member gets up (§7.1): the death's XP cut first
+    /// (<see cref="DeathCost"/>), since the maxima are derived from XP; then
+    /// standing, at 1 HP (PHASE 7 DECISION 6) — never above a maximum, which is
+    /// always at least 1 — and mana as it was, capped at the new
+    /// <see cref="ActorState.UsableMaxMana"/> (PHASE 7 DECISION 4). Statuses were
+    /// shed at death. It gets up beside the leader, not where it fell (§7.3):
+    /// the bodies lie in the fight the party may have run from. The budget is
+    /// refilled by the turn's start, as every living member's is.
+    /// </summary>
+    private void Revive(PartyMemberState member)
+    {
+        var clawbacks = DeathCost?.Invoke(member) ?? Array.Empty<XpClawback>();
+        (member.X, member.Y) = RevivalPlace(member);
+        StandUp(member);
+        CharacterRevived?.Invoke(member, clawbacks);
+    }
+
+    /// <summary>
+    /// A fallen member stands, its death's cut already taken: at 1 HP (PHASE 7
+    /// DECISION 6), never above a maximum, and mana as it was capped at the
+    /// <see cref="ActorState.UsableMaxMana"/> the cut left (PHASE 7 DECISION 4).
+    /// The one rule a revive in a fight's end and a body carried out the way out
+    /// (<see cref="CampaignState.EndRun"/>) both stand by.
+    /// </summary>
+    internal static void StandUp(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        member.Alive = true;
+        member.Hp = Math.Min(1, member.MaxHp);
+        member.Mana = Math.Min(member.Mana, member.UsableMaxMana);
+    }
+
+    /// <summary>
+    /// Where a revived member gets up (§7.3): the centre of the nearest floor tile
+    /// to the leader where it overlaps no living body — breadth-first from the
+    /// leader's own tile across floor only (<see cref="GridUtils.NearestFreeTile"/>),
+    /// so it is in the leader's room or corridor and never through a wall. Members
+    /// revived together fill the tiles in roster order, each one standing before
+    /// the next looks. With nobody standing to lead (a wipe never gets here), where
+    /// it fell.
+    /// <para>
+    /// The plan preferred a point behind the leader along the march trail; the
+    /// trail is the scene's, and it restarts the moment marching does, so after a
+    /// fight there is none to read. The nearest free tile is what the march's
+    /// "tuck in behind" then closes up from.
+    /// </para>
+    /// </summary>
+    private (float X, float Y) RevivalPlace(PartyMemberState member)
+    {
+        var leader = Leader?.Invoke() is { Alive: true } chosen && chosen != member
+            ? chosen
+            : _party.FirstOrDefault(m => m.Alive);
+        if (leader is null) return (member.X, member.Y);
+
+        var (r, c) = GridUtils.NearestFreeTile(_grid, TileOf(leader.X, leader.Y),
+            tile => _party.Any(m => m.Alive && Overlaps(m, tile)) || _enemies.Any(e => e.Alive && Overlaps(e, tile)));
+        return Centre(r, c);
+
+        // Taken where the member, stood at the tile's centre, would overlap a
+        // living body: a body off its tile's centre, or one wider than a tile (a
+        // boss's), reaches into the tiles around it.
+        bool Overlaps(ActorState body, (int R, int C) tile)
+        {
+            var (x, y) = Centre(tile.R, tile.C);
+            float dx = body.X - x, dy = body.Y - y, reach = body.Radius + member.Radius;
+            return dx * dx + dy * dy < reach * reach;
+        }
+
+        static (float X, float Y) Centre(int row, int col) => ((col + 0.5f) * GameConstants.Tile, (row + 0.5f) * GameConstants.Tile);
     }
 
     // ── Player actions ───────────────────────────────────────────────────────
@@ -935,11 +1113,16 @@ public sealed class TurnSystem
         // The enemy side's turn starts: its chosen attacks are counted afresh.
         _attacksThisTurn.Clear();
 
-        // Seen bookkeeping happens once for everyone, before anyone acts.
+        // Seen bookkeeping happens once for everyone, before anyone acts. An
+        // enemy standing in view as the enemy turn begins is seen, sighted this
+        // turn or not: a party that stands still all turn — waiting out a fight
+        // with a member down, say — never crosses a tile to sight it, and an
+        // enemy in plain view left to count as unseen would go passive after two
+        // turns and freeze where it stood, the encounter never able to end.
         foreach (var enemy in _enemies)
         {
             if (!enemy.Alive) continue;
-            if (_seenThisTurn.Contains(enemy))
+            if (_seenThisTurn.Contains(enemy) || _inView.Contains(enemy))
                 enemy.TurnsSinceSeen = 0;
             else
                 enemy.TurnsSinceSeen++;
@@ -1463,6 +1646,11 @@ public sealed class TurnSystem
         foreach (var roster in _rosters)
             foreach (var actor in roster)
                 actor.HeldShots = 0;
+
+        // The encounter's end (§7.2), after resurrections — a dummy getting up in
+        // sight keeps the fight on — and before the zones arm and the budgets
+        // refill, so a revived member stands in both.
+        CheckEncounterEnd();
         SnapshotZones();
 
         // The player phase opens for every member, the fallen included — the

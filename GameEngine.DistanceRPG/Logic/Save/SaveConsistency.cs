@@ -244,6 +244,23 @@ internal static class SaveConsistency
                     $"a potion is carried and every dungeon this campaign has cleared is retired: the alchemist arrives with the first clear of a dungeon besides the tutorial, and mixes nothing before");
     }
 
+    /// <summary>The place of the member <paramref name="id"/> in the party: the mapper has already refused a death naming none.</summary>
+    private static int IndexOf(IReadOnlyList<MemberDto> party, string id)
+    {
+        for (int i = 0; i < party.Count; i++)
+            if (party[i].Id == id)
+                return i;
+        throw new InvalidOperationException($"'{id}' is no member of the party: the mapper refuses a death naming none before the cross-checks run.");
+    }
+
+    /// <summary>A pool's XP by its name (<see cref="XpSnapshot.HpPool"/>, <see cref="XpSnapshot.ManaPool"/>, or a weapon class, at 0 when unwritten).</summary>
+    private static int Pool(IReadOnlyDictionary<string, int> weaponXp, int hpXp, int manaXp, string pool) => pool switch
+    {
+        XpSnapshot.HpPool => hpXp,
+        XpSnapshot.ManaPool => manaXp,
+        _ => weaponXp.TryGetValue(pool, out int xp) ? xp : 0,
+    };
+
     /// <summary>4. No run has ended: only a run's end moves the counter or clears a dungeon, and it always writes the summary.</summary>
     private static void NoRunEnded(CampaignDto campaign)
     {
@@ -263,9 +280,9 @@ internal static class SaveConsistency
     private static void LastRun(CampaignDto campaign, RunResultDto last, HashSet<string> cleared, HashSet<string> retired, Dictionary<string, int> locks)
     {
         const string at = $"{At}.lastResult";
-        bool wiped = last.Outcome == nameof(RunOutcome.Death);
+        bool wiped = last.Outcome == nameof(RunOutcome.PartyWipe);
 
-        // 5. The outcome: a wipe is a death; walking out, a boss kill exactly when the boss is down.
+        // 5. The outcome: a wipe is a party wipe; walking out, a boss kill exactly when the boss is down.
         if (last.Outcome == nameof(RunOutcome.BossKill) && !last.BossDefeated)
             throw new SaveFormatException($"{at}.outcome",
                 "BossKill with the boss standing: a run is a boss kill only when the party walks out with the boss down");
@@ -366,13 +383,49 @@ internal static class SaveConsistency
         if (last.Retired && !retired.Contains(last.DungeonId))
             throw new SaveFormatException($"{at}.dungeonId",
                 $"{last.DungeonId} is not retired and its last run retired it: a retiring clear records it retired");
+
+        // 37. The deaths the run paid for, each a cut that took something, chained
+        // pool by pool (DeathChain). Against nothing else: a wipe reset every pool
+        // after them, and the next entry's door is taken after both.
+        DeathChain(last.Deaths, $"{at}.deaths");
     }
 
     /// <summary>
-    /// 15–20. The visit in progress, against the campaign that entered it and
+    /// 36–37's walk over the deaths a run paid for, in the order paid: each cut
+    /// takes something from its pool — a cut that took nothing is not recorded
+    /// (<see cref="XpSnapshot.ClawBack"/> lists a pool only when it lost XP) — and,
+    /// pool by pool, a member's next death finds at least what its last left,
+    /// since between two deaths a visit only adds XP.
+    /// </summary>
+    /// <returns>What each member's pool held after its last cut, by member and pool.</returns>
+    private static Dictionary<(string Member, string Pool), (int After, string At)> DeathChain(IReadOnlyList<RunDeathDto>? deaths, string at)
+    {
+        var left = new Dictionary<(string Member, string Pool), (int After, string At)>();
+        var rows = deaths ?? [];
+        for (int i = 0; i < rows.Count; i++)
+            for (int j = 0; j < rows[i].Cuts.Count; j++)
+            {
+                var cut = rows[i].Cuts[j];
+                string where = $"{at}[{i}].cuts[{j}]";
+                if (cut.After >= cut.Before)
+                    throw new SaveFormatException($"{where}.after",
+                        $"{cut.After} is not below what the pool held, {cut.Before}: the cut of a death takes XP from a pool, and one it took nothing from is not recorded");
+                var key = (rows[i].MemberId, cut.Pool);
+                if (left.TryGetValue(key, out var before) && cut.Before < before.After)
+                    throw new SaveFormatException($"{where}.before",
+                        $"{cut.Before} is below the {before.After} the {cut.Pool} pool of {rows[i].MemberId} kept at its last death ({before.At}): between two deaths a visit only adds XP");
+                left[key] = (cut.After, where);
+            }
+        return left;
+    }
+
+    /// <summary>
+    /// 15–20 and 36. The visit in progress, against the campaign that entered it and
     /// against itself: entered as <see cref="CampaignState.Enter"/> enters, played
-    /// as a visit plays — XP only gained, the boss down for good once it falls, a
-    /// drop handed over only then, and no weapon worn that no member wielded.
+    /// as a visit plays — XP only gained but for a death's cut, which takes a share
+    /// of the run's gain and never what was held at the door, the boss down for good
+    /// once it falls, a drop handed over only then, and no weapon worn that no
+    /// member wielded.
     /// </summary>
     private static void Visit(CampaignDto campaign, VisitDto visit, HashSet<string> retired, Dictionary<string, int> locks)
     {
@@ -397,6 +450,33 @@ internal static class SaveConsistency
                 NoMoreThanNow(xp, member.WeaponXp.TryGetValue(name, out int now) ? now : 0, member.Id, $"{where}.weaponXp.{name}");
             NoMoreThanNow(door[i].HpXp, member.HpXp, member.Id, $"{where}.hpXp");
             NoMoreThanNow(door[i].ManaXp, member.ManaXp, member.Id, $"{where}.manaXp");
+        }
+
+        // 36. The deaths paid so far (Phase 7.5): chained pool by pool (DeathChain);
+        // a cut never takes a pool below the door, which it takes a share of the gain
+        // past; and since the last cut the visit has only added XP, so every pool
+        // holds at least what its last death left. The walk has matched the snapshot
+        // to the party in roster order, and every death names a member.
+        var deaths = visit.Deaths ?? [];
+        for (int i = 0; i < deaths.Count; i++)
+        {
+            int k = IndexOf(campaign.Party, deaths[i].MemberId);
+            for (int j = 0; j < deaths[i].Cuts.Count; j++)
+            {
+                var cut = deaths[i].Cuts[j];
+                int atDoor = k < door.Count ? Pool(door[k].WeaponXp, door[k].HpXp, door[k].ManaXp, cut.Pool) : 0;
+                if (cut.After < atDoor)
+                    throw new SaveFormatException($"{at}.deaths[{i}].cuts[{j}].after",
+                        $"{cut.After} is below the {atDoor} the {cut.Pool} pool of {deaths[i].MemberId} held at the door: a death takes a share of the gain of the run, never what the member walked in with");
+            }
+        }
+        foreach (var ((memberId, pool), (after, where)) in DeathChain(visit.Deaths, $"{at}.deaths"))
+        {
+            var member = campaign.Party[IndexOf(campaign.Party, memberId)];
+            int now = Pool(member.WeaponXp, member.HpXp, member.ManaXp, pool);
+            if (now < after)
+                throw new SaveFormatException(where,
+                    $"the {pool} pool of {memberId} holds {now}, below the {after} its last death left: after the cut of a death a visit only adds XP");
         }
 
         // 17. The promise is a stack a floor past the offset, and the offset is never negative.

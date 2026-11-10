@@ -18,7 +18,7 @@ public enum RunEnding
 /// <summary>
 /// The three ways a run ends (§4.4, "three outcomes, not two"), in the doc's
 /// table's order. Only one of them should feel like nothing happened, and
-/// retreat and death share the mercy tick without sharing an XP outcome.
+/// retreat and a party wipe share the mercy tick without sharing an XP outcome.
 /// </summary>
 public enum RunOutcome
 {
@@ -28,9 +28,26 @@ public enum RunOutcome
     /// <summary>Out alive with the boss standing: nothing dropped to keep, the XP kept, and a mercy tick only for having got three floors down.</summary>
     Retreat,
 
-    /// <summary>The party wiped: the loot is lost, a share of the run's XP gain is clawed back, and the run ticks as its depth and the boss earned.</summary>
-    Death,
+    /// <summary>
+    /// The party wiped — every member down in one encounter (§7.4): the loot is
+    /// lost, every XP pool is reset to the door, and the run ticks as its depth
+    /// and the boss earned. Saved by name; version 3 and before called it
+    /// <c>Death</c>, which <see cref="SaveCodec.LiftToVersion4"/> renames (PHASE 7
+    /// DECISION 2: one member's death is no longer the run's end).
+    /// </summary>
+    PartyWipe,
 }
+
+/// <summary>
+/// One death the run paid for (§7.1, §7.5): a fallen member got back up — the
+/// encounter ended, or the party carried the body out — and its cut took
+/// <see cref="Tuning.DeathXpLossPercent"/> of each pool's run gain. Kept by the
+/// visit in the order paid (<see cref="DungeonState.Deaths"/>) and handed to the
+/// run's result for its summary.
+/// </summary>
+/// <param name="MemberId">The member who died, by roster id.</param>
+/// <param name="Clawbacks">What the cut took from each pool, in <see cref="XpSnapshot.ClawBack"/>'s order: empty when the member had no run gain left to lose.</param>
+public sealed record RunDeath(string MemberId, IReadOnlyList<XpClawback> Clawbacks);
 
 /// <summary>
 /// One member's XP pools as they stood when the party stepped into the dungeon
@@ -48,10 +65,10 @@ public sealed record MemberXp(string MemberId, IReadOnlyList<int> WeaponXp, int 
 /// The party's XP at the moment it stepped into the dungeon (§4.4:
 /// "Party XP pools ... are captured the moment the party steps into the
 /// dungeon"), held by the visit (<see cref="DungeonState.EntrySnapshot"/>) —
-/// the object §5.1's Run group is — and discarded with it. A wipe rolls each
-/// pool back by <see cref="Tuning.DeathXpLossPercent"/> of its gain since this
-/// (<see cref="ClawBack"/>); any other ending leaves it untouched and it goes
-/// with the visit.
+/// the object §5.1's Run group is — and discarded with it. Each death claws a
+/// member's pools back by <see cref="Tuning.DeathXpLossPercent"/> of its gain
+/// since this (<see cref="ClawBack"/>, §7.1), and a wipe resets every pool to it
+/// (§7.4); it goes with the visit.
 /// <para>
 /// A copy of plain integers, never a reference to a live pool — which is what
 /// §2.2's pools being cumulative numbers bought — so nothing a member does in
@@ -169,7 +186,7 @@ public sealed record XpClawback(string MemberId, string Pool, int Before, int Af
 /// <param name="Retired">Whether the clear retired the dungeon for good (the tutorial, §4.3).</param>
 /// <param name="SpoilsKept">This run's pickups carried home: the ones still in a bag on the way out.</param>
 /// <param name="SpoilsLost">This run's pickups a wipe took out of the bags.</param>
-/// <param name="Clawbacks">What a wipe took back from each pool; empty on any other ending.</param>
+/// <param name="Clawbacks">What a wipe's reset took back from each pool; empty on any other ending.</param>
 /// <param name="Services">
 /// What the run's end did at the enchanter (§6.2, §6.3; Phase 6a.3a): a report for
 /// every deposit that was in the shop as the run ended, in deposit order — each
@@ -195,11 +212,18 @@ public sealed record XpClawback(string MemberId, string Pool, int Before, int Af
 /// writes and reads back. A potion is a consumable, not gear: it is lost by its
 /// lifetime, never forfeited by a wipe, so a wipe still takes no gear carried in.
 /// </param>
+/// <param name="Deaths">
+/// Every death the run paid for, in the order paid (<see cref="DungeonState.Deaths"/>,
+/// Phase 7.5): each fallen member that got up — the encounter ended, or the body
+/// was carried out — and what its cut took; a wipe's reset is
+/// <see cref="Clawbacks"/>, never one of these. Null when nobody died, which is
+/// what a save writes and reads back. Appended, with its default.
+/// </param>
 public sealed record RunResult(string DungeonId, RunOutcome Outcome, bool BossDefeated, int DeepestFloor, int? BossFloorRevealed,
     bool ServiceTick, bool MercyTick, int RunCounter, int? LockedUntilRun, bool Retired,
     IReadOnlyList<Weapon> SpoilsKept, IReadOnlyList<Weapon> SpoilsLost, IReadOnlyList<XpClawback> Clawbacks,
     IReadOnlyList<ServiceReport>? Services = null, int FarmYield = 0, int FarmClears = 0, bool FirstClear = false,
-    IReadOnlyList<Potion>? Spoiled = null);
+    IReadOnlyList<Potion>? Spoiled = null, IReadOnlyList<RunDeath>? Deaths = null);
 
 /// <summary>
 /// What one run's end did with one deposit at the enchanter (§6.2, §6.3; Phase

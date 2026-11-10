@@ -93,7 +93,7 @@ public sealed class DungeonListingTests : IDisposable
         Assert.Equal(new[] { "tutorial" }, IdsOf(Listed(campaign)));
 
         visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
-        Assert.Equal(RunOutcome.Death, CampaignRuns.Wipe(campaign, visit.OpenTurns(campaign.Party, CampaignRuns.Ten)).Outcome);
+        Assert.Equal(RunOutcome.PartyWipe, CampaignRuns.Wipe(campaign, visit.OpenTurns(campaign.Party, CampaignRuns.Ten)).Outcome);
         Assert.Equal(new DungeonListing(tutorial, true, 0, false), Assert.Single(Listed(campaign)));
 
         // Not even a dungeon entered by other means and cleared opens the hub early
