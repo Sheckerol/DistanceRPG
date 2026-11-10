@@ -1113,11 +1113,16 @@ public sealed class TurnSystem
         // The enemy side's turn starts: its chosen attacks are counted afresh.
         _attacksThisTurn.Clear();
 
-        // Seen bookkeeping happens once for everyone, before anyone acts.
+        // Seen bookkeeping happens once for everyone, before anyone acts. An
+        // enemy standing in view as the enemy turn begins is seen, sighted this
+        // turn or not: a party that stands still all turn — waiting out a fight
+        // with a member down, say — never crosses a tile to sight it, and an
+        // enemy in plain view left to count as unseen would go passive after two
+        // turns and freeze where it stood, the encounter never able to end.
         foreach (var enemy in _enemies)
         {
             if (!enemy.Alive) continue;
-            if (_seenThisTurn.Contains(enemy))
+            if (_seenThisTurn.Contains(enemy) || _inView.Contains(enemy))
                 enemy.TurnsSinceSeen = 0;
             else
                 enemy.TurnsSinceSeen++;
