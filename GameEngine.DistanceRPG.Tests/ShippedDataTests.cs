@@ -31,7 +31,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// ship with the friendly-fire switch off until the placement scorer exists
 /// (settled.md L134-136):
 /// <see cref="WandTests.FriendlyFire_OffByDefault_HalfWhenOn"/>.</item>
-/// <item>The eight class rows, the thirty-two weapons' statlines and spreads, the
+/// <item>The eight class rows, the thirty-two weapons' statlines (bar range, the
+/// user's to tune — their ruling of 2026-11-09) and spreads, the
 /// staves' own mana and the wands' shapes — phase-1-weapons.md §1.2–§1.4 (the
 /// costs at L131-138, the staves at L642-647, the wands at L897-902):
 /// <see cref="WeaponContentTests.Statlines_MatchTheTables"/>,
