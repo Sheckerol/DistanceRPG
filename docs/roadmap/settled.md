@@ -4510,7 +4510,13 @@ see [phase-7-death](phase-7-death.md).
 - **PHASE 7 DECISION 4 — a revived member's mana (§7.1), ruled 2026-11-03.**
   As it was when they fell, capped at their new `UsableMaxMana`. Only HP is
   refilled: dying never tops up a caster better than the members who survived.
+  (HP is restored only to 1 since DECISION 6.)
 - **PHASE 7 DECISION 5 — when a revive happens (§7.2), ruled 2026-11-03.** At
   the start of the player turn that finds no live enemy in view — the moment the
   game already drops into movement mode — never mid-turn when the last enemy in
   view falls.
+- **PHASE 7 DECISION 6 — a revived member gets up at 1 HP (§7.1), ruled
+  2026-11-09.** Replaces "full HP". Dying is never a free heal: the party pays
+  for the member's recovery with a cast, a potion or the next entry's rest, or
+  takes them into the next fight one hit from going down again. Healing them
+  back feeds their HP XP as any healing does (§2.2).

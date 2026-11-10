@@ -25,8 +25,9 @@ of the turn order, unable to act, a body on the floor, exactly as today. A
 death mid-fight stays a real tactical loss: the fight you are in has to be
 finished, or escaped, three-handed.
 
-**When the encounter ends, they revive** at full HP — mana as it was when they
-fell, capped at their new maximum (PHASE 7 DECISION 4) — and pay for it in XP:
+**When the encounter ends, they revive** at **1 HP** (PHASE 7 DECISION 6) — mana
+as it was when they fell, capped at their new maximum (PHASE 7 DECISION 4) — and
+pay for it in XP:
 
 ```
 runGain    = currentXp − snapshotXp        # per pool, per member
@@ -44,9 +45,24 @@ Only the member who fell pays. The rest of the party keeps everything.
 
 **Why:** "dead for the rest of the run" was a death spiral the player could not
 climb out of — one member down makes every later fight harder, which makes the
-next death likelier. A cost in XP keeps the party at full strength and puts the
-cost where §4.4 already puts its risk: the deeper and longer the run, the more a
-death costs, because there is more run gain to halve.
+next death likelier. A cost in XP keeps the party whole and puts the cost where
+§4.4 already puts its risk: the deeper and longer the run, the more a death
+costs, because there is more run gain to halve.
+
+### Getting up at 1 HP
+
+A revived member stands, but barely (PHASE 7 DECISION 6). Death isn't a free
+heal: the party has to spend something to bring them back up — a Renewal cast, a
+health potion, or the next entry's rest — before the next fight, or walk into it
+with a member one hit from going down again. Two things follow from the rules
+already in place:
+
+- **Healing them back feeds HP XP** (§2.2: `hpXp += hpRestored`), so part of
+  what the death cut took is earned back by doing the healing. That's a small
+  consolation, and it goes to the member who needed the healing.
+- **A second death in a row costs less** because the first cut already halved
+  the run gain (§7.1, below). A member left at 1 HP who falls again pays half of
+  what is left, not half of the original.
 
 ### Repeat deaths get cheaper, and that is accepted
 
@@ -147,7 +163,7 @@ save's `ActorDto.Alive`, which already records a member down mid-encounter.
   same check runs on floor arrival. The scene subscribes to grant marching and
   play the revive, instead of deciding "no enemy in view" itself.
 - **The revive** (`TurnSystem`, on `CombatEnded`): for each fallen member — HP to
-  the (new) full, `Alive = true`, mana clamped to `UsableMaxMana`, status effects
+  1 (never above the new maximum, which is always at least 1), `Alive = true`, mana clamped to `UsableMaxMana`, status effects
   already shed at death, XP cut through a per-member `XpSnapshot.ClawBack`
   overload at `DeathXpLossPercent`, position from `MarchingLine.PointBehind` (the
   scene hands the leader's trail point in, or Logic finds the nearest free tile
@@ -184,7 +200,7 @@ touches `MapGenerator`, `Mulberry32` or `Pathfinder`, and no RNG stream is added
    marching grant reads it (spacing test kept for marching only). No revive yet:
    behaviour is unchanged, and existing marching tests still pass.
 2. **7.2 — The per-death cut.** Per-member `XpSnapshot.ClawBack`; the revive on
-   `CombatEnded` (HP, alive, mana clamp, XP cut); `CharacterRevived`. Tests: half
+   `CombatEnded` (HP to 1, alive, mana clamp, XP cut); `CharacterRevived`. Tests: revived at exactly 1 HP; half
    the gain per pool, truncation, repeat deaths halving what is left, nothing
    below the snapshot, only the fallen pay, `DeathXpLossPercent` 0 and 100.
 3. **7.3 — Where they get up.** Revive position behind the leader with the
