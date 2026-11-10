@@ -129,6 +129,14 @@ public sealed class TurnSystem
     /// </summary>
     public Func<PartyMemberState, IReadOnlyList<XpClawback>>? DeathCost { get; set; }
 
+    /// <summary>
+    /// Who leads the party (§7.3): the member the player is moving, which only the
+    /// scene knows, so it hands this in. A revived member gets up beside them. Null,
+    /// or a leader who is down, and the first living member in roster order leads —
+    /// the member a turn's start hands the lead to.
+    /// </summary>
+    public Func<PartyMemberState?>? Leader { get; set; }
+
     // ── Events for the presentation layer ────────────────────────────────────
     public event Action<float>? TurnEnded;                                 // total movement banked
     public event Action? PlayerTurnStarted;
@@ -632,16 +640,45 @@ public sealed class TurnSystem
     /// standing, at 1 HP (PHASE 7 DECISION 6) — never above a maximum, which is
     /// always at least 1 — and mana as it was, capped at the new
     /// <see cref="ActorState.UsableMaxMana"/> (PHASE 7 DECISION 4). Statuses were
-    /// shed at death. Where it stands is where it fell; the budget is refilled by
-    /// the turn's start, as every living member's is.
+    /// shed at death. It gets up beside the leader, not where it fell (§7.3):
+    /// the bodies lie in the fight the party may have run from. The budget is
+    /// refilled by the turn's start, as every living member's is.
     /// </summary>
     private void Revive(PartyMemberState member)
     {
         var clawbacks = DeathCost?.Invoke(member) ?? Array.Empty<XpClawback>();
+        (member.X, member.Y) = RevivalPlace(member);
         member.Alive = true;
         member.Hp = Math.Min(1, member.MaxHp);
         member.Mana = Math.Min(member.Mana, member.UsableMaxMana);
         CharacterRevived?.Invoke(member, clawbacks);
+    }
+
+    /// <summary>
+    /// Where a revived member gets up (§7.3): the centre of the nearest floor tile
+    /// to the leader that no living actor stands on — breadth-first from the
+    /// leader's own tile across floor only (<see cref="GridUtils.NearestFreeTile"/>),
+    /// so it is in the leader's room or corridor and never through a wall. Members
+    /// revived together fill the tiles in roster order, each one standing before
+    /// the next looks. With nobody standing to lead (a wipe never gets here), where
+    /// it fell.
+    /// <para>
+    /// The plan preferred a point behind the leader along the march trail; the
+    /// trail is the scene's, and it restarts the moment marching does, so after a
+    /// fight there is none to read. The nearest free tile is what the march's
+    /// "tuck in behind" then closes up from.
+    /// </para>
+    /// </summary>
+    private (float X, float Y) RevivalPlace(PartyMemberState member)
+    {
+        var leader = Leader?.Invoke() is { Alive: true } chosen && chosen != member
+            ? chosen
+            : _party.FirstOrDefault(m => m.Alive);
+        if (leader is null) return (member.X, member.Y);
+
+        var (r, c) = GridUtils.NearestFreeTile(_grid, TileOf(leader.X, leader.Y),
+            tile => _party.Any(m => m.Alive && TileOf(m.X, m.Y) == tile) || _enemies.Any(e => e.Alive && TileOf(e.X, e.Y) == tile));
+        return ((c + 0.5f) * GameConstants.Tile, (r + 0.5f) * GameConstants.Tile);
     }
 
     // ── Player actions ───────────────────────────────────────────────────────

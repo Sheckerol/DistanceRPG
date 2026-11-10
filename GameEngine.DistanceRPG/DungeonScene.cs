@@ -1490,12 +1490,15 @@ public class DungeonScene : Scene
         // RunEnded put the summary up. What is left here is the log line.
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER - the party is defeated");
         _turns.CombatEnded += () => Log.Info("[Turns] The encounter is over - no live enemy in view");
+        _turns.Leader = () => ActiveCharacter.State;   // a revived member gets up beside whoever the player is moving (§7.3)
         _turns.CharacterRevived += (member, clawbacks) =>
         {
             int index = _party.FindIndex(p => p.State == member);
-            Log.Info($"[Combat] {member.Id} revived at {member.Hp} HP"
+            Log.Info($"[Combat] {member.Id} revived at {member.Hp} HP beside the leader"
                 + (clawbacks.Count == 0 ? " - no run gain to lose" : $" - {string.Join(", ", clawbacks.Select(c => $"{c.Pool} XP {c.Before} -> {c.After}"))}"));
-            SetColor(_party[index], MemberColor(member, index));
+            var obj = _party[index];
+            SetColor(obj, MemberColor(member, index));
+            obj.SyncTransform();   // up beside the leader, not where it fell
         };
     }
 

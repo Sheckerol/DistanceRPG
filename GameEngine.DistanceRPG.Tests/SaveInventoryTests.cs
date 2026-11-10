@@ -287,6 +287,7 @@ public class SaveInventoryTests
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
             new("CombatEnded", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
             new("CharacterRevived", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
+            new("Leader", Kept.NotSaved, "wiring: the scene hands in its active member; the active member is saved in the view"),
             new("DeathCost", Kept.Derived, "set by OpenTurns: the cut against the visit's saved entry snapshot at the tuning's DeathXpLossPercent"),
         ],
     };

@@ -101,6 +101,13 @@ free tile beside the active character (the march leader), preferring a point
 spiralling out to the nearest tile that clears `GridCollision` if that is
 blocked.
 
+*As built (step 3):* the march trail is the scene's and restarts the moment
+marching does, so after a fight there is no trail to read. A revived member gets
+up on the nearest free floor tile to the leader instead: breadth-first from the
+leader's tile, crossing floor only, so it is never through a wall. Members
+revived together fill tiles in roster order. The march's "tuck in behind"
+closes the line up from there.
+
 This matters most for a retreat: the bodies are back in the fight the party ran
 from. Reviving in place would put a member there, and marching would drag the
 other three back after them to keep the line. Reviving at the leader means the

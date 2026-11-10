@@ -276,6 +276,115 @@ public sealed class EncounterEndTests : IDisposable
         Assert.Equal(door.HpXp + 10 - 10 * GameContent.Current.Tuning.DeathXpLossPercent / 100, member.HpXp);
     }
 
+    // ── Where they get up (§7.3, step 3) ─────────────────────────────────────
+
+    private static (int R, int C) TileOf(ActorState actor)
+        => ((int)MathF.Floor(actor.Y / Tile), (int)MathF.Floor(actor.X / Tile));
+
+    private static void Centre(ActorState actor, int r, int c)
+        => (actor.X, actor.Y) = ((c + 0.5f) * Tile, (r + 0.5f) * Tile);
+
+    [Fact]
+    public void ARevivedMember_GetsUpBesideTheLeader_NotWhereItFell()
+    {
+        var grid = new int[30, 30];
+        var a = Member("A", 0, 0);
+        var b = Member("B", 0, 0);
+        var c = Member("C", 0, 0);
+        Centre(a, 20, 20);
+        Centre(b, 5, 5);    // fell far off, in the fight
+        Centre(c, 10, 10);  // the one the player is moving
+        var turns = new TurnSystem(grid, new[] { a, b, c }, Array.Empty<EnemyState>(), () => 10) { Leader = () => c };
+        Fall(b);
+
+        Assert.True(turns.CheckEncounterEnd());
+
+        Assert.Equal((9, 10), TileOf(b));   // the first free tile of the leader's: up, down, left, right
+        Assert.Equal(((10 + 0.5f) * Tile, (9 + 0.5f) * Tile), (b.X, b.Y));   // a tile's centre
+    }
+
+    [Fact]
+    public void MembersRevivedTogether_TakeTheirOwnTiles_InRosterOrder_AroundEveryBody()
+    {
+        var grid = new int[30, 30];
+        var a = Member("A", 0, 0);
+        var b = Member("B", 0, 0);
+        var c = Member("C", 0, 0);
+        var enemy = new EnemyState();
+        Centre(a, 10, 10);
+        Centre(b, 2, 2);
+        Centre(c, 3, 3);
+        Centre(enemy, 9, 10);   // a corpse would not hold it; a living body does
+        var turns = new TurnSystem(grid, new[] { a, b, c }, new[] { enemy }, () => 10) { Leader = () => a };
+        Fall(b);
+        Fall(c);
+
+        Assert.True(turns.CheckEncounterEnd());   // the enemy is not in view
+
+        Assert.Equal((11, 10), TileOf(b));   // up is the enemy's: down
+        Assert.Equal((10, 9), TileOf(c));    // then left
+    }
+
+    [Fact]
+    public void InACorridor_TheyGetUpAlongIt_NeverThroughAWall()
+    {
+        // A one-tile corridor running left to right along row 5, walls either side;
+        // the room beyond the wall above is nearer as the crow flies, and never reached.
+        var grid = new int[12, 12];
+        for (int r = 0; r < 12; r++)
+            for (int col = 0; col < 12; col++)
+                grid[r, col] = r == 5 || r <= 3 ? 0 : 1;
+        var a = Member("A", 0, 0);
+        var b = Member("B", 0, 0);
+        var c = Member("C", 0, 0);
+        Centre(a, 5, 6);
+        Centre(c, 5, 5);   // left of the leader: taken
+        Centre(b, 2, 2);
+        var turns = new TurnSystem(grid, new[] { a, b, c }, Array.Empty<EnemyState>(), () => 10) { Leader = () => a };
+        Fall(b);
+
+        turns.CheckEncounterEnd();
+
+        Assert.Equal((5, 7), TileOf(b));
+    }
+
+    [Fact]
+    public void WithTheLeaderDown_TheFirstLivingMemberLeads()
+    {
+        var grid = new int[30, 30];
+        var a = Member("A", 0, 0);
+        var b = Member("B", 0, 0);
+        var c = Member("C", 0, 0);
+        Centre(a, 2, 2);
+        Centre(b, 15, 15);
+        Centre(c, 20, 20);
+        var turns = new TurnSystem(grid, new[] { a, b, c }, Array.Empty<EnemyState>(), () => 10) { Leader = () => a };
+        Fall(a);   // the leader fell; B is the first standing
+
+        turns.CheckEncounterEnd();
+
+        Assert.Equal((14, 15), TileOf(a));
+    }
+
+    [Fact]
+    public void AnArrival_RevivesBesideTheLeader_WhenNoLiveEnemyIsInViewThere()
+    {
+        // The stairs (PHASE 7 DECISION 1): the party arrives with a body carried, and
+        // the arrival's check (the scene's, after its lighting) gets it up on the new floor.
+        var (turns, party, enemy, log) = Fixture();
+        turns.Leader = () => party[0];
+        Fall(party[1]);
+        Centre(party[1], 20, 20);
+        turns.NotifyEnemyInView(enemy, false);
+
+        Assert.True(turns.CheckEncounterEnd());
+
+        Assert.True(party[1].Alive);
+        var (lr, lc) = TileOf(party[0]);
+        var (r, c) = TileOf(party[1]);
+        Assert.Equal(1, Math.Abs(r - lr) + Math.Abs(c - lc));
+    }
+
     [Fact]
     public void AnEnemyWalkingBackIntoView_ReopensTheFight()
     {
