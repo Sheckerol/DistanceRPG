@@ -105,7 +105,22 @@ internal sealed class VisitScript
     /// sight the save kept rather than lighting it afresh: what the party could
     /// see this turn is part of the turn (Phase 5.8's resume keeps it too).
     /// </summary>
-    public TurnSystem Resume() => Visit.OpenTurns(Party, Die);
+    /// <para>
+    /// The kept sight then tells the system who is in view, as the scene's resume
+    /// does (<see cref="TurnSystem.NotifyEnemyInView"/>): in view, never a
+    /// sighting, since the turn's sightings came back with its counters.
+    /// </para>
+    public TurnSystem Resume()
+    {
+        var turns = Visit.OpenTurns(Party, Die);
+        var floor = Floor;
+        foreach (var row in floor.Enemies)
+        {
+            var (r, c) = Displacer.TileOf(row);
+            turns.NotifyEnemyInView(row, floor.Fog.Visible[r, c]);
+        }
+        return turns;
+    }
 
     // ── Moving ───────────────────────────────────────────────────────────────
 

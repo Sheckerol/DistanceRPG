@@ -84,6 +84,34 @@ public sealed class TurnSystem
     /// <summary>True once any still-living enemy has been seen this turn — the combat-footing signal.</summary>
     public bool AnyLiveEnemySeenThisTurn => _seenThisTurn.Any(e => e.Alive);
 
+    /// <summary>
+    /// Enemies standing on a lit tile right now, kept on both edges
+    /// (<see cref="NotifyEnemyInView"/>) — unlike <see cref="_seenThisTurn"/>,
+    /// which only ever grows within a turn. The scene's fog is the only thing that
+    /// knows what is lit, so this is what it last said.
+    /// </summary>
+    private readonly HashSet<EnemyState> _inView = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>A live enemy is in view now: the party is in combat mode (§7.2).</summary>
+    public bool AnyLiveEnemyInView => _inView.Any(e => e.Alive);
+
+    /// <summary>
+    /// A live enemy has been sighted since the last encounter check
+    /// (<see cref="CheckEncounterEnd"/>): an encounter is open. Not saved — a
+    /// reload only loses the end of an encounter nobody fell in, which nothing
+    /// acts on; a member saved down still has the check find them.
+    /// </summary>
+    private bool _encounterOpen;
+
+    /// <summary>
+    /// The encounter is over (§7.2): raised by <see cref="CheckEncounterEnd"/> at
+    /// a player turn's start, or on a floor arrival, when no live enemy is in
+    /// view and either an enemy was sighted since the last check or a member is
+    /// down. Raised before the members' budgets refill and before
+    /// <see cref="PlayerTurnStarted"/>.
+    /// </summary>
+    public event Action? CombatEnded;
+
     // ── Events for the presentation layer ────────────────────────────────────
     public event Action<float>? TurnEnded;                                 // total movement banked
     public event Action? PlayerTurnStarted;
@@ -518,14 +546,59 @@ public sealed class TurnSystem
             RefreshZoneOf(actor);
     }
 
-    /// <summary>Scene calls this whenever an enemy's tile visibility changes.</summary>
+    /// <summary>
+    /// Scene calls this whenever an enemy's tile visibility changes: a sighting,
+    /// counted as seen this turn, and the in-view set on both edges.
+    /// </summary>
     public void NotifyEnemyVisible(EnemyState enemy, bool visible)
     {
+        NotifyEnemyInView(enemy, visible);
         if (!visible) return;
         // Seeing an enemy during the enemy turn also counts (the prototype
         // updates visibility while enemies walk).
         if (Phase is TurnPhase.Player or TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking)
             _seenThisTurn.Add(enemy);
+    }
+
+    /// <summary>
+    /// Whether an enemy stands on a lit tile now, without counting it as a
+    /// sighting: the in-view set alone. The scene's lighting of a resumed turn
+    /// says this much and no more, since the turn's sightings came back with its
+    /// counters (<see cref="NotifyEnemyVisible"/> is the sighting).
+    /// </summary>
+    public void NotifyEnemyInView(EnemyState enemy, bool visible)
+    {
+        ArgumentNullException.ThrowIfNull(enemy);
+        if (!visible)
+        {
+            _inView.Remove(enemy);
+            return;
+        }
+        _inView.Add(enemy);
+        if (enemy.Alive)
+            _encounterOpen = true;
+    }
+
+    /// <summary>
+    /// The encounter's end (§7.2): no live enemy in view, and an encounter open
+    /// or a member down — then <see cref="CombatEnded"/>, and the encounter is
+    /// closed. Runs at every player turn's start (<see cref="StartPlayerTurn"/>)
+    /// and is called by the scene on a floor arrival once the arrival's lighting
+    /// has told this system who is in view; a resumed turn is not an arrival, so
+    /// a member saved down revives at the next turn's start (PHASE 7 DECISION 3).
+    /// Ignores marching's spacing test, which decides whether the line forms,
+    /// not whether the fight is over.
+    /// </summary>
+    /// <returns>True if the encounter ended here.</returns>
+    public bool CheckEncounterEnd()
+    {
+        if (Phase == TurnPhase.GameOver || AnyLiveEnemyInView) return false;
+        bool anyDown = _party.Any(member => !member.Alive);
+        if (!_encounterOpen && !anyDown) return false;
+
+        _encounterOpen = false;
+        CombatEnded?.Invoke();
+        return true;
     }
 
     // ── Player actions ───────────────────────────────────────────────────────
@@ -1464,6 +1537,10 @@ public sealed class TurnSystem
             foreach (var actor in roster)
                 actor.HeldShots = 0;
         SnapshotZones();
+
+        // The encounter's end (§7.2), after resurrections — a dummy getting up in
+        // sight keeps the fight on — and before the budgets refill.
+        CheckEncounterEnd();
 
         // The player phase opens for every member, the fallen included — the
         // boundary events are the roster's; only the budget refill is the living's.

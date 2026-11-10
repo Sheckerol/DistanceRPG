@@ -882,6 +882,7 @@ public class DungeonScene : Scene
         else
         {
             RevealArrival(keepSight: false);
+            turns.CheckEncounterEnd();   // the arrival's check (§7.5), after the lighting told the system who is in view
             EvaluateMarchingForTurn();   // after visibility, which it reads; the party gathered to take the stairs
         }
         _cameraTarget = ActiveCharacter.Position;
@@ -1488,6 +1489,7 @@ public class DungeonScene : Scene
         // game over first and the campaign ended the run in Logic, whose
         // RunEnded put the summary up. What is left here is the log line.
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER - the party is defeated");
+        _turns.CombatEnded += () => Log.Info("[Turns] The encounter is over - no live enemy in view");
     }
 
     /// <summary>
@@ -2688,7 +2690,7 @@ public class DungeonScene : Scene
         => !transiting && phase == TurnPhase.Player && !menuOpen && memberAlive && (enemySeenThisTurn || liveEnemyInView);
 
     /// <summary>Is a live enemy on a tile the party can see right now?</summary>
-    private bool LiveEnemyInView => _enemies.Any(e => e.State.Alive && e.IsActive);
+    private bool LiveEnemyInView => _turns.AnyLiveEnemyInView;   // what the fog last told the system (UpdateEnemyVisibility)
 
     /// <summary>
     /// Listen to <paramref name="next"/> in place of what <paramref name="slot"/>
@@ -3221,6 +3223,8 @@ public class DungeonScene : Scene
             enemy.SetVisible(visible); // hidden, a shove's slide ends where the logic put it
             if (notify)
                 _turns.NotifyEnemyVisible(enemy.State, visible);
+            else
+                _turns.NotifyEnemyInView(enemy.State, visible);   // in view, not a sighting: the encounter's end reads it (§7.2)
         }
         UpdateGroundItemVisibility();   // what a corpse left is lit by the same fog the corpse was
     }
