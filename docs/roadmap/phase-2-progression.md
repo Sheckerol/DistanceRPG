@@ -5,7 +5,7 @@
 Each party member gets a permanent spread of **STR / DEX / CON / INT**. Stats
 never rise. They are pure *rate multipliers*: you level what you use, at the
 speed your nature allows. This is what makes party composition matter for the
-whole run — D will always be the better caster, no matter how long C swings a
+whole run — C will always be the better caster, no matter how long B swings a
 staff.
 
 ### Stats run 1–4, and every character is a permutation of them
@@ -24,35 +24,40 @@ needs and wider than most survive.
 
 | Member | STR | DEX | CON | INT | Starts with | Teaches |
 | --- | --- | --- | --- | --- | --- | --- |
-| A | 1 | **4** | 2 | 3 | Dagger | Crit windows |
-| B | 3 | 1 | **4** | 2 | Sword & shield | Block |
-| C | **4** | 2 | 3 | 1 | **Axe** | Cleave, and beating armour |
-| D | 2 | 3 | 1 | **4** | **Staff of Renewal** | Buffs, mana |
+| A | 3 | 1 | **4** | 2 | Sword & shield | Block |
+| B | **4** | 2 | 3 | 1 | **Axe** | Cleave, and beating armour |
+| C | 2 | 3 | 1 | **4** | **Staff of Renewal** | Buffs, mana |
+| D | 1 | **4** | 2 | 3 | Dagger | Crit windows |
+
+The letters follow each member's 4 (the user's ruling of 2026-11-08): A high CON,
+B high STR, C high INT, D high DEX. Later sections of this file written before
+that ruling, and the other phase plans, may still use the old letters (old A is
+now D, old B is A, old C is B, old D is C).
 
 **The four spreads fall into two pairs, and the pairs split opposite halves of
 the stat list:**
 
 | | Top two, swapped | Bottom two, swapped |
 | --- | --- | --- |
-| **Front line** — B and C | CON 4 / STR 3, and STR 4 / CON 3 | INT 2 / DEX 1, and DEX 2 / INT 1 |
-| **Back line** — A and D | DEX 4 / INT 3, and INT 4 / DEX 3 | CON 2 / STR 1, and STR 2 / CON 1 |
+| **Front line** — A and B | CON 4 / STR 3, and STR 4 / CON 3 | INT 2 / DEX 1, and DEX 2 / INT 1 |
+| **Back line** — D and C | DEX 4 / INT 3, and INT 4 / DEX 3 | CON 2 / STR 1, and STR 2 / CON 1 |
 
-So B is the party's body and C is its arm — the difference between the one who
-holds a line and the one who breaks it — while A and D divide speed and mind the
+So A is the party's body and B is its arm — the difference between the one who
+holds a line and the one who breaks it — while D and C divide speed and mind the
 same way. Each pair is a mirror of the other's ranking, which means no stat is
 anyone's 4 twice and every stat is somebody's best.
 
-**D is the only CON 1 in the party**, which makes the caster the single thing
+**C is the only CON 1 in the party**, which makes the caster the single thing
 that must not be reached — not a shared frailty but a specific one.
 
 **Expect to move these after playing.** The permutation rule is the part worth
 keeping; which member gets which permutation is a first guess.
 
-The axe goes to C, the only member whose STR 4 suits it. D gives up the second
+The axe goes to B, the only member whose STR 4 suits it. C gives up the second
 spear for a staff — at STR 3 they would never level a martial weapon well
 anyway, and a party with no caster never discovers half the game.
 
-**D carries a debuff staff in the bag.** Renewal equipped, Blight or Mire in an
+**C carries a debuff staff in the bag.** Renewal equipped, Blight or Mire in an
 inventory slot, so the player meets both halves of casting and learns the swap
 mechanic getting to the second one.
 

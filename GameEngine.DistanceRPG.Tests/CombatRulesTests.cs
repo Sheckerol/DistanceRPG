@@ -112,8 +112,8 @@ public sealed class CombatRulesTests : IDisposable
     public void StartingWeapons_MatchPrototype()
     {
         // The three prototype classes keep their places 0-2 (parity, now on the
-        // class enum rather than a weapon list); the loadout is dagger, sword,
-        // axe, staff by stable id.
+        // class enum rather than a weapon list); the loadout is sword, axe,
+        // staff, dagger by stable id.
         Assert.Equal(
             new[] { WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear },
             Enum.GetValues<WeaponClass>().Take(3));
@@ -123,10 +123,10 @@ public sealed class CombatRulesTests : IDisposable
         // this assertion -- and only the arrays spawned, so pinning them pinned
         // the copy that could drift. The arrays are gone; this is the statement.
         Assert.Equal(
-            new[] { "weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal" },
+            new[] { "tower_guard", "great_axe", "staff_of_renewal", "weakspot_stiletto" },
             GameContent.Current.Party.All.Select(m => m.StartingWeaponId));
         Assert.Equal(
-            new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire" },
+            new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_mire", "staff_of_renewal" },
             GameContent.Current.Party.All.Select(m => m.BagWeaponIds.Single()));
     }
 

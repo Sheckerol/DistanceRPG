@@ -39,26 +39,26 @@ public sealed class ProgressionStateTests : IDisposable
     [Fact]
     public void BothPoolsStartAtTheStartingPool_WhateverTheSpread()
     {
-        // "Nobody starts with more of anything": A is DEX 4 / CON 2 and D is
+        // "Nobody starts with more of anything": D is DEX 4 / CON 2 and C is
         // INT 4 / CON 1, and they open the game with the same 30 HP and the same
         // 30 mana. The stat is a rate, so it shows up in what a point costs and
         // never in what a pool holds.
-        var a = TestPools.Fresh("A", Spread("A"));
         var d = TestPools.Fresh("D", Spread("D"));
+        var c = TestPools.Fresh("C", Spread("C"));
 
         Assert.Equal(30, StartingPool);
-        Assert.NotEqual(a.Stats, d.Stats);
-        Assert.Equal((StartingPool, StartingPool), (a.MaxHp, a.MaxMana));
+        Assert.NotEqual(d.Stats, c.Stats);
         Assert.Equal((StartingPool, StartingPool), (d.MaxHp, d.MaxMana));
+        Assert.Equal((StartingPool, StartingPool), (c.MaxHp, c.MaxMana));
 
         // And both spawn full: an unwritten pool reads as the maximum.
-        Assert.Equal((StartingPool, StartingPool), (a.Hp, a.Mana));
         Assert.Equal((StartingPool, StartingPool), (d.Hp, d.Mana));
+        Assert.Equal((StartingPool, StartingPool), (c.Hp, c.Mana));
 
         // What differs is the price of the next point: 30 / 2 against 30 / 1 for
         // health, 30 / 3 against 30 / 4 for mana.
-        Assert.Equal((15, 10), (a.HealthPool.XpToNext, a.ManaPool.XpToNext));
-        Assert.Equal((30, 7), (d.HealthPool.XpToNext, d.ManaPool.XpToNext));
+        Assert.Equal((15, 10), (d.HealthPool.XpToNext, d.ManaPool.XpToNext));
+        Assert.Equal((30, 7), (c.HealthPool.XpToNext, c.ManaPool.XpToNext));
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public sealed class ProgressionStateTests : IDisposable
         // invalidated.
         using var _ = TestContent.UsePremise(tuning: t => t with { StartingPool = 40 });
 
-        var member = TestPools.Fresh("A", Spread("A"));
+        var member = TestPools.Fresh("D", Spread("D"));
         Assert.Equal((40, 40), (member.MaxHp, member.MaxMana));
         Assert.Equal(20, member.HealthPool.XpToNext);   // 40 / CON 2
     }
@@ -80,13 +80,13 @@ public sealed class ProgressionStateTests : IDisposable
         // CON 4 buys a point for a quarter of the bar; CON 1 pays the whole of
         // it. Neither gains anything for the XP below the bar, because the credit
         // is raw and only the threshold knows the stat.
-        var fighter = TestPools.Fresh("B", Spread("B"));   // CON 4
+        var fighter = TestPools.Fresh("A", Spread("A"));   // CON 4
         Assert.Equal(0, Credit(fighter, XpPool.Health, 6));
         Assert.Equal((StartingPool, 6), (fighter.MaxHp, fighter.HealthPool.XpIntoNext));
         Assert.Equal(1, Credit(fighter, XpPool.Health, 1));
         Assert.Equal((StartingPool + 1, 7), (fighter.MaxHp, fighter.HpXp));
 
-        var wizard = TestPools.Fresh("D", Spread("D"));    // CON 1
+        var wizard = TestPools.Fresh("C", Spread("C"));    // CON 1
         Assert.Equal(0, Credit(wizard, XpPool.Health, 29));
         Assert.Equal(StartingPool, wizard.MaxHp);
         Assert.Equal(1, Credit(wizard, XpPool.Health, 1));
@@ -96,13 +96,13 @@ public sealed class ProgressionStateTests : IDisposable
     [Fact]
     public void MaxMana_RisesOnePointPerBar_IntDividingIt()
     {
-        // The same arithmetic against INT: D's mana grows four times as fast as
-        // C's, and C is the one holding an axe.
-        var caster = TestPools.Fresh("D", Spread("D"));    // INT 4
+        // The same arithmetic against INT: C's mana grows four times as fast as
+        // B's, and B is the one holding an axe.
+        var caster = TestPools.Fresh("C", Spread("C"));    // INT 4
         Assert.Equal(1, Credit(caster, XpPool.Mana, 7));
         Assert.Equal(StartingPool + 1, caster.MaxMana);
 
-        var axe = TestPools.Fresh("C", Spread("C"));       // INT 1
+        var axe = TestPools.Fresh("B", Spread("B"));       // INT 1
         Assert.Equal(0, Credit(axe, XpPool.Mana, 29));
         Assert.Equal(1, Credit(axe, XpPool.Mana, 1));
         Assert.Equal(StartingPool + 1, axe.MaxMana);
@@ -112,11 +112,11 @@ public sealed class ProgressionStateTests : IDisposable
     [Fact]
     public void AFighterAndAWizardOpenTheSame_AndDivergeFourfold()
     {
-        // Fed identical healing, B (CON 4) banks four points where D (CON 1)
+        // Fed identical healing, A (CON 4) banks four points where C (CON 1)
         // banks one -- 7 + 7 + 8 + 8 against a single 30. The XP is the same
         // number in both books: nothing multiplies a gain by a stat.
-        var fighter = TestPools.Fresh("B", Spread("B"));
-        var wizard = TestPools.Fresh("D", Spread("D"));
+        var fighter = TestPools.Fresh("A", Spread("A"));
+        var wizard = TestPools.Fresh("C", Spread("C"));
         Assert.Equal(4, Credit(fighter, XpPool.Health, 30));
         Assert.Equal(1, Credit(wizard, XpPool.Health, 30));
 
@@ -124,20 +124,20 @@ public sealed class ProgressionStateTests : IDisposable
         Assert.Equal((StartingPool + 4, StartingPool + 1), (fighter.MaxHp, wizard.MaxHp));
 
         // The mirror, on a ladder rather than a pool, and against the member the
-        // claim actually names: D will never be the better knife-fighter however
-        // much damage their knife does. Fed the same 150 dagger XP as A (DEX 4),
-        // that same D is a level behind -- A has paid 25 + 50 + 75 exactly and
-        // wields at 4, D has paid 33 + 66 and is still on 3 with 51 carried --
+        // claim actually names: C will never be the better knife-fighter however
+        // much damage their knife does. Fed the same 150 dagger XP as D (DEX 4),
+        // that same C is a level behind -- D has paid 25 + 50 + 75 exactly and
+        // wields at 4, C has paid 33 + 66 and is still on 3 with 51 carried --
         // and both books hold the same number, because the stat is in the
         // threshold and never in the credit.
-        var thief = TestPools.Fresh("A", Spread("A"));
+        var thief = TestPools.Fresh("D", Spread("D"));
         Credit(thief, WeaponClass.Dagger, 150);
         Credit(wizard, WeaponClass.Dagger, 150);
 
         Assert.Equal(thief.WeaponXp[WeaponClass.Dagger], wizard.WeaponXp[WeaponClass.Dagger]);
         var dagger = TestWeapons.Get("weakspot_stiletto");
         Assert.Equal(4, thief.WeaponLevel(dagger));    // 150 paid, nothing carried into a 100 bar
-        Assert.Equal(3, wizard.WeaponLevel(dagger));   // 99 paid, 51 carried: half a bar short of A
+        Assert.Equal(3, wizard.WeaponLevel(dagger));   // 99 paid, 51 carried: half a bar short of D
     }
 
     [Fact]
@@ -174,26 +174,26 @@ public sealed class ProgressionStateTests : IDisposable
         // A proficiency is the character's and the class's: swapping to a staff
         // and back leaves the dagger ladder exactly where it was, any dagger
         // wields at that level, and the member next to them has learned nothing.
-        var a = TestPools.Fresh("A", Spread("A"));
+        var d = TestPools.Fresh("D", Spread("D"));
         var stiletto = TestWeapons.Get("weakspot_stiletto");
         var knife = TestWeapons.Get("flensing_knife");
         var staff = TestWeapons.Get("staff_of_renewal");
 
-        a.Inventory[0] = stiletto;
-        Credit(a, WeaponClass.Dagger, 60);
-        a.Inventory[0] = staff;
-        Credit(a, WeaponClass.Staff, 10);
-        a.Inventory[0] = stiletto;
+        d.Inventory[0] = stiletto;
+        Credit(d, WeaponClass.Dagger, 60);
+        d.Inventory[0] = staff;
+        Credit(d, WeaponClass.Staff, 10);
+        d.Inventory[0] = stiletto;
 
-        Assert.Equal(60, a.WeaponXp[WeaponClass.Dagger]);
-        Assert.Equal(10, a.WeaponXp[WeaponClass.Staff]);
-        Assert.Equal(2, a.WeaponLevel(stiletto));       // DEX 4: the first step cost 25
-        Assert.Equal(2, a.WeaponLevel(knife));          // a different dagger, the same proficiency
-        Assert.Equal(Progression.StartingLevel, a.WeaponLevel(TestWeapons.Get("great_axe")));
-        Assert.Equal(new[] { (WeaponClass.Dagger, 60), (WeaponClass.Staff, 10) }, a.WeaponXp.Entries.ToArray());
-        Assert.Equal(70, a.WeaponXp.Total);
+        Assert.Equal(60, d.WeaponXp[WeaponClass.Dagger]);
+        Assert.Equal(10, d.WeaponXp[WeaponClass.Staff]);
+        Assert.Equal(2, d.WeaponLevel(stiletto));       // DEX 4: the first step cost 25
+        Assert.Equal(2, d.WeaponLevel(knife));          // d different dagger, the same proficiency
+        Assert.Equal(Progression.StartingLevel, d.WeaponLevel(TestWeapons.Get("great_axe")));
+        Assert.Equal(new[] { (WeaponClass.Dagger, 60), (WeaponClass.Staff, 10) }, d.WeaponXp.Entries.ToArray());
+        Assert.Equal(70, d.WeaponXp.Total);
 
-        var twin = TestPools.Fresh("A2", Spread("A"));
+        var twin = TestPools.Fresh("D2", Spread("D"));
         Assert.Equal(0, twin.WeaponXp[WeaponClass.Dagger]);
         Assert.Equal(Progression.StartingLevel, twin.WeaponLevel(stiletto));
     }
@@ -237,13 +237,13 @@ public sealed class ProgressionStateTests : IDisposable
         // points spawns at the new full rather than at a number copied when they
         // were made. A member who has been hurt keeps its number, and a raw XP
         // write -- a rollback, a load -- moves the ceiling without healing anyone.
-        var fresh = TestPools.Fresh("B", Spread("B"));
+        var fresh = TestPools.Fresh("A", Spread("A"));
         Assert.Equal(fresh.MaxHp, fresh.Hp);
 
         Credit(fresh, XpPool.Health, 30);                 // CON 4: four points
         Assert.Equal((StartingPool + 4, StartingPool + 4), (fresh.MaxHp, fresh.Hp));
 
-        var wounded = TestPools.Fresh("B", Spread("B"));
+        var wounded = TestPools.Fresh("A", Spread("A"));
         wounded.Hp = 10;
         wounded.HpXp = 30;                                 // written raw, not credited
         Assert.Equal((StartingPool + 4, 10), (wounded.MaxHp, wounded.Hp));
@@ -258,12 +258,12 @@ public sealed class ProgressionStateTests : IDisposable
         // filled. Mana is earned by spending, so filling a gained point would
         // hand part of the cast back; the ceiling rises and the pool stays where
         // the spend left it, to be refilled by unspent movement like any other.
-        var hurt = TestPools.Fresh("B", Spread("B"));      // CON 4
+        var hurt = TestPools.Fresh("A", Spread("A"));      // CON 4
         hurt.Hp = hurt.MaxHp - 10;
         Assert.Equal(1, Credit(hurt, XpPool.Health, 7));
         Assert.Equal((StartingPool + 1, StartingPool - 10 + 1), (hurt.MaxHp, hurt.Hp));
 
-        var caster = TestPools.Fresh("D", Spread("D"));    // INT 4
+        var caster = TestPools.Fresh("C", Spread("C"));    // INT 4
         caster.Mana = caster.MaxMana - 13;                 // what a Renewal cast leaves
         Assert.Equal(2, Credit(caster, XpPool.Mana, 14));
         Assert.Equal(StartingPool + 2, caster.MaxMana);
@@ -272,7 +272,7 @@ public sealed class ProgressionStateTests : IDisposable
         // And a pool nobody has written is no exception, though it is the one
         // that would break the rule for free: it reads as its own ceiling, so a
         // ceiling that rose unpinned would hand over a filled point.
-        var unspent = TestPools.Fresh("D", Spread("D"));   // INT 4, mana never written
+        var unspent = TestPools.Fresh("C", Spread("C"));   // INT 4, mana never written
         Assert.Equal(2, Credit(unspent, XpPool.Mana, 14));
         Assert.Equal(StartingPool + 2, unspent.MaxMana);
         Assert.Equal(StartingPool, unspent.Mana);          // what the old bar held, not what the new one holds
@@ -365,9 +365,9 @@ public sealed class ProgressionStateTests : IDisposable
         Assert.Equal(new[] { "A", "B", "C", "D" }, party.Select(m => m.Id));
         Assert.Equal(new[] { 0, 1, 2, 3 }, party.Select(m => m.ColorIndex));
         Assert.Equal(roster.Select(d => d.Stats), party.Select(m => m.Stats));
-        Assert.Equal(new[] { "weakspot_stiletto", "tower_guard", "great_axe", "staff_of_renewal" },
+        Assert.Equal(new[] { "tower_guard", "great_axe", "staff_of_renewal", "weakspot_stiletto" },
             party.Select(m => m.EquippedWeapon!.Id));
-        Assert.Equal(new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_renewal", "staff_of_mire" },
+        Assert.Equal(new[] { "staff_of_renewal", "staff_of_renewal", "staff_of_mire", "staff_of_renewal" },
             party.Select(m => m.WeaponIn(1)!.Id));
         Assert.All(party, m => Assert.Null(m.Inventory[2]));
         Assert.Equal((0f, 64f), (party[0].X, party[0].Y));
@@ -382,40 +382,40 @@ public sealed class ProgressionStateTests : IDisposable
         // InnateStats.None -- 1/1/1/1, not even a permutation -- and every pool
         // and every ladder divided by 1, so the four grew at identical rates and
         // the table might as well not have existed.
-        var (c, d) = (party[2], party[3]);
-        Assert.Equal(new InnateStats(4, 2, 3, 1), c.Stats);
-        Assert.Equal(new InnateStats(2, 3, 1, 4), d.Stats);
+        var (b, c) = (party[1], party[2]);
+        Assert.Equal(new InnateStats(4, 2, 3, 1), b.Stats);
+        Assert.Equal(new InnateStats(2, 3, 1, 4), c.Stats);
         Assert.All(party, m => Assert.True(m.Stats.IsPermutation, $"{m.Id}: {m.Stats}"));
 
-        // D is always the better caster, and no amount of swinging a staff makes
-        // C one: the fourfold threshold difference is on the spawned members.
-        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Staff, d.Stats));
-        Assert.Equal(1, Progression.GoverningStat(WeaponClass.Staff, c.Stats));
+        // C is always the better caster, and no amount of swinging a staff makes
+        // B one: the fourfold threshold difference is on the spawned members.
+        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Staff, c.Stats));
+        Assert.Equal(1, Progression.GoverningStat(WeaponClass.Staff, b.Stats));
 
         // The mirror, and the class table resolving to something other than 1
-        // for once: C's axe against D's, and B's sword taking the better of
+        // for once: B's axe against C's, and A's sword taking the better of
         // STR 3 and DEX 1 rather than either in particular.
-        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Axe, c.Stats));
-        Assert.Equal(2, Progression.GoverningStat(WeaponClass.Axe, d.Stats));
-        Assert.Equal(3, Progression.GoverningStat(WeaponClass.Sword, party[1].Stats));
+        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Axe, b.Stats));
+        Assert.Equal(2, Progression.GoverningStat(WeaponClass.Axe, c.Stats));
+        Assert.Equal(3, Progression.GoverningStat(WeaponClass.Sword, party[0].Stats));
 
         // They open the game identical and diverge only through growth: the same
-        // 25 mana, the same 25 HP, and then the same credit buying D four points
-        // where it buys C one.
-        Assert.Equal((StartingPool, StartingPool), (c.MaxMana, d.MaxMana));
-        Assert.Equal((StartingPool, StartingPool), (c.MaxHp, d.MaxHp));
-        Assert.Equal(1, Credit(c, XpPool.Mana, StartingPool));
-        Assert.Equal(4, Credit(d, XpPool.Mana, StartingPool));
+        // 25 mana, the same 25 HP, and then the same credit buying C four points
+        // where it buys B one.
+        Assert.Equal((StartingPool, StartingPool), (b.MaxMana, c.MaxMana));
+        Assert.Equal((StartingPool, StartingPool), (b.MaxHp, c.MaxHp));
+        Assert.Equal(1, Credit(b, XpPool.Mana, StartingPool));
+        Assert.Equal(4, Credit(c, XpPool.Mana, StartingPool));
 
-        // The staff ladder's first rung costs D 25 and C 100 -- the fourfold
+        // The staff ladder's first rung costs C 25 and B 100 -- the fourfold
         // difference, read off members the scene built rather than off the data.
-        // The same 25 buys D the rung and leaves C exactly where it was.
-        Assert.Equal(25, d.Proficiency(WeaponClass.Staff).XpToNext);
-        Assert.Equal(100, c.Proficiency(WeaponClass.Staff).XpToNext);
-        Assert.Equal(0, Credit(c, WeaponClass.Staff, 25));
-        Assert.Equal(1, Credit(d, WeaponClass.Staff, 25));
-        Assert.Equal(Progression.StartingLevel, c.WeaponLevel(c.WeaponIn(1)!));
-        Assert.Equal(Progression.StartingLevel + 1, d.WeaponLevel(d.EquippedWeapon!));
+        // The same 25 buys C the rung and leaves B exactly where it was.
+        Assert.Equal(25, c.Proficiency(WeaponClass.Staff).XpToNext);
+        Assert.Equal(100, b.Proficiency(WeaponClass.Staff).XpToNext);
+        Assert.Equal(0, Credit(b, WeaponClass.Staff, 25));
+        Assert.Equal(1, Credit(c, WeaponClass.Staff, 25));
+        Assert.Equal(Progression.StartingLevel, b.WeaponLevel(b.WeaponIn(1)!));
+        Assert.Equal(Progression.StartingLevel + 1, c.WeaponLevel(c.EquippedWeapon!));
     }
 
     [Fact]
@@ -434,27 +434,27 @@ public sealed class ProgressionStateTests : IDisposable
 
         const float tile = GameConstants.Tile;
         var grid = new int[20, 30];
-        var a = PartyMemberState.From(GameContent.Current.Party["A"], 0, 5 * tile + 16f, 5 * tile + 16f);
-        var enemy = new EnemyState { X = a.X + 200f, Y = a.Y, Weapon = TestWeapons.Get("skirmishers_pike") };
-        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+        var d = PartyMemberState.From(GameContent.Current.Party["D"], 3, 5 * tile + 16f, 5 * tile + 16f);
+        var enemy = new EnemyState { X = d.X + 200f, Y = d.Y, Weapon = TestWeapons.Get("skirmishers_pike") };
+        var turns = new TurnSystem(grid, new[] { d }, new[] { enemy }, () => 10);
 
         int braces = 0;
         turns.EnemyBraceTriggered += _ => braces++;
         turns.NotifyEnemyVisible(enemy, true);
 
         // Outside the spear's reach (162 surface > 128): stepping around is safe.
-        a.X += 10f;
-        turns.NotifyCharacterMoved(a);
+        d.X += 10f;
+        turns.NotifyCharacterMoved(d);
         Assert.Equal(0, braces);
-        Assert.Equal(StartingPool, a.Hp);
+        Assert.Equal(StartingPool, d.Hp);
 
         // Into reach: the free poke, 7 plus Longshot x1's +1 at the fourth tile,
-        // and A's dagger blocks nothing. A roster member opens at the starting
+        // and D's dagger blocks nothing. A roster member opens at the starting
         // pool, so this is what the lesson costs a fresh party.
-        a.X = enemy.X - 150f;
-        turns.NotifyCharacterMoved(a);
+        d.X = enemy.X - 150f;
+        turns.NotifyCharacterMoved(d);
         Assert.Equal(1, braces);
-        Assert.Equal(StartingPool - 8, a.Hp);
+        Assert.Equal(StartingPool - 8, d.Hp);
     }
 
     [Fact]

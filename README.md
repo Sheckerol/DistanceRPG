@@ -186,7 +186,7 @@ weapon is not broken. Nothing else wears a weapon: a status ticking, a hit on th
 dead, the enemies' own weapons. A wipe keeps the party's wear (what counts as a
 hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
 `docs/roadmap/open-questions.md`). The log says when a member's weapon fills:
-`[Wear] A's Rondel is full: wear 30 of 30`. The enchanter spends it
+`[Wear] D's Rondel is full: wear 30 of 30`. The enchanter spends it
 and grows a weapon's capacity (below).
 
 **Potions** (Phase 6b): a potion in a member's bag is drunk by its number with the
@@ -379,8 +379,8 @@ no wear, no roll`). A weapon taken back early (T on its row in the shop, and Ent
 on the ask) comes back to the end of the stable with its wear and its capacity as they
 were before it went in, its service lost (PHASE 6a DECISION 8). A deposit and a
 take-back are each saved at once (PHASE 6a DECISION 10), and logged: `[Enchanter]
-Deposited Scutum and Gladius (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
-(capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of Renewal
+Deposited Scutum and Gladius (tower_guard) from A's hand: Enchant vampiric, 30 wear cashed
+(capacity 30 -> 31), 1 run, deposit #0; A's hand, emptied, took up Staff of Renewal
 from the bag` — the deposit's number, with the run's map seed, is what a finished
 service's improvement roll is keyed by — and `[Enchanter] Took back Scutum and Gladius
 (tower_guard) to the stable's end: Enchant vampiric forfeited, 0 of 1 run worked
@@ -1181,8 +1181,8 @@ everything in them is named by a stable string id.
   and since the Sword's baseline forges both, the game opens on `WEAPONS.JSON`,
   `SWORD`, and a detail ending
   `RESTRICTED.JSON EXCLUDES [PUSH, BLOCK]: PUSH IS ALREADY FORGED HERE`. A
-  `weapons.json` that renames a weapon only the starting party names — A's
-  `weakspot_stiletto`, C's `great_axe` — stops on `WEAPONS.JSON` too, naming the
+  `weapons.json` that renames a weapon only the starting party names — D's
+  `weakspot_stiletto`, B's `great_axe` — stops on `WEAPONS.JSON` too, naming the
   member.
 - **A missing file plays the built-in one, and says so**: delete
   `weapons.json` and the game plays the built-in weapons, with

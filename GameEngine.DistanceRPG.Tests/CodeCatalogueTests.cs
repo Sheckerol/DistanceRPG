@@ -82,29 +82,29 @@ public class CodeCatalogueTests
         Assert.Equal(["A", "B", "C", "D"], shipped.Party.All.Select(member => member.Id));
 
         // PHASE5-175 through the one file that can break it: a weapons.json that
-        // renames weakspot_stiletto — a Dagger variant nothing but A names — stops
+        // renames weakspot_stiletto — a Dagger variant nothing but D names — stops
         // the game at the party's stage, stamped weapons.json, naming the member,
         // the rule and the id.
         var renamed = Fails(Shipped with { Weapons = DataTexts.Edit(Shipped.Weapons!, "\"id\": \"weakspot_stiletto\",", "\"id\": \"weakspot_dirk\",") });
-        Assert.Equal((WeaponsJson.FileName, false, "A", ContentValidator.RulePartyWeaponExists), Stamp(renamed));
+        Assert.Equal((WeaponsJson.FileName, false, "D", ContentValidator.RulePartyWeaponExists), Stamp(renamed));
         Assert.Equal("weakspot_stiletto", renamed.Detail);
 
-        // So does C's great_axe, the other hand weapon only the roster names.
+        // So does B's great_axe, the other hand weapon only the roster names.
         var greatAxe = Fails(Shipped with { Weapons = DataTexts.Edit(Shipped.Weapons!, "\"id\": \"great_axe\",", "\"id\": \"greater_axe\",") });
-        Assert.Equal((WeaponsJson.FileName, false, "C", ContentValidator.RulePartyWeaponExists), Stamp(greatAxe));
+        Assert.Equal((WeaponsJson.FileName, false, "B", ContentValidator.RulePartyWeaponExists), Stamp(greatAxe));
         Assert.Equal("great_axe", greatAxe.Detail);
 
         // A bag is checked the same way. No weapons.json edit can reach it — every
         // bag weapon of the shipped roster is one the code names, refused earlier
         // at the weapons' stage — so it is pinned through records built in code:
-        // an A whose bag names staff_of_nothing. Records handed in as they stand
+        // a D whose bag names staff_of_nothing. Records handed in as they stand
         // are no built-in copy, so the stamp is weapons.json alone.
-        var party = new PartyData(StartingParty.Data.Members.Select(m => m.Id == "A" ? m with { BagWeaponIds = ["staff_of_nothing"] } : m).ToList());
+        var party = new PartyData(StartingParty.Data.Members.Select(m => m.Id == "D" ? m with { BagWeaponIds = ["staff_of_nothing"] } : m).ToList());
         var bag = Assert.Throws<ContentException>(() => TestContent.Load(party: party));
-        Assert.Equal((WeaponsJson.FileName, false, "A", ContentValidator.RulePartyWeaponExists), Stamp(bag));
+        Assert.Equal((WeaponsJson.FileName, false, "D", ContentValidator.RulePartyWeaponExists), Stamp(bag));
         Assert.Equal("staff_of_nothing", bag.Detail);
 
-        // And a weapons.json without staff_of_mire, D's bag staff, is refused at the
+        // And a weapons.json without staff_of_mire, C's bag staff, is refused at the
         // weapons' stage first — the Staff row's drop order still names it — before
         // the party is asked.
         var noMire = Fails(Shipped with { Weapons = DataTexts.WithoutRow(Shipped.Weapons!, "staff_of_mire") });

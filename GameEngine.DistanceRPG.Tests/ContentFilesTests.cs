@@ -514,9 +514,9 @@ public class ContentFilesTests
             (Shipped with { Restricted = pushBlocks }, (ContentFiles.WeaponsFileName, false, "Sword", ContentValidator.RuleForgedNotAllowed)),
             // The dungeons' file, broken on its own: two dungeons that retire.
             (Shipped with { Dungeons = TwoRetiring }, (ContentFiles.DungeonsFileName, false, "spear_hall", ContentValidator.RuleOneRetiringDungeon)),
-            // A weapons.json that renames the weapon the code's roster hands A: the roster breaks against it.
+            // A weapons.json that renames the weapon the code's roster hands D: the roster breaks against it.
             (Shipped with { Weapons = DataTexts.Edit(Shipped.Weapons!, "\"id\": \"weakspot_stiletto\",", "\"id\": \"weakspot_dirk\",") },
-                (ContentFiles.WeaponsFileName, false, "A", ContentValidator.RulePartyWeaponExists)),
+                (ContentFiles.WeaponsFileName, false, "D", ContentValidator.RulePartyWeaponExists)),
         ];
         foreach (var (texts, expected) in cases)
             Assert.Equal(expected, Stamp(Fails(texts)));

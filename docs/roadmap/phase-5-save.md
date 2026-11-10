@@ -462,7 +462,7 @@ weapon only the party names stops the game naming the member, the rule and
 members, each spread a permutation, a caster in hand — no file can break: only
 a code edit can, and the tests catch it first.
 
-Party B/C/D's own identities (which pair splits which stats, which debuff
-staff D carries) are therefore the code's: changing the tutorial's fourth
+The party's own identities (which pair splits which stats, which debuff
+staff C carries) are therefore the code's: changing the tutorial's fourth
 character to try a different stat pairing is an edit to `StartingParty` and a
 rebuild.

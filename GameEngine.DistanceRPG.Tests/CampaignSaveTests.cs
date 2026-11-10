@@ -161,14 +161,14 @@ public sealed class CampaignSaveTests : IDisposable
     {
         // The flagship (PHASE5-009–015, -017, -018): a campaign some way in — the
         // tutorial beaten and retired, the Spear Hall cleared and locked with its
-        // boss's own drop in B's bag, a retreat from three floors down the Long
+        // boss's own drop in A's bag, a retreat from three floors down the Long
         // Gallery that counted as a mercy — and then everything a member can carry
         // out of a run.
         var campaign = NewCampaign();
         var (a, b, c, d) = (campaign.Party[0], campaign.Party[1], campaign.Party[2], campaign.Party[3]);
 
         Assert.Equal(RunOutcome.BossKill, Clear(campaign, "tutorial").Outcome);
-        var hall = Clear(campaign, "spear_hall", taker: b);
+        var hall = Clear(campaign, "spear_hall", taker: a);
         Assert.Equal((RunOutcome.BossKill, 5, 1), (hall.Outcome, hall.DeepestFloor, hall.SpoilsKept.Count));
         var retreat = Retreat(campaign, "long_gallery", floors: 3);
         Assert.Equal((RunOutcome.Retreat, true), (retreat.Outcome, retreat.MercyTick));
@@ -177,51 +177,51 @@ public sealed class CampaignSaveTests : IDisposable
         // The boss's drop: forged with the Spear Hall's Brace on top of its row's
         // own spread, and the floor's promised stack acquired on top of that.
         var drop = hall.SpoilsKept[0];
-        Assert.Same(drop, b.Inventory.Single(w => ReferenceEquals(w, drop)));
+        Assert.Same(drop, a.Inventory.Single(w => ReferenceEquals(w, drop)));
         Assert.Equal(1, drop.Forged.Stacks(ModifierType.Brace));
         Assert.NotEqual(TestWeapons.Get(drop.Id).Forged, drop.Forged);
         Assert.NotEqual(drop.Forged, drop.Modifiers);
 
-        // A takes up a Nameless Knife: three souls, vampiric at tier 3 with XP into
+        // D takes up a Nameless Knife: three souls, vampiric at tier 3 with XP into
         // it, and a unique soul whose spend banked and bought nothing.
         var knife = TestWeapons.Get("flensing_knife_unique");
         Assert.Equal(["serrated", "vampiric", "overheal"], knife.Enchantments.Select(e => e.Id));
         knife.CreditEnchantment(1, 7);
         knife.CreditEnchantment(0, 4);
         Assert.Equal([(1, 4), (3, 7), (1, 0)], knife.Enchantments.Select(e => (e.Tier, e.Xp)));
-        a.Inventory[2] = knife;
+        d.Inventory[2] = knife;
         campaign.See(knife);
 
         // XP in all three pools, weapon XP in two classes.
-        a.Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 140));
-        a.Credit(new XpCredit(XpPool.Weapon, WeaponClass.Staff, 3));
-        c.Credit(new XpCredit(XpPool.Health, null, 12));
-        d.Credit(new XpCredit(XpPool.Mana, null, 30));
+        d.Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 140));
+        d.Credit(new XpCredit(XpPool.Weapon, WeaponClass.Staff, 3));
+        b.Credit(new XpCredit(XpPool.Health, null, 12));
+        c.Credit(new XpCredit(XpPool.Mana, null, 30));
 
-        // C walks out carrying statuses — the hidden Overheal remainder among them
+        // B walks out carrying statuses — the hidden Overheal remainder among them
         // — and a turn's movement cut by Mire from a banked bonus.
-        c.ApplyStatus(StatusEffectType.Poison, null, 2);
-        c.ApplyStatus(StatusEffectType.OverhealPool, null, 3);
-        c.ApplyStatus(StatusEffectType.Searing, DamageType.Flaming, 1);
-        c.ApplyStatus(StatusEffectType.Mire, null, 3);
-        c.SavedMovement = 40;
-        c.StartTurn();
-        Assert.Equal((200f, 140f), (c.BudgetBeforeMire, c.EffectiveMax));
-        c.Movement.SpendUpTo(37.123457f, MoveReason.Walk);   // a walk is its frames' steps: no short decimal form
-        c.X += 3.1415927f;
-        c.Y -= 0.3333333f;
-        c.EndTurnSaveMovement();
+        b.ApplyStatus(StatusEffectType.Poison, null, 2);
+        b.ApplyStatus(StatusEffectType.OverhealPool, null, 3);
+        b.ApplyStatus(StatusEffectType.Searing, DamageType.Flaming, 1);
+        b.ApplyStatus(StatusEffectType.Mire, null, 3);
+        b.SavedMovement = 40;
+        b.StartTurn();
+        Assert.Equal((200f, 140f), (b.BudgetBeforeMire, b.EffectiveMax));
+        b.Movement.SpendUpTo(37.123457f, MoveReason.Walk);   // a walk is its frames' steps: no short decimal form
+        b.X += 3.1415927f;
+        b.Y -= 0.3333333f;
+        b.EndTurnSaveMovement();
 
-        // D has spent and been hurt and holds its shots; B fell, carries an innate
+        // C has spent and been hurt and holds its shots; A fell, carries an innate
         // and an attunement no member has yet, and lies where it fell.
-        d.Mana = 3;
-        d.Hp = 11;
-        d.HeldShots = 2;
-        b.Alive = false;
-        b.Innate = ModifierSet.Of((ModifierType.Block, 2));
-        b.Attunement = DamageType.Cold;
+        c.Mana = 3;
+        c.Hp = 11;
+        c.HeldShots = 2;
+        a.Alive = false;
+        a.Innate = ModifierSet.Of((ModifierType.Block, 2));
+        a.Attunement = DamageType.Cold;
 
-        var view = new ViewDto("C");
+        var view = new ViewDto("B");
         var file = SaveGame.Capture(campaign, view);
         string text = SaveCodec.Write(file);
         var loaded = SaveGame.Restore(SaveCodec.Read(text), GameContent.Current);
@@ -232,20 +232,20 @@ public sealed class CampaignSaveTests : IDisposable
 
         // Each thing §5.1 names, in the document as plain values.
         var saved = file.Campaign.Party;
-        Assert.Equal((c.X, c.Y), (saved[2].Body.X, saved[2].Body.Y));                              // PHASE5-009: position
-        Assert.Equal((11, 3), (saved[3].Body.Hp, saved[3].Body.Mana));                              // PHASE5-010, -011: HP, mana
-        Assert.Equal(new StatsDto(4, 2, 3, 1), saved[2].Stats);                                     // PHASE5-012: innate stats
-        Assert.Equal(new[] { ("Dagger", 140), ("Staff", 3) }, saved[0].WeaponXp.Select(x => (x.Key, x.Value)));   // PHASE5-013: by class name
-        Assert.Equal((12, 30), (saved[2].HpXp, saved[3].ManaXp));
-        var knifeRow = saved[0].Inventory[2]!;                                                     // PHASE5-014: both spreads
+        Assert.Equal((b.X, b.Y), (saved[1].Body.X, saved[1].Body.Y));                              // PHASE5-009: position
+        Assert.Equal((11, 3), (saved[2].Body.Hp, saved[2].Body.Mana));                              // PHASE5-010, -011: HP, mana
+        Assert.Equal(new StatsDto(4, 2, 3, 1), saved[1].Stats);                                     // PHASE5-012: innate stats
+        Assert.Equal(new[] { ("Dagger", 140), ("Staff", 3) }, saved[3].WeaponXp.Select(x => (x.Key, x.Value)));   // PHASE5-013: by class name
+        Assert.Equal((12, 30), (saved[1].HpXp, saved[2].ManaXp));
+        var knifeRow = saved[3].Inventory[2]!;                                                     // PHASE5-014: both spreads
         Assert.Equal(new[] { ("CritWindow", 2), ("CritMultiplier", 1), ("Light", 1) }, knifeRow.Forged.Select(x => (x.Key, x.Value)));
-        var dropRow = saved[1].Inventory.Single(w => w?.Id == drop.Id && w.Forged.ContainsKey("Brace"))!;
+        var dropRow = saved[0].Inventory.Single(w => w?.Id == drop.Id && w.Forged.ContainsKey("Brace"))!;
         Assert.NotEqual(dropRow.Forged.ToArray(), dropRow.Modifiers.ToArray());
         Assert.Equal(new[] { ("serrated", 1, 4), ("vampiric", 3, 7), ("overheal", 1, 0) },        // PHASE5-015: enchantments
             knifeRow.Enchantments.Select(e => (e.Id, e.Tier, e.Xp)));
         Assert.Equal(new[] { ("Poison", (string?)null, 2), ("OverhealPool", null, 3), ("Searing", "Flaming", 1), ("Mire", null, 3) },
-            saved[2].Body.Statuses.Select(s => (s.Type, s.Element, s.Levels)));                     // PHASE5-017, -018
-        Assert.Equal(6, saved[0].Inventory.Count);
+            saved[1].Body.Statuses.Select(s => (s.Type, s.Element, s.Levels)));                     // PHASE5-017, -018
+        Assert.Equal(6, saved[3].Inventory.Count);
     }
 
     [Fact]
@@ -268,21 +268,21 @@ public sealed class CampaignSaveTests : IDisposable
             Assert.StartsWith(path, failure.Message, StringComparison.Ordinal);
         }
 
-        Differs(c => c.Party[2].X = BitConverter.Int32BitsToSingle(BitConverter.SingleToInt32Bits(c.Party[2].X) + 1), "campaign.Party[2].X");
-        Differs(c => c.Party[0].WeaponIn(0)!.Acquire(ModifierType.CritWindow, 1), "campaign.Party[0].EquippedWeapon.Modifiers");
-        Differs(c => c.Party[3].WeaponIn(0)!.CreditEnchantment(0, 1), "campaign.Party[3].EquippedWeapon.Enchantments[0].Xp");
-        Differs(c => c.Party[1].ApplyStatus(StatusEffectType.Poison, null, 1), "campaign.Party[1].StatusEffects");
-        Differs(c => c.Party[1].BudgetBeforeMire = 161f, "campaign.Party[1].BudgetBeforeMire");
-        Differs(c => c.Party[1].HpXp = 30, "campaign.Party[1].HealthPool");
+        Differs(c => c.Party[1].X = BitConverter.Int32BitsToSingle(BitConverter.SingleToInt32Bits(c.Party[1].X) + 1), "campaign.Party[1].X");
+        Differs(c => c.Party[3].WeaponIn(0)!.Acquire(ModifierType.CritWindow, 1), "campaign.Party[3].EquippedWeapon.Modifiers");
+        Differs(c => c.Party[2].WeaponIn(0)!.CreditEnchantment(0, 1), "campaign.Party[2].EquippedWeapon.Enchantments[0].Xp");
+        Differs(c => c.Party[0].ApplyStatus(StatusEffectType.Poison, null, 1), "campaign.Party[0].StatusEffects");
+        Differs(c => c.Party[0].BudgetBeforeMire = 161f, "campaign.Party[0].BudgetBeforeMire");
+        Differs(c => c.Party[0].HpXp = 30, "campaign.Party[0].HealthPool");
 
         var catalogue = GameContent.Current.Enchantments;
         Differs(c =>
         {
-            var staff = c.Party[3].WeaponIn(0)!;
+            var staff = c.Party[2].WeaponIn(0)!;
             var copy = catalogue["regeneration"] with { };   // reads alike, and is not the catalogue's row
-            c.Party[3].Inventory[0] = new Weapon(GameContent.Current.Weapons[staff.Id], staff.Forged, staff.Modifiers,
+            c.Party[2].Inventory[0] = new Weapon(GameContent.Current.Weapons[staff.Id], staff.Forged, staff.Modifiers,
                 [new Enchantment(copy, staff.Enchantments[0].Tier)], staff.ForgedEnchantmentCount);
-        }, "campaign.Party[3].EquippedWeapon.Enchantments[0].Def");
+        }, "campaign.Party[2].EquippedWeapon.Enchantments[0].Def");
     }
 
     [Fact]
@@ -541,34 +541,34 @@ public sealed class CampaignSaveTests : IDisposable
         // campaign's members have written neither, and a save keeps that: the
         // document says null, and the restored pool still follows its ceiling.
         var campaign = NewCampaign();
-        var d = campaign.Party[3];
-        Assert.Equal("staff_of_renewal", d.EquippedWeapon!.Id);
-        Assert.Equal((null, null), (d.RawHp, d.RawMana));
+        var c = campaign.Party[2];
+        Assert.Equal("staff_of_renewal", c.EquippedWeapon!.Id);
+        Assert.Equal((null, null), (c.RawHp, c.RawMana));
 
         string text = Save(campaign);
         var tree = JsonNode.Parse(text)!.AsObject();
-        Assert.Null(Party(tree, 3)["body"]!["hp"]);
-        Assert.Null(Party(tree, 3)["body"]!["mana"]);
-        var restored = Load(text).Campaign.Party[3];
+        Assert.Null(Party(tree, 2)["body"]!["hp"]);
+        Assert.Null(Party(tree, 2)["body"]!["mana"]);
+        var restored = Load(text).Campaign.Party[2];
         Assert.Equal((null, null), (restored.RawHp, restored.RawMana));
 
         // The same member written full at the same number, for the contrast.
-        var written = Load(text).Campaign.Party[3];
+        var written = Load(text).Campaign.Party[2];
         written.Mana = written.Mana;
         Assert.Equal(restored.Mana, written.Mana);
 
         // The lock deepens past the pool: Renewal climbs to tier 3, locks 45 of 30,
         // and sleeps — the whole pool is spendable again. The unwritten pool reads
         // the new ceiling, as the live member's does; the written one does not.
-        foreach (var member in new[] { d, restored, written })
+        foreach (var member in new[] { c, restored, written })
             member.EquippedWeapon!.CreditEnchantment(0, 15 + 30);
         Assert.Equal(3, restored.EquippedWeapon!.Enchantments[0].Tier);
-        Assert.Equal((d.UsableMaxMana, d.UsableMaxMana), (d.Mana, restored.Mana));
+        Assert.Equal((c.UsableMaxMana, c.UsableMaxMana), (c.Mana, restored.Mana));
         Assert.True(restored.Mana > written.Mana, $"the unwritten pool reads {restored.Mana}, the written one {written.Mana}");
 
         // HP the same way: a raw XP write moves the maximum, and an unwritten pool reads it.
-        d.HpXp = restored.HpXp = 60;
-        Assert.Equal((d.MaxHp, d.MaxHp), (d.Hp, restored.Hp));
+        c.HpXp = restored.HpXp = 60;
+        Assert.Equal((c.MaxHp, c.MaxHp), (c.Hp, restored.Hp));
         Assert.True(restored.Hp > GameContent.Current.Tuning.StartingPool);
     }
 

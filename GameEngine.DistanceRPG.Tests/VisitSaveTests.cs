@@ -125,14 +125,14 @@ public sealed class VisitSaveTests : IDisposable
 
     /// <summary>
     /// A visit some way in, played to the point it is saved at: the Spear Hall on
-    /// seed 4 (five floors). B's staff put down on floor 1 — gear, never a spoil. A
+    /// seed 4 (five floors). A's staff put down on floor 1 — gear, never a spoil. A
     /// dagger dummy on floor 2 put down, back up nine turns later with its gain
     /// rolled, and put down again. Down to floor 5 and the boss put down, its own
-    /// drop into B's bag, a spoil; a turn waited out at the bottom and the lair
+    /// drop into A's bag, a spoil; a turn waited out at the bottom and the lair
     /// looked over again; up to floor 4, where two daggers are put down for good —
     /// one's drop taken and put back down (a loose spoil), the other's left lying —
-    /// B stands inside a seen halberd's reach and C just outside it, the halberd
-    /// Mired, and A, mid-turn, has two attacks spent and Poison on it. Fog explored
+    /// A stands inside a seen halberd's reach and B just outside it, the halberd
+    /// Mired, and D, mid-turn, has two attacks spent and Poison on it. Fog explored
     /// on every floor. The save point is floor 4 (index 3), turn 10.
     /// </summary>
     /// <param name="die">
@@ -146,22 +146,22 @@ public sealed class VisitSaveTests : IDisposable
         // A party that has earned something before it steps in, so what it held at
         // the door is not what it holds now, nor nothing.
         var campaign = NewCampaign();
-        campaign.Party[0].Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 40));
-        campaign.Party[2].Credit(new XpCredit(XpPool.Health, null, 9));
-        campaign.Party[3].Credit(new XpCredit(XpPool.Mana, null, 12));
+        campaign.Party[3].Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 40));
+        campaign.Party[1].Credit(new XpCredit(XpPool.Health, null, 9));
+        campaign.Party[2].Credit(new XpCredit(XpPool.Mana, null, 12));
         var script = VisitScript.Enter(campaign, "spear_hall", FiveDeep, die);
         var visit = script.Visit;
         Assert.Equal((5, 1), (visit.BossFloor, visit.PromisedStacks));
 
-        // Floor 1: B puts down the staff it carried in, where it stands — gear, never a spoil.
-        Assert.Equal("staff_of_renewal", script.Member("B").WeaponIn(1)!.Id);
-        script.Leave("B", 1);
+        // Floor 1: A puts down the staff it carried in, where it stands — gear, never a spoil.
+        Assert.Equal("staff_of_renewal", script.Member("A").WeaponIn(1)!.Id);
+        script.Leave("A", 1);
 
         // Floor 2: a dagger dummy farmed — put down, up again nine turns later with
         // its gain rolled, and put down again.
         script.Down();
         var farmed = script.Row(19, "weakspot_stiletto");
-        script.Kill("A", farmed);
+        script.Kill("D", farmed);
         script.Look();
         Assert.Equal((1, 0), (farmed.DefeatCount, farmed.DefeatedAtTurn));
         script.Home();
@@ -169,59 +169,59 @@ public sealed class VisitSaveTests : IDisposable
         Assert.True(farmed.Alive);
         Assert.Equal((9, 1), (visit.Turn, farmed.RevivalsRolled));
         Assert.True(farmed.RevivalDamage + farmed.RevivalMaxHp > 0);
-        script.Kill("A", farmed);
+        script.Kill("D", farmed);
         Assert.Equal((2, 9), (farmed.DefeatCount, farmed.DefeatedAtTurn));
 
         // Through floors 3 and 4 to the bottom, and the boss put down with its own
         // drop — forged with the Spear Hall's Brace, the floor's stack on it — into
-        // B's bag, where the staff was.
+        // A's bag, where the staff was.
         script.Down();
         script.Down();
         script.Down();
         Assert.Equal(4, visit.FloorIndex);
         var boss = visit.Current.Boss!;
         Assert.Equal((38, "tower_guard"), (boss.SpawnIndex, boss.Weapon.Id));
-        script.Kill("A", boss);
+        script.Kill("D", boss);
         Assert.Equal((true, 9), (visit.BossDefeated, visit.BossDefeatedAtTurn));
-        Assert.Equal(1, script.Take("B", boss));
+        Assert.Equal(1, script.Take("A", boss));
         script.Look();
 
         // A turn waited out at the bottom, the lair looked over again, and up.
         script.Home();
         script.PassTurns(1);
-        script.Walk("A", script.Beside(boss));
+        script.Walk("D", script.Beside(boss));
         script.Look();
         script.Up();
         Assert.Equal((3, 10), (visit.FloorIndex, visit.Turn));
 
         // Floor 4, the halberd's room: two daggers put down for good, each lying on
-        // its drop now the boss is dead — one's taken into A's bag and put back down
-        // where A stands, a spoil lying loose; the other's left lying.
+        // its drop now the boss is dead — one's taken into D's bag and put back down
+        // where D stands, a spoil lying loose; the other's left lying.
         var halberd = script.Row(0, "halberd");
         var taken = script.Row(1, "assassins_fang");
         var lying = script.Row(2, "assassins_fang");
-        script.Kill("A", taken);
-        Assert.Equal(2, script.Take("A", taken));
-        script.Leave("A", 2);
-        script.Kill("A", lying);
+        script.Kill("D", taken);
+        Assert.Equal(2, script.Take("D", taken));
+        script.Leave("D", 2);
+        script.Kill("D", lying);
         Assert.NotNull(script.Turns.GroundItemOf(lying));
 
-        // B walks inside the halberd's reach before anyone sees it, C to just
-        // outside; then the room is looked over, and the halberd is seen — B's pair
-        // marked inside, C's not (Phase 5.7 walks C in after a reload).
-        script.Walk("B", (40, 28));
-        script.Walk("C", (41, 26));
+        // A walks inside the halberd's reach before anyone sees it, B to just
+        // outside; then the room is looked over, and the halberd is seen — A's pair
+        // marked inside, B's not (Phase 5.7 walks B in after a reload).
+        script.Walk("A", (40, 28));
+        script.Walk("B", (41, 26));
         var grid = visit.Current.Map.Grid;
-        Assert.True(EnemyAi.CanHit(halberd, script.Member("B"), halberd.Weapon, grid));
-        Assert.False(EnemyAi.CanHit(halberd, script.Member("C"), halberd.Weapon, grid));
+        Assert.True(EnemyAi.CanHit(halberd, script.Member("A"), halberd.Weapon, grid));
+        Assert.False(EnemyAi.CanHit(halberd, script.Member("B"), halberd.Weapon, grid));
         script.Look();
         Assert.True(script.Turns.AnyLiveEnemySeenThisTurn);
 
-        // A status on a row (the rows are the floor's stored state), and A mid-turn:
+        // A status on a row (the rows are the floor's stored state), and D mid-turn:
         // two attacks spent, and poisoned.
         halberd.ApplyStatus(StatusEffectType.Mire, null, 2);
-        script.Member("A").ApplyStatus(StatusEffectType.Poison, null, 2);
-        Assert.Equal(2, script.Turns.AttacksThisTurn(script.Member("A")));
+        script.Member("D").ApplyStatus(StatusEffectType.Poison, null, 2);
+        Assert.Equal(2, script.Turns.AttacksThisTurn(script.Member("D")));
         return script;
     }
 
@@ -258,9 +258,9 @@ public sealed class VisitSaveTests : IDisposable
         Assert.Equal(("spear_hall", FiveDeep, 5, 1), (saved.DungeonId, saved.MapSeed, saved.BossFloor, saved.PromisedStacks));
         Assert.Equal((3, 4, 10, true, 9), (saved.FloorIndex, saved.DeepestFloorIndex, saved.Turn, saved.BossDefeated, saved.BossDefeatedAtTurn));
         Assert.Equal(["A", "B", "C", "D"], saved.EntrySnapshot.Members.Select(m => m.MemberId));
-        Assert.Equal([("Dagger", 40)], saved.EntrySnapshot.Members[0].WeaponXp.Select(entry => (entry.Key, entry.Value)));
-        Assert.Equal((9, 12), (saved.EntrySnapshot.Members[2].HpXp, saved.EntrySnapshot.Members[3].ManaXp));
-        Assert.True(campaign.Party[0].WeaponXp[WeaponClass.Dagger] > 40);
+        Assert.Equal([("Dagger", 40)], saved.EntrySnapshot.Members[3].WeaponXp.Select(entry => (entry.Key, entry.Value)));
+        Assert.Equal((9, 12), (saved.EntrySnapshot.Members[1].HpXp, saved.EntrySnapshot.Members[2].ManaXp));
+        Assert.True(campaign.Party[3].WeaponXp[WeaponClass.Dagger] > 40);
         StateAssert.Equivalent(visit.EntrySnapshot, back.EntrySnapshot, "entrySnapshot");
 
         // Every floor stood on, and only those (-024): all five, the bottom's boss
@@ -280,7 +280,7 @@ public sealed class VisitSaveTests : IDisposable
         Assert.Equal([new StatusDto("Mire", null, 2)], halberdRow.Body.Statuses);
 
         // The explored fog on every floor (-023), the current floor's sight and no
-        // other's, and the loose items: B's staff on floor 1, gear; the fang's drop
+        // other's, and the loose items: A's staff on floor 1, gear; the fang's drop
         // on floor 4, a spoil.
         Assert.All(saved.Floors, f => Assert.Contains(f.Seen, row => row.Contains('1')));
         Assert.Equal([false, false, false, true, false], saved.Floors.Select(f => f.Visible is not null));
@@ -290,11 +290,11 @@ public sealed class VisitSaveTests : IDisposable
             Assert.Equal(visit.Floors[n].Fog.Seen.Cast<bool>(), back.Floors[n].Fog.Seen.Cast<bool>());
         Assert.Equal(visit.Current.Fog.Visible.Cast<bool>(), back.Current.Fog.Visible.Cast<bool>());
 
-        // The spoils in the order taken, each by where it is — B's bag, and lying on
+        // The spoils in the order taken, each by where it is — A's bag, and lying on
         // floor 4 — and each restored as the very weapon now there.
-        Assert.Equal([new SpoilDto(Member: "B", Slot: 1), new SpoilDto(Floor: 3, Loose: 0)], saved.Spoils);
+        Assert.Equal([new SpoilDto(Member: "A", Slot: 1), new SpoilDto(Floor: 3, Loose: 0)], saved.Spoils);
         Assert.Equal(2, back.Spoils.Count);
-        Assert.Same(restored.Party[1].Inventory[1], back.Spoils[0]);
+        Assert.Same(restored.Party[0].Inventory[1], back.Spoils[0]);
         Assert.Same(back.Floors[3].LooseItems[0].Weapon, back.Spoils[1]);
 
         // The drops lying on corpses, pinned as the game answered them: the fang
@@ -308,11 +308,11 @@ public sealed class VisitSaveTests : IDisposable
         Assert.Null(saved.Floors[3].Enemies.Single(e => e.SpawnIndex == 1).GroundItem);
         Assert.Null(saved.Floors[4].Enemies.Single(e => e.Boss).GroundItem);
 
-        // The turn's counters: A's two attacks, the halberd seen — and the boss's
+        // The turn's counters: D's two attacks, the halberd seen — and the boss's
         // floor's rows seen earlier this turn, named by floor and spawn.
         var carry = saved.Carry!;
         Assert.Equal(10, carry.Turn);
-        Assert.Equal([new CountDto(new ActorRefDto(Member: "A"), 2)], carry.Attacks);
+        Assert.Equal([new CountDto(new ActorRefDto(Member: "D"), 2)], carry.Attacks);
         Assert.Contains(new ActorRefDto(Floor: 3, Spawn: 0), carry.Seen);
         Assert.Contains(new ActorRefDto(Floor: 4, Spawn: 38), carry.Seen);
 
@@ -676,7 +676,7 @@ public sealed class VisitSaveTests : IDisposable
         // 4D:1i, L1405-1407: a spoil put down and taken back is the spoil it was —
         // lost to a wipe — and a weapon the party carried in stays gear however
         // often it is put down: never taken. So across a save too: the golem's drop,
-        // taken and put down on the tutorial's floor 2, and D's staff put down beside
+        // taken and put down on the tutorial's floor 2, and C's staff put down beside
         // it, both taken back after the reload; the wipe takes the drop and leaves
         // the staff, exactly as without the reload.
         var script = VisitScript.Enter(NewCampaign(), "tutorial", GoldenSeed);
@@ -684,12 +684,12 @@ public sealed class VisitSaveTests : IDisposable
         script.Down();
         var golem = script.Floor.Boss!;
         Assert.Equal("pinning_lance", golem.Weapon.Id);
-        script.Kill("A", golem);
-        Assert.Equal(2, script.Take("A", golem));
-        var spoil = script.Member("A").Inventory[2]!;
-        script.Leave("A", 2);
-        Assert.Equal("staff_of_mire", script.Member("D").WeaponIn(1)!.Id);
-        script.Leave("D", 1);
+        script.Kill("D", golem);
+        Assert.Equal(2, script.Take("D", golem));
+        var spoil = script.Member("D").Inventory[2]!;
+        script.Leave("D", 2);
+        Assert.Equal("staff_of_mire", script.Member("C").WeaponIn(1)!.Id);
+        script.Leave("C", 1);
         Assert.Same(spoil, Assert.Single(script.Visit.Spoils));
         string text = Save(script.Campaign);
         Assert.Equal([new SpoilDto(Floor: 1, Loose: 0)], SaveCodec.Read(text).Campaign.Visit!.Spoils);
@@ -701,15 +701,15 @@ public sealed class VisitSaveTests : IDisposable
         {
             var loose = side.Floor.LooseItems;
             Assert.Equal(["drop", "staff_of_mire"], loose.Select(item => ReferenceEquals(item.Weapon, side.Visit.Spoils[0]) ? "drop" : item.Weapon.Id));
-            Assert.Equal(2, side.TakeLoose("A", loose[0]));
-            Assert.Equal(1, side.TakeLoose("D", loose[0]));
+            Assert.Equal(2, side.TakeLoose("D", loose[0]));
+            Assert.Equal(1, side.TakeLoose("C", loose[0]));
             var party = side.Party;
             var result = Wipe(side);
             results.Add(result);
             Assert.Equal(RunOutcome.Death, result.Outcome);
             Assert.Empty(result.SpoilsKept);
-            Assert.Null(party[0].Inventory[2]);                                 // the spoil taken out of the bag
-            Assert.Equal("staff_of_mire", party[3].WeaponIn(1)!.Id);           // the gear never a spoil
+            Assert.Null(party[3].Inventory[2]);                                 // the spoil taken out of the bag
+            Assert.Equal("staff_of_mire", party[2].WeaponIn(1)!.Id);           // the gear never a spoil
         }
         Assert.Equal(Describe(Assert.Single(results[0].SpoilsLost)), Describe(Assert.Single(results[1].SpoilsLost)));
     }
@@ -722,15 +722,15 @@ public sealed class VisitSaveTests : IDisposable
         // wipe without the reload would — DeathXpLossPercent of each pool's gain
         // since the door, and nothing the party walked in with.
         var campaign = NewCampaign();
-        campaign.Party[0].Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 60));
-        campaign.Party[2].Credit(new XpCredit(XpPool.Health, null, 20));
-        campaign.Party[3].Credit(new XpCredit(XpPool.Mana, null, 40));
+        campaign.Party[3].Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 60));
+        campaign.Party[1].Credit(new XpCredit(XpPool.Health, null, 20));
+        campaign.Party[2].Credit(new XpCredit(XpPool.Mana, null, 40));
         var script = VisitScript.Enter(campaign, "tutorial", GoldenSeed);
-        script.Kill("A", script.Row(20, "flensing_knife"));
-        script.Kill("A", script.Row(3, "assassins_fang"));
-        script.Member("C").Credit(new XpCredit(XpPool.Health, null, 9));
-        script.Member("D").Credit(new XpCredit(XpPool.Mana, null, 12));
-        Assert.NotEqual(0, script.Member("A").WeaponXp[WeaponClass.Dagger]);
+        script.Kill("D", script.Row(20, "flensing_knife"));
+        script.Kill("D", script.Row(3, "assassins_fang"));
+        script.Member("B").Credit(new XpCredit(XpPool.Health, null, 9));
+        script.Member("C").Credit(new XpCredit(XpPool.Mana, null, 12));
+        Assert.NotEqual(0, script.Member("D").WeaponXp[WeaponClass.Dagger]);
         string text = Save(script.Campaign);
 
         var reloaded = new VisitScript(Load(text).Campaign);
@@ -747,7 +747,7 @@ public sealed class VisitSaveTests : IDisposable
         // Only the gain since the door is clawed, at DeathXpLossPercent: what each
         // pool walked in with — 60 dagger XP, 20 HP XP, 40 mana XP — is kept whole.
         int loss = GameContent.Current.Tuning.DeathXpLossPercent;
-        foreach (var (member, pool, atDoor) in new[] { ("A", nameof(WeaponClass.Dagger), 60), ("C", XpSnapshot.HpPool, 20), ("D", XpSnapshot.ManaPool, 40) })
+        foreach (var (member, pool, atDoor) in new[] { ("D", nameof(WeaponClass.Dagger), 60), ("B", XpSnapshot.HpPool, 20), ("C", XpSnapshot.ManaPool, 40) })
         {
             var clawed = afterReload.Clawbacks.Single(back => back.MemberId == member && back.Pool == pool);
             Assert.Equal(clawed.Before - (clawed.Before - atDoor) * loss / 100, clawed.After);
@@ -1032,9 +1032,9 @@ public sealed class VisitSaveTests : IDisposable
             (tree => FloorNode(tree, 4)["enemies"]![0]!["boss"] = true, "campaign.visit.floors[4].enemies[38].boss"),
             (tree => FloorNode(tree, 2)["enemies"]![0]!["boss"] = true, "campaign.visit.floors[2].enemies[0].boss"),
             // A spoil in an empty slot, one in two places, and one named twice.
-            (tree => VisitNode(tree)["spoils"]![0] = JsonNode.Parse("""{ "member": "C", "slot": 5 }"""), "campaign.visit.spoils[0].slot"),
-            (tree => VisitNode(tree)["spoils"]![0] = JsonNode.Parse("""{ "member": "B", "slot": 1, "floor": 3, "loose": 0 }"""), "campaign.visit.spoils[0]"),
-            (tree => VisitNode(tree)["spoils"]![1] = JsonNode.Parse("""{ "member": "B", "slot": 1 }"""), "campaign.visit.spoils[1]"),
+            (tree => VisitNode(tree)["spoils"]![0] = JsonNode.Parse("""{ "member": "B", "slot": 5 }"""), "campaign.visit.spoils[0].slot"),
+            (tree => VisitNode(tree)["spoils"]![0] = JsonNode.Parse("""{ "member": "A", "slot": 1, "floor": 3, "loose": 0 }"""), "campaign.visit.spoils[0]"),
+            (tree => VisitNode(tree)["spoils"]![1] = JsonNode.Parse("""{ "member": "A", "slot": 1 }"""), "campaign.visit.spoils[1]"),
             // A carry naming a missing spawn, a member among the seen, or another turn.
             (tree => VisitNode(tree)["carry"]!["seen"]![0] = JsonNode.Parse("""{ "floor": 3, "spawn": 99 }"""), "campaign.visit.carry.seen[0].spawn"),
             (tree => VisitNode(tree)["carry"]!["seen"]![0] = JsonNode.Parse("""{ "member": "A" }"""), "campaign.visit.carry.seen[0]"),

@@ -27,33 +27,33 @@ public class PartyContentTests
     {
         Assert.Equal(GameConstants.PartySize, Roster.All.Count);
         Assert.Equal(new[] { "A", "B", "C", "D" }, Roster.All.Select(m => m.Id));
-        Assert.Equal(new[] { "Dagger", "Shield", "Axe", "Caster" }, Roster.All.Select(m => m.Name));
+        Assert.Equal(new[] { "Shield", "Axe", "Caster", "Dagger" }, Roster.All.Select(m => m.Name));
 
         // The four spreads, verbatim: STR / DEX / CON / INT.
-        Assert.Equal(new InnateStats(1, 4, 2, 3), Member("A").Stats);
-        Assert.Equal(new InnateStats(3, 1, 4, 2), Member("B").Stats);
-        Assert.Equal(new InnateStats(4, 2, 3, 1), Member("C").Stats);
-        Assert.Equal(new InnateStats(2, 3, 1, 4), Member("D").Stats);
+        Assert.Equal(new InnateStats(3, 1, 4, 2), Member("A").Stats);
+        Assert.Equal(new InnateStats(4, 2, 3, 1), Member("B").Stats);
+        Assert.Equal(new InnateStats(2, 3, 1, 4), Member("C").Stats);
+        Assert.Equal(new InnateStats(1, 4, 2, 3), Member("D").Stats);
 
-        // A dagger, a sword and shield, an axe, and a staff: the axe goes to C,
-        // the only STR 4, and D gives up the second spear for the staff.
-        Assert.Equal("weakspot_stiletto", Member("A").StartingWeaponId);
-        Assert.Equal("tower_guard", Member("B").StartingWeaponId);
-        Assert.Equal("great_axe", Member("C").StartingWeaponId);
-        Assert.Equal("staff_of_renewal", Member("D").StartingWeaponId);
+        // A sword and shield, an axe, a staff and a dagger: the axe goes to B, the
+        // only STR 4, and C gives up the second spear for the staff.
+        Assert.Equal("tower_guard", Member("A").StartingWeaponId);
+        Assert.Equal("great_axe", Member("B").StartingWeaponId);
+        Assert.Equal("staff_of_renewal", Member("C").StartingWeaponId);
+        Assert.Equal("weakspot_stiletto", Member("D").StartingWeaponId);
 
         var catalogue = GameContent.Current.Weapons;
         Assert.Equal(
-            new[] { WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Axe, WeaponClass.Staff },
+            new[] { WeaponClass.Sword, WeaponClass.Axe, WeaponClass.Staff, WeaponClass.Dagger },
             Roster.All.Select(m => catalogue[m.StartingWeaponId].Class));
 
-        // The slot-1 staff the party has always carried, and D's second, debuff
+        // The slot-1 staff the party has always carried, and C's second, debuff
         // staff: Mire, not Blight -- the on-theme choice for a game where
         // movement is the resource.
         Assert.Equal(new[] { "staff_of_renewal" }, Member("A").BagWeaponIds);
         Assert.Equal(new[] { "staff_of_renewal" }, Member("B").BagWeaponIds);
-        Assert.Equal(new[] { "staff_of_renewal" }, Member("C").BagWeaponIds);
-        Assert.Equal(new[] { "staff_of_mire" }, Member("D").BagWeaponIds);
+        Assert.Equal(new[] { "staff_of_mire" }, Member("C").BagWeaponIds);
+        Assert.Equal(new[] { "staff_of_renewal" }, Member("D").BagWeaponIds);
 
         // No spear anywhere: the party's own Brace demonstration is dropped, and
         // Brace is taught from the receiving end instead.
@@ -69,7 +69,7 @@ public class PartyContentTests
     }
 
     [Fact]
-    public void EveryStatIsSomebodysFourExactlyOnce_AndDIsTheOnlyConOne()
+    public void EveryStatIsSomebodysFourExactlyOnce_AndCIsTheOnlyConOne()
     {
         // "No character is better endowed than another; they are differently
         // arranged": every spread is a permutation and sums to 10.
@@ -84,33 +84,33 @@ public class PartyContentTests
         foreach (var stat in Enum.GetValues<Stat>())
             Assert.Single(Roster.All, m => m.Stats.Of(stat) == InnateStats.High);
 
-        // D is the only CON 1: the caster is the single thing that must not be
+        // C is the only CON 1: the caster is the single thing that must not be
         // reached -- not a shared frailty but a specific one.
-        Assert.Equal(new[] { "D" }, Roster.All.Where(m => m.Stats.CON == InnateStats.Low).Select(m => m.Id));
+        Assert.Equal(new[] { "C" }, Roster.All.Where(m => m.Stats.CON == InnateStats.Low).Select(m => m.Id));
 
         // The two pairs, each splitting opposite halves of the stat list.
-        // Front line -- B is the party's body, C its arm.
-        var b = Member("B").Stats;
-        var c = Member("C").Stats;
-        Assert.Equal((4, 3), (b.CON, b.STR));
-        Assert.Equal((4, 3), (c.STR, c.CON));
-        Assert.Equal((2, 1), (b.INT, b.DEX));
-        Assert.Equal((2, 1), (c.DEX, c.INT));
-
-        // Back line -- A and D divide speed and mind the same way.
+        // Front line -- A is the party's body, B its arm.
         var a = Member("A").Stats;
-        var d = Member("D").Stats;
-        Assert.Equal((4, 3), (a.DEX, a.INT));
-        Assert.Equal((4, 3), (d.INT, d.DEX));
-        Assert.Equal((2, 1), (a.CON, a.STR));
-        Assert.Equal((2, 1), (d.STR, d.CON));
+        var b = Member("B").Stats;
+        Assert.Equal((4, 3), (a.CON, a.STR));
+        Assert.Equal((4, 3), (b.STR, b.CON));
+        Assert.Equal((2, 1), (a.INT, a.DEX));
+        Assert.Equal((2, 1), (b.DEX, b.INT));
 
-        // And the consequence the whole table exists for: D levels a staff four
-        // times as fast as C does, and C an axe four times as fast as D.
-        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Staff, d));
-        Assert.Equal(1, Progression.GoverningStat(WeaponClass.Staff, c));
-        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Axe, c));
-        Assert.Equal(2, Progression.GoverningStat(WeaponClass.Axe, d));
+        // Back line -- D and C divide speed and mind the same way.
+        var d = Member("D").Stats;
+        var c = Member("C").Stats;
+        Assert.Equal((4, 3), (d.DEX, d.INT));
+        Assert.Equal((4, 3), (c.INT, c.DEX));
+        Assert.Equal((2, 1), (d.CON, d.STR));
+        Assert.Equal((2, 1), (c.STR, c.CON));
+
+        // And the consequence the whole table exists for: C levels a staff four
+        // times as fast as B does, and B an axe four times as fast as C.
+        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Staff, c));
+        Assert.Equal(1, Progression.GoverningStat(WeaponClass.Staff, b));
+        Assert.Equal(4, Progression.GoverningStat(WeaponClass.Axe, b));
+        Assert.Equal(2, Progression.GoverningStat(WeaponClass.Axe, c));
     }
 
     [Fact]
@@ -118,38 +118,38 @@ public class PartyContentTests
     {
         // Two 4s and two 1s still sum to 10, which is exactly why the rule is
         // the permutation and not the sum.
-        var spread = Rejected(With(0, m => m with { Stats = new InnateStats(4, 4, 1, 1) }));
-        Assert.Equal("A", spread.EntryId);
+        var spread = Rejected(With(3, m => m with { Stats = new InnateStats(4, 4, 1, 1) }));
+        Assert.Equal("D", spread.EntryId);
         Assert.Equal(ContentValidator.RulePartyStatPermutation, spread.Rule);
 
         // A missing weapon aborts the load, naming the member -- never a
         // KeyNotFoundException at spawn, half a party later.
-        var equipped = Rejected(With(2, m => m with { StartingWeaponId = "great_axe_of_typos" }));
-        Assert.Equal("C", equipped.EntryId);
+        var equipped = Rejected(With(1, m => m with { StartingWeaponId = "great_axe_of_typos" }));
+        Assert.Equal("B", equipped.EntryId);
         Assert.Equal(ContentValidator.RulePartyWeaponExists, equipped.Rule);
 
-        var bagged = Rejected(With(3, m => m with { BagWeaponIds = ["staff_of_mire", "staff_of_blght"] }));
-        Assert.Equal("D", bagged.EntryId);
+        var bagged = Rejected(With(2, m => m with { BagWeaponIds = ["staff_of_mire", "staff_of_blght"] }));
+        Assert.Equal("C", bagged.EntryId);
         Assert.Equal(ContentValidator.RulePartyWeaponExists, bagged.Rule);
 
         // One equipped plus a whole share of the carry bagged is a weapon more
         // than a member's slots, whatever share tuning.json gives each.
         int slots = ShippedContent.Tuning.PartyCarrySlots / GameConstants.PartySize;
-        var deep = Rejected(With(3, m => m with
+        var deep = Rejected(With(2, m => m with
         {
             BagWeaponIds = Enumerable.Range(0, slots)
                 .Select(i => new[] { "staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "flensing_knife", "arming_sword" }[i % 6])
                 .ToList(),
         }));
-        Assert.Equal("D", deep.EntryId);
+        Assert.Equal("C", deep.EntryId);
         Assert.Equal(ContentValidator.RulePartyBagFits, deep.Rule);
 
-        var duplicate = Rejected(With(1, m => m with { Id = "A" }));
-        Assert.Equal("A", duplicate.EntryId);
+        var duplicate = Rejected(With(0, m => m with { Id = "D" }));
+        Assert.Equal("D", duplicate.EntryId);
         Assert.Equal(ContentValidator.RuleDuplicateId, duplicate.Rule);
 
         // A party with no caster never discovers half the game.
-        var martial = Rejected(With(3, m => m with { StartingWeaponId = "great_axe" }));
+        var martial = Rejected(With(2, m => m with { StartingWeaponId = "great_axe" }));
         Assert.Equal(ContentValidator.RulePartyHasACaster, martial.Rule);
 
         // A roster longer or shorter than the party's slots would otherwise
@@ -170,18 +170,18 @@ public class PartyContentTests
         ContentValidator.ValidateParty(ShippedContent.Party, GameContent.Current.Weapons);   // does not throw
 
         var before = GameContent.Current;
-        var renamed = With(0, m => m with { Name = "Thief" });
+        var renamed = With(3, m => m with { Name = "Thief" });
 
         using (TestContent.Use(party: renamed))
         {
             Assert.NotSame(before, GameContent.Current);
-            Assert.Equal("Thief", GameContent.Current.Party["A"].Name);
-            Assert.Equal(new InnateStats(1, 4, 2, 3), GameContent.Current.Party["A"].Stats);   // the rest of the row is untouched
+            Assert.Equal("Thief", GameContent.Current.Party["D"].Name);
+            Assert.Equal(new InnateStats(1, 4, 2, 3), GameContent.Current.Party["D"].Stats);   // the rest of the row is untouched
             Assert.Equal(GameConstants.PartySize, GameContent.Current.Party.All.Count);
         }
 
         Assert.Same(before, GameContent.Current);
-        Assert.Equal("Dagger", GameContent.Current.Party["A"].Name);
+        Assert.Equal("Dagger", GameContent.Current.Party["D"].Name);
 
         // The two tuning keys the roster's pools are measured against are
         // tuning.json's to set; what is the code's is the loader's refusal of a
