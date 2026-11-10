@@ -116,7 +116,20 @@ public sealed class EnemyState : ActorState
     /// </summary>
     public bool IsHealer => Weapon.Innate?.Def.Applies is { } type && StatusRules.Of(type).RestoresHp;
 
-    public override float Radius => (GameConstants.Tile - 4f) / 2f;
+    /// <summary>The body's radius a dummy has: a party member's, 14.</summary>
+    public const float DummyRadius = (GameConstants.Tile - 4f) / 2f;
+
+    /// <summary>
+    /// The body's radius, in logic units: every reach is measured from its edge,
+    /// every collision against it, and its base is drawn at it.
+    /// <see cref="DummyRadius"/> for rank and file, and a boss's statline for a
+    /// boss (<see cref="BossDef.Radius"/>) — larger, so it is reached from
+    /// further back. Like the rest of a boss's statline, a save need not store
+    /// it: it re-derives from content (§5.1).
+    /// </summary>
+    public float BodyRadius { get; set; } = DummyRadius;
+
+    public override float Radius => BodyRadius;
 
     /// <summary>Turn index when the dummy was defeated; -1 while alive.</summary>
     public int DefeatedAtTurn { get; set; } = -1;

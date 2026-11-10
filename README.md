@@ -1155,6 +1155,7 @@ everything in them is named by a stable string id.
   | `dungeons.json`: `bossFloorMin` and `bossFloorMax`, where a dungeon pins them | 1–99 | a floor number starts at 1 (an inverted range is refused as before); 99 is the deepest floor `tuning.json` can name (`BossFloorMax` at its most), and one the boss offset can always be fitted to |
   | a boss's `maxHp` | 1–10000 | a boss has a hit point at least, and no more than the largest bar a pool opens on (`StartingPool` at its most) |
   | a boss's `movementBudget` | 1–10000 | a boss moves a unit at least, and no farther than the tuning measures |
+  | a boss's `radius` | 1–48 | a body is a unit across at least, and no wider than the halls it walks: 48 is half a corridor's three tiles |
   | a boss's `innate` stack | 1–53 | an innate stack is one at least — innate is no forge's, so the golem may stand deeper than any weapon — and none is deeper than a stack can ever grow (`MaxForged` 3 plus `AcquiredHeadroom` 50, each at its most) |
 
   `restricted.json` holds no number, and a `dropOrder` is ids. A copy beside the

@@ -175,6 +175,63 @@ public class ReachFieldsTests
         Assert.True(checkedIn > 0);
     }
 
+    [Theory]
+    [InlineData(EnemyState.DummyRadius)]
+    [InlineData(20f)]   // a boss's body
+    public void WeaponReach_ABodyTouchingTheZone_IsInRange(float radius)
+    {
+        // Open floor, so sight never parts the two: a body whose base touches the
+        // zone drawn to the weapon's tip is one the member can hit, and a body it
+        // can hit touches the zone (to within the lattice's step), whatever its size.
+        var grid = Room(24, 24);
+        var weapon = TestWeapons.Get("weakspot_stiletto");
+        var member = TestPools.Holding("A", weapon, x: 12 * Tile + 3, y: 12.5f * Tile);
+        var probe = new EnemyState { BodyRadius = radius };
+        var zone = ReachFields.WeaponReach(grid, member.X, member.Y, member.Radius, weapon.Range);
+
+        bool Touches(float x, float y, float within)
+        {
+            for (int row = zone.Row0; row < zone.Row0 + zone.Rows; row++)
+            for (int col = zone.Col0; col < zone.Col0 + zone.Cols; col++)
+            {
+                if (!zone.Contains(row, col)) continue;
+                var (px, py) = ReachArea.NodePoint(row, col);
+                if ((px - x) * (px - x) + (py - y) * (py - y) <= within * within) return true;
+            }
+            return false;
+        }
+
+        int span = (int)MathF.Ceiling(radius / Step) + 2, hits = 0, misses = 0;
+        for (int row = zone.Row0 - span; row < zone.Row0 + zone.Rows + span; row++)
+        for (int col = zone.Col0 - span; col < zone.Col0 + zone.Cols + span; col++)
+        {
+            var (px, py) = ReachArea.NodePoint(row, col);
+            if (!ReachFields.BodyFits(grid, px, py, radius, null)) continue;
+            probe.X = px; probe.Y = py;
+            bool hit = EnemyAi.CanHit(member, probe, weapon, grid);
+            if (Touches(px, py, radius)) Assert.True(hit, $"touching at ({px}, {py}) and out of range");
+            if (hit) Assert.True(Touches(px, py, radius + Step), $"in range at ({px}, {py}) and nowhere near the zone");
+            if (hit) hits++; else misses++;
+        }
+        Assert.True(hits > 0 && misses > 0);
+    }
+
+    [Fact]
+    public void ABigBody_IsReachedFromFurtherBack()
+    {
+        // The same gap between centres: out of a dagger's reach for a dummy, in
+        // it for a boss's larger body — reach is measured to the body's edge.
+        var grid = Room(24, 24);
+        var weapon = TestWeapons.Get("weakspot_stiletto");
+        var member = TestPools.Holding("A", weapon, x: 6 * Tile, y: 12 * Tile);
+        float gap = member.Radius + EnemyState.DummyRadius + weapon.Range + 3f;
+        var dummy = new EnemyState { X = member.X + gap, Y = member.Y };
+        var boss = new EnemyState { X = member.X + gap, Y = member.Y, BodyRadius = 20f };
+
+        Assert.False(EnemyAi.CanHit(member, dummy, weapon, grid));
+        Assert.True(EnemyAi.CanHit(member, boss, weapon, grid));
+    }
+
     [Fact]
     public void InReach_AWallCastsAShadow()
     {

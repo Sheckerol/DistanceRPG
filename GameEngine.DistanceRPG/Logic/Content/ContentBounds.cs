@@ -378,6 +378,15 @@ internal static class ContentBounds
         KeptBy: ContentValidator.RuleBossStatline);
 
     /// <summary>
+    /// A boss's body radius, in logic units: <see cref="ContentValidator.RuleBossStatline"/>
+    /// keeps the 1. The top is half a hall's width (<see cref="MapGenerator.CorridorWidth"/>
+    /// tiles): a body any wider could not stand in the halls it walks.
+    /// </summary>
+    internal static NumberBound BossRadius { get; } = new(DungeonsJson.FileName, "boss.radius", 1, (int)(MapGenerator.CorridorWidth * GameConstants.Tile / 2),
+        "a boss body is a unit across at least, and no wider than the halls it walks (half of a corridor, three tiles wide)",
+        KeptBy: ContentValidator.RuleBossStatline);
+
+    /// <summary>
     /// A boss's innate stack: <see cref="ContentValidator.RuleBossInnateStackable"/>
     /// keeps the 1. Innate stacks are no forge's — "a golem deeper than any forge
     /// is a golem" (A21) — but none is deeper than a stack can ever grow
@@ -396,7 +405,7 @@ internal static class ContentBounds
         VariantRange, VariantDamage, VariantCost, VariantManaCost, Adds, Forged,
         Tier,
         Radius, Length, Width, AngleDegrees, TargetReach,
-        BossFloorMin, BossFloorMax, BossMaxHp, BossMovementBudget, BossInnate,
+        BossFloorMin, BossFloorMax, BossMaxHp, BossMovementBudget, BossRadius, BossInnate,
     ];
 
     /// <summary>The row a shape's dimension is held to, by the name the file writes it under (<c>radius</c>, <c>angleDegrees</c>).</summary>

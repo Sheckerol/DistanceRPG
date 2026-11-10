@@ -114,6 +114,7 @@ public class ContentBoundsTests
             ["bossFloorMax"] = ContentValidator.RuleBossFloorRange,
             ["boss.maxHp"] = ContentValidator.RuleBossStatline,
             ["boss.movementBudget"] = ContentValidator.RuleBossStatline,
+            ["boss.radius"] = ContentValidator.RuleBossStatline,
             ["boss.innate.M"] = ContentValidator.RuleBossInnateStackable,
         };
         foreach (var row in ContentBounds.All)
@@ -175,6 +176,7 @@ public class ContentBoundsTests
                 yield return (ContentBounds.BossFloorMax, $"{def.Id}.bossFloorMax", max);
             yield return (ContentBounds.BossMaxHp, $"{def.Id}.boss.maxHp", def.Boss.MaxHp);
             yield return (ContentBounds.BossMovementBudget, $"{def.Id}.boss.movementBudget", def.Boss.MovementBudget);
+            yield return (ContentBounds.BossRadius, $"{def.Id}.boss.radius", def.Boss.Radius);
             foreach (var (t, n) in def.Boss.Innate)
                 yield return (ContentBounds.BossInnate, $"{def.Id}.boss.innate.{t}", n);
         }
@@ -313,6 +315,8 @@ public class ContentBoundsTests
             v => WithDungeons(DataTexts.InRow(dungeons, "tutorial", $"\"maxHp\": {golem.MaxHp},", $"\"maxHp\": {v},")));
         yield return new(ContentBounds.BossMovementBudget, "tutorial", "boss.movementBudget",
             v => WithDungeons(DataTexts.InRow(dungeons, "tutorial", $"\"movementBudget\": {golem.MovementBudget},", $"\"movementBudget\": {v},")));
+        yield return new(ContentBounds.BossRadius, "tutorial", "boss.radius",
+            v => WithDungeons(DataTexts.InRow(dungeons, "tutorial", $"\"radius\": {golem.Radius},", $"\"radius\": {v},")));
         yield return new(ContentBounds.BossInnate, "tutorial", "boss.innate.Block",
             v => WithDungeons(DataTexts.InRow(dungeons, "tutorial", $"\"Block\": {golem.Innate[Block]}", $"\"Block\": {v}")));
     }
