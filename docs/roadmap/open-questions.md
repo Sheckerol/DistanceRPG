@@ -1387,7 +1387,14 @@ the movement/reach overlay (PR #17) are integrated** — not before.
   - How does the tree's levelling relate to the weapon and stat progression of
     Phase 2?
 
-## One combat/movement mode, and exploring without the pause (§1.2) — not yet planned
+## One combat/movement mode, and exploring without the pause (§1.2) — planned as Phase 8
+
+**Planned 2026-11-09 as [Phase 8](phase-8-modes.md)**: three modes — exploring,
+resting and combat — with turns kept as the world's clock (PHASE 8 DECISIONS 1–7,
+settled.md). The plan answers "does movement mode lose turns?" (no: the clock runs
+while the party walks) and "what keeps counting them?" (the ground walked, and a
+rest); its own open questions are listed there. The record below is kept as it was
+raised.
 
 Raised by the user on 2026-11-08, after play: the reach overlay turned off at a
 turn's end and did not come back at the next one's start. A large structural

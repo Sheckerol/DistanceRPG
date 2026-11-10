@@ -4540,3 +4540,34 @@ record (`RunResult.Deaths`), and the summary tells a line a member who died
 renames a version-3 `Death` outcome and saves the death record on the visit and the
 last result (checks 36 and 37). A revive floats `REVIVED` with the levels the cut
 took (`REVIVED  -1 SWORD  -2 HP`), or `REVIVED` alone when it crossed none.
+
+## Exploring, resting and combat — Phase 8 (2026-11-09, planned)
+
+Replaces the three checks that stand in for a mode (marching's turn-start grant,
+the turn's sightings, each enemy's reactions) and the pause every couple of spaces
+while exploring. Planned as its own phase: see [phase-8-modes](phase-8-modes.md),
+whose open questions are still the user's to rule.
+
+- **PHASE 8 DECISION 1 — three modes, held in `Logic/`, ruled 2026-11-09.**
+  Exploring, resting and combat, exactly one at a time; everything that today
+  asks its own question — the swap cost, the reach overlay, marching, the turn's
+  pace — reads the mode.
+- **PHASE 8 DECISION 2 — turns stay the world's clock, ruled 2026-11-09.**
+  Resurrection timers, status ticks and `TurnsSinceSeen` keep counting turns in
+  every mode: patrol routes, a later addition, need enemies moving while the party
+  moves.
+- **PHASE 8 DECISION 3 — exploring is simultaneous, ruled 2026-11-09.** Everyone
+  moves at once, an enemy at the party's speed times its movement budget over the
+  party's: more movement, faster; the slow ones at a relaxed pace.
+- **PHASE 8 DECISION 4 — the clock runs only while the party walks, ruled
+  2026-11-09.** A turn per `MovementBudget` the leader walks; standing still stops
+  the world, so nothing happens while the player thinks; resting is time passing
+  on purpose.
+- **PHASE 8 DECISION 5 — resting, ruled 2026-11-09.** Chosen while exploring: the
+  party regains HP and mana while the enemies move, until every living member is
+  at full HP and mana or an enemy is spotted, whichever is first.
+- **PHASE 8 DECISION 6 — resting teaches nothing, ruled 2026-11-09.** No HP or
+  mana XP from a rest, so damage and a rest are never an XP farm.
+- **PHASE 8 DECISION 7 — the party opens every fight, ruled 2026-11-09.** Combat
+  begins on a fresh party turn with full movement, wherever the party stands when
+  the enemy comes into view.
