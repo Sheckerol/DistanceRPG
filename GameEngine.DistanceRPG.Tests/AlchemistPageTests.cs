@@ -303,18 +303,18 @@ public sealed class AlchemistPageTests : IDisposable
         Assert.Equal(["H  HEALTH POTION Q3 - RESTORES 60 OF 100 HP", "H  HEALTH POTION Q5 - RESTORES ALL 100 HP", "H  HEALTH POTION Q7 - RESTORES ALL 100 HP - 40 OVER"],
             new[] { 3, 5, 7 }.Select(q => AlchemistPage.MixLines(PotionType.Health, q, fixture).Single()));
 
-        // A caster whose locks reserve mana — the starting party's D, its staff's
+        // A caster whose locks reserve mana — the starting party's C, its staff's
         // Regeneration holding some of the pool — is told what a mana potion restores
         // of what it can spend, so the quality that fills it shows, and the waste
         // past it (the audit of Phase 6b): the share is still of the earned pool.
-        var d = campaign.Party.Single(member => member.Id == "D");
-        int earned = d.MaxMana, spendable = d.UsableMaxMana;
-        Assert.True(spendable < earned, $"D's locks reserve nothing: {spendable} of {earned}");
+        var c = campaign.Party.Single(member => member.Id == "C");
+        int earned = c.MaxMana, spendable = c.UsableMaxMana;
+        Assert.True(spendable < earned, $"C's locks reserve nothing: {spendable} of {earned}");
         int whole = Enumerable.Range(1, 5).First(q => Alchemist.Share(PotionType.Mana, q, earned) >= spendable);
         Assert.True(whole < Alchemist.QualityForAll(PotionType.Mana));
-        Assert.Equal($"M  MANA POTION Q1 - RESTORES {earned / 5} OF {spendable} SPENDABLE MANA", AlchemistPage.MixLines(PotionType.Mana, 1, d).Single());
-        Assert.StartsWith($"M  MANA POTION Q{whole} - RESTORES ALL {spendable} SPENDABLE MANA", AlchemistPage.MixLines(PotionType.Mana, whole, d).Single(), StringComparison.Ordinal);
-        Assert.Equal($"M  MANA POTION Q5 - RESTORES ALL {spendable} SPENDABLE MANA - {earned - spendable} OVER", AlchemistPage.MixLines(PotionType.Mana, 5, d).Single());
+        Assert.Equal($"M  MANA POTION Q1 - RESTORES {earned / 5} OF {spendable} SPENDABLE MANA", AlchemistPage.MixLines(PotionType.Mana, 1, c).Single());
+        Assert.StartsWith($"M  MANA POTION Q{whole} - RESTORES ALL {spendable} SPENDABLE MANA", AlchemistPage.MixLines(PotionType.Mana, whole, c).Single(), StringComparison.Ordinal);
+        Assert.Equal($"M  MANA POTION Q5 - RESTORES ALL {spendable} SPENDABLE MANA - {earned - spendable} OVER", AlchemistPage.MixLines(PotionType.Mana, 5, c).Single());
 
         // The percentages apart; a drink that is free.
         using (TestContent.UsePremise(tuning: t => Mixing(t) with { ManaPotionPercent = 25, PotionUseCost = 0 }))

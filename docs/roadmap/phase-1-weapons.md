@@ -237,6 +237,10 @@ magnitude.
 Starting at `×1` rather than the prototype's `×4` also leaves the dagger seven
 stacks of headroom for depth, grafts and services to work with, instead of one.
 
+> **Ranges are tuned in `weapons.json`, not fixed here** (the user's ruling of
+> 2026-11-09). The Range columns below are the first draft; after playtesting the
+> Sword plays at 60 and the Axe at 90, and no test pins any class's range.
+
 ### Sword & Shield (max STR/DEX) — baseline `Block ×1, Push ×1`
 
 | Role | Name | Range | Dmg | Cost | Adds |

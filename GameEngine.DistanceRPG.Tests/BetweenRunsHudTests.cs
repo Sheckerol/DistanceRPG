@@ -762,25 +762,25 @@ public sealed class BetweenRunsHudTests : IDisposable
         // Last the enchanter (Phase 6a.3a), shut until the tutorial is beaten
         // (TheEnchanterSectionShowsWorkingAndStalled).
         var campaign = CampaignState.Start(GameContent.Current);
-        campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
+        campaign.Move(new WeaponPlace("D", 1), WeaponPlace.InTheStable(0));
         Assert.Equal(new[]
         {
             "THE PARTY AND THE STABLE",
             "[A]",
-            "  HAND  RONDEL - WEAR 0/30",
-            "  BAG   - ROOM FOR 5 MORE -",
-            "[B]",
             "  HAND  SCUTUM AND GLADIUS - WEAR 0/30",
             "  BAG   STAFF OF RENEWAL - WEAR 0/30",
             "  BAG   - ROOM FOR 4 MORE -",
-            "[C]",
+            "[B]",
             "  HAND  DANE AXE - WEAR 0/30",
             "  BAG   STAFF OF RENEWAL - WEAR 0/30",
             "  BAG   - ROOM FOR 4 MORE -",
-            "[D]",
+            "[C]",
             "  HAND  STAFF OF RENEWAL - WEAR 0/30",
             "  BAG   STAFF OF MIRE - WEAR 0/30",
             "  BAG   - ROOM FOR 4 MORE -",
+            "[D]",
+            "  HAND  RONDEL - WEAR 0/30",
+            "  BAG   - ROOM FOR 5 MORE -",
             "THE STABLE - 1 WEAPON",
             "  STAFF OF RENEWAL - WEAR 0/30",
             "  - ROOM -",
@@ -791,20 +791,20 @@ public sealed class BetweenRunsHudTests : IDisposable
 
         // A full bag has no room row; an empty hand is a row of its own, somewhere a
         // weapon can go; a full weapon reads FULL.
-        var b = campaign.Party[1];
-        for (int slot = 2; slot < b.Inventory.Length; slot++)
-            b.Inventory[slot] = TestWeapons.Get("darts");
         var a = campaign.Party[0];
+        for (int slot = 2; slot < a.Inventory.Length; slot++)
+            a.Inventory[slot] = TestWeapons.Get("darts");
+        var d = campaign.Party[3];
         var def = GameContent.Current.Weapons["weakspot_stiletto"];
-        var full = new Weapon(def, a.WeaponIn(0)!.Forged, a.WeaponIn(0)!.Modifiers, [], 0, wear: 30);
-        a.Inventory[0] = null;
-        a.Inventory[2] = full;
+        var full = new Weapon(def, d.WeaponIn(0)!.Forged, d.WeaponIn(0)!.Modifiers, [], 0, wear: 30);
+        d.Inventory[0] = null;
+        d.Inventory[2] = full;
         var rows = HubWeapons.Rows(campaign);
-        Assert.Equal(new[] { "[A]", "  HAND  - EMPTY -", "  BAG   RONDEL - WEAR 30/30 FULL", "  BAG   - ROOM FOR 4 MORE -" },
-            rows.Skip(1).Take(4).Select(row => row.Text));
-        Assert.DoesNotContain(rows, row => row.Place?.MemberId == "B" && row.Kind == HubWeapons.RowKind.Room);
-        Assert.Equal(new WeaponPlace("A", 0), rows[2].Place);
-        Assert.Equal(new WeaponPlace("A", 1), rows[4].Place);   // a weapon put in the room takes the first empty slot
+        Assert.Equal(new[] { "[D]", "  HAND  - EMPTY -", "  BAG   RONDEL - WEAR 30/30 FULL", "  BAG   - ROOM FOR 4 MORE -" },
+            rows.Skip(16).Take(4).Select(row => row.Text));
+        Assert.DoesNotContain(rows, row => row.Place?.MemberId == "A" && row.Kind == HubWeapons.RowKind.Room);
+        Assert.Equal(new WeaponPlace("D", 0), rows[17].Place);
+        Assert.Equal(new WeaponPlace("D", 1), rows[19].Place);   // a weapon put in the room takes the first empty slot
         Assert.Equal(WeaponPlace.InTheStable(1), rows[^2].Place);   // the stable's end, over the enchanter's heading
 
         // Drawn: headings and members grey, a room dark grey, a weapon white — its
@@ -812,15 +812,15 @@ public sealed class BetweenRunsHudTests : IDisposable
         // yellow, its indent marked and its end closed, as the dungeon list's choice
         // is; a weapon taken up reads cyan where it lies.
         Assert.Equal(DungeonHud.Grey, Assert.Single(HubWeapons.Runs(rows[0])).Color);
-        Assert.Equal(DungeonHud.DarkGrey, Assert.Single(HubWeapons.Runs(rows[2])).Color);
-        var fullRuns = HubWeapons.Runs(rows[3]);
+        Assert.Equal(DungeonHud.DarkGrey, Assert.Single(HubWeapons.Runs(rows[17])).Color);
+        var fullRuns = HubWeapons.Runs(rows[18]);
         Assert.Equal(("  BAG   ", DungeonHud.White), (fullRuns[0].Text, fullRuns[0].Color));
         Assert.Equal(("WEAR 30/30 FULL", DungeonHud.Green), (fullRuns[^1].Text, fullRuns[^1].Color));
-        var chosen = HubWeapons.Runs(rows[3], chosen: true);
+        var chosen = HubWeapons.Runs(rows[18], chosen: true);
         Assert.Equal("> BAG   RONDEL - WEAR 30/30 FULL <", string.Concat(chosen.Select(run => run.Text)));
         Assert.Equal((DungeonHud.Yellow, DungeonHud.Green), (chosen[0].Color, chosen[3].Color));
-        Assert.Equal("> HAND  - EMPTY - <", Assert.Single(HubWeapons.Runs(rows[2], chosen: true)).Text);
-        Assert.Equal(DungeonHud.Cyan, HubWeapons.Runs(rows[3], carried: true)[0].Color);
+        Assert.Equal("> HAND  - EMPTY - <", Assert.Single(HubWeapons.Runs(rows[17], chosen: true)).Text);
+        Assert.Equal(DungeonHud.Cyan, HubWeapons.Runs(rows[18], carried: true)[0].Color);
         var knife = new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.StableLabel, WeaponPlace.InTheStable(0), TestWeapons.Get("flensing_knife_unique"));
         Assert.True(knife.Weapon!.Unique);
         Assert.Equal(DungeonHud.Orange, HubWeapons.Runs(knife)[1].Color);
@@ -832,10 +832,10 @@ public sealed class BetweenRunsHudTests : IDisposable
         // slots and what its next enchantment costs (Phase 6a.3a; their words are
         // TheEnchanterSectionShowsWorkingAndStalled's).
         var stiletto = TestWeapons.Get("weakspot_stiletto");
-        var detail = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.HandLabel, new WeaponPlace("A", 0), stiletto));
+        var detail = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.HandLabel, new WeaponPlace("D", 0), stiletto));
         Assert.Equal(new[]
         {
-            "IN THE HAND OF [A]",
+            "IN THE HAND OF [D]",
             "RONDEL",
             DungeonHud.WeaponStats(stiletto),
             $"* {DungeonHud.ModifierReadout(stiletto)}",
@@ -844,7 +844,7 @@ public sealed class BetweenRunsHudTests : IDisposable
             BetweenRunsHud.SlotsLine(stiletto),
             BetweenRunsHud.PriceLine(stiletto),
         }, detail.Select(row => row.Text));
-        Assert.Equal(DungeonHud.Green, BetweenRunsHud.DetailRows(rows[3]).Single(row => row.Text.StartsWith("WEAR", StringComparison.Ordinal)).Color);
+        Assert.Equal(DungeonHud.Green, BetweenRunsHud.DetailRows(rows[18]).Single(row => row.Text.StartsWith("WEAR", StringComparison.Ordinal)).Color);
         Assert.Equal("WEAR 30 OF 30 - FULL - TIME TO ROTATE IT INTO THE SHOP", DungeonHud.WearLine(full));
         Assert.Equal("IN THE STABLE", BetweenRunsHud.WhereLine(WeaponPlace.InTheStable(3)));
         Assert.Equal("IN THE BAG OF [D]", BetweenRunsHud.WhereLine(new WeaponPlace("D", 2)));
@@ -873,20 +873,20 @@ public sealed class BetweenRunsHudTests : IDisposable
         })
         {
             Assert.True(BetweenRunsHud.CastsNothing(caster), $"{caster.Name} carrying {caster.Enchantments.Count} casts something");
-            var said = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.BagLabel, new WeaponPlace("D", 1), caster));
+            var said = BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.BagLabel, new WeaponPlace("C", 1), caster));
             var why = Assert.Single(said, line => line.Text == BetweenRunsHud.CastsNothingLine);
             Assert.Equal(DungeonHud.Orange, why.Color);
             Assert.Equal(said.Count - 5, said.ToList().IndexOf(why));   // under the enchantments, over the wear, the capacity, the slots and the price
         }
         Assert.DoesNotContain(GameContent.Current.Weapons.All.Select(Made), BetweenRunsHud.CastsNothing);
-        var dStaff = campaign.Party[3].EquippedWeapon!;
-        Assert.True(dStaff.IsCaster);
-        Assert.DoesNotContain(BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.HandLabel, new WeaponPlace("D", 0), dStaff)),
+        var cStaff = campaign.Party[2].EquippedWeapon!;
+        Assert.True(cStaff.IsCaster);
+        Assert.DoesNotContain(BetweenRunsHud.DetailRows(new HubWeapons.Row(HubWeapons.RowKind.Weapon, HubWeapons.HandLabel, new WeaponPlace("C", 0), cStaff)),
             line => line.Text == BetweenRunsHud.CastsNothingLine);
 
         // A room says where it is and how a weapon gets there; a heading says nothing.
-        Assert.Equal(new[] { "THE HAND OF [A] IS EMPTY", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[2]).Select(row => row.Text));
-        Assert.Equal(new[] { "ROOM IN THE BAG OF [A]", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[4]).Select(row => row.Text));
+        Assert.Equal(new[] { "THE HAND OF [D] IS EMPTY", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[17]).Select(row => row.Text));
+        Assert.Equal(new[] { "ROOM IN THE BAG OF [D]", BetweenRunsHud.RoomHint }, BetweenRunsHud.DetailRows(rows[19]).Select(row => row.Text));
         Assert.Equal("THE END OF THE STABLE - IT KEEPS ANY NUMBER OF WEAPONS", BetweenRunsHud.DetailRows(rows[^2])[0].Text);
         Assert.Empty(BetweenRunsHud.DetailRows(rows[0]));
         Assert.Empty(BetweenRunsHud.DetailRows(rows[^1]));
@@ -1030,7 +1030,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         while (walked.Weapons.Chosen != 7)
             Assert.Equal(6, Press(Keys.W));   // up to B's bag weapon, the window where it was
         Assert.Equal(5, Press(Keys.W));   // B's hand, the first under [B]: [B] comes in over it
-        Assert.Equal(("[B]", "  HAND  SCUTUM AND GLADIUS - WEAR 0/30"), (walked.Weapons.Rows()[5].Text, ChosenText(walked)));
+        Assert.Equal(("[B]", "  HAND  DANE AXE - WEAR 0/30"), (walked.Weapons.Rows()[5].Text, ChosenText(walked)));
         Assert.Equal(5, Press(Keys.S));   // and stays in
         Assert.Equal(5, Press(Keys.W));
         Assert.Equal(4, Press(Keys.W));   // A's room, out of view above: just far enough
@@ -1111,13 +1111,13 @@ public sealed class BetweenRunsHudTests : IDisposable
         Assert.Equal("  STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
         Assert.Equal(1, host.HubSavesAsked);
 
-        // Taken up from the stable and put down onto C's hand: a swap — equipping —
+        // Taken up from the stable and put down onto B's hand: a swap — equipping —
         // the axe going to the stable where the staff was.
-        var axe = campaign.Party[2].EquippedWeapon!;
+        var axe = campaign.Party[1].EquippedWeapon!;
         scene.OnKey(Keys.Enter);
         ChooseRow(scene, "  HAND  DANE AXE - WEAR 0/30");
         scene.OnKey(Keys.Enter);
-        Assert.Same(staff, campaign.Party[2].EquippedWeapon);
+        Assert.Same(staff, campaign.Party[1].EquippedWeapon);
         Assert.Equal([axe], campaign.Stable);
         Assert.Equal(2, host.HubSavesAsked);
     }
@@ -1133,55 +1133,63 @@ public sealed class BetweenRunsHudTests : IDisposable
         var (scene, host) = Hub(campaign);
         scene.OnKey(Keys.Tab);
 
-        // A's staff to the stable: asked once.
-        ChooseRow(scene, "  BAG   STAFF OF RENEWAL - WEAR 0/30");
+        // D's staff to the stable: asked once.
+        void ChoosePlace(WeaponPlace place)
+        {
+            for (int step = 0; step <= scene.Weapons.Rows().Count && scene.Weapons.ChosenRow.Place != place; step++)
+                scene.OnKey(Keys.S);
+            Assert.Equal(place, scene.Weapons.ChosenRow.Place);
+        }
+        ChoosePlace(new WeaponPlace("D", 1));
+        Assert.Equal("  BAG   STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
         scene.OnKey(Keys.Enter);
         ChooseRow(scene, HubWeapons.StableRoom);
         scene.OnKey(Keys.Enter);
         Assert.Equal(1, host.HubSavesAsked);
 
-        // A's stiletto, its last weapon, to the stable: refused, said in the refusal
+        // D's stiletto, its last weapon, to the stable: refused, said in the refusal
         // row — PHASE 6a DECISION 7 — and still taken up; nothing moved, nothing asked.
         var bags = Bags(campaign);
         ChooseRow(scene, "  HAND  RONDEL - WEAR 0/30");
         scene.OnKey(Keys.Enter);
         ChooseRow(scene, HubWeapons.StableRoom);
         scene.OnKey(Keys.Enter);
-        Assert.Equal("EACH MEMBER KEEPS A WEAPON - [A] WOULD CARRY NONE", scene.Refusal);
-        Assert.Equal(HubWeapons.KeepsAWeapon("A"), scene.Refusal);
+        Assert.Equal("EACH MEMBER KEEPS A WEAPON - [D] WOULD CARRY NONE", scene.Refusal);
+        Assert.Equal(HubWeapons.KeepsAWeapon("D"), scene.Refusal);
         Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
         Assert.Equal(bags, Bags(campaign));
         Assert.Single(campaign.Stable);
         Assert.Equal(1, host.HubSavesAsked);
 
-        // Into B's bag room: refused the same way — it leaves A with none.
+        // Into A's bag room: refused the same way — it leaves D with none.
         ChooseRow(scene, "  BAG   - ROOM FOR 4 MORE -");
         Assert.Null(scene.Refusal);   // until the next key
         scene.OnKey(Keys.Enter);
-        Assert.Equal(HubWeapons.KeepsAWeapon("A"), scene.Refusal);
+        Assert.Equal(HubWeapons.KeepsAWeapon("D"), scene.Refusal);
 
-        // Into A's own bag room: A's emptied hand would take it straight back — a
+        // Into D's own bag room: D's emptied hand would take it straight back — a
         // move that moves nothing, once logged and saved as one (the audit of Phase
         // 6a). Refused, said why, still taken up; nothing moved, nothing asked.
         ChooseRow(scene, "  BAG   - ROOM FOR 5 MORE -");
         scene.OnKey(Keys.Enter);
-        Assert.Equal("AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - [A] WOULD TAKE IT STRAIGHT BACK", scene.Refusal);
-        Assert.Equal(HubWeapons.StraightBack("A"), scene.Refusal);
+        Assert.Equal("AN EMPTY HAND TAKES THE FIRST WEAPON IN THE BAG - [D] WOULD TAKE IT STRAIGHT BACK", scene.Refusal);
+        Assert.Equal(HubWeapons.StraightBack("D"), scene.Refusal);
         Assert.Equal(BetweenRunsScene.HubMode.Carrying, scene.Mode);
         Assert.Equal(bags, Bags(campaign));
         Assert.Equal(1, host.HubSavesAsked);
         Assert.DoesNotContain(GameEngine.Core.Diagnostics.Log.RecentEntries, entry => entry.Message.StartsWith("[Hub] Moved Rondel", StringComparison.Ordinal));
 
-        // Onto the stable's staff instead: a swap, which leaves A armed — asked again.
+        // Onto the stable's staff instead: a swap, which leaves D armed — asked again.
         ChooseRow(scene, "  STAFF OF RENEWAL - WEAR 0/30");
         scene.OnKey(Keys.Enter);
         Assert.Null(scene.Refusal);
-        Assert.Equal("staff_of_renewal", campaign.Party[0].EquippedWeapon!.Id);
+        Assert.Equal("staff_of_renewal", campaign.Party[3].EquippedWeapon!.Id);
         Assert.Equal("weakspot_stiletto", Assert.Single(campaign.Stable).Id);
         Assert.Equal(2, host.HubSavesAsked);
 
         // ESC clears a refusal too, and puts the weapon back.
-        ChooseRow(scene, "  HAND  STAFF OF RENEWAL - WEAR 0/30");
+        ChoosePlace(new WeaponPlace("D", 0));
+        Assert.Equal("  HAND  STAFF OF RENEWAL - WEAR 0/30", ChosenText(scene));
         scene.OnKey(Keys.Enter);
         ChooseRow(scene, HubWeapons.StableRoom);
         scene.OnKey(Keys.Enter);
@@ -1469,7 +1477,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         var campaign = AlchemistTests.Arrived();
         var (scene, _) = Hub(campaign);
         scene.OnKey(Keys.Tab);
-        ChooseRow(scene, "  HAND  SCUTUM AND GLADIUS - WEAR 0/30");
+        ChooseRow(scene, "  HAND  DANE AXE - WEAR 0/30");
         int was = scene.Weapons.Chosen;
 
         scene.OnKey(Keys.Tab);
@@ -1479,7 +1487,7 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
         Assert.Equal(BetweenRunsScene.HubMode.Weapons, scene.Mode);
-        Assert.Equal("  HAND  SCUTUM AND GLADIUS - WEAR 0/30", ChosenText(scene));
+        Assert.Equal("  HAND  DANE AXE - WEAR 0/30", ChosenText(scene));
         Assert.Equal(was + 3, scene.Weapons.Chosen);
 
         // A pour-back from the full bag takes a potion row away over it and brings
@@ -1490,13 +1498,13 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.T);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
-        Assert.Equal(("  HAND  SCUTUM AND GLADIUS - WEAR 0/30", was + 3), (ChosenText(scene), scene.Weapons.Chosen));
+        Assert.Equal(("  HAND  DANE AXE - WEAR 0/30", was + 3), (ChosenText(scene), scene.Weapons.Chosen));
         scene.OnKey(Keys.Tab);
         ChooseAlchemistRow(scene, "  BAG 4  HEALTH POTION Q1");
         scene.OnKey(Keys.T);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
-        Assert.Equal(("  HAND  SCUTUM AND GLADIUS - WEAR 0/30", was + 2), (ChosenText(scene), scene.Weapons.Chosen));
+        Assert.Equal(("  HAND  DANE AXE - WEAR 0/30", was + 2), (ChosenText(scene), scene.Weapons.Chosen));
         Assert.Equal(5, Farm.Batch(campaign));
 
         // On A's room, which a mix moves to its next empty slot: the choice with it.
@@ -1509,29 +1517,29 @@ public sealed class BetweenRunsHudTests : IDisposable
         scene.OnKey(Keys.Tab);
         Assert.Equal((HubWeapons.BagRoom(1), new WeaponPlace("A", 3)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
 
-        // On the stable's end: a mix into C adds a row over it, and the choice moves down with it.
+        // On the stable's end: a mix into B adds a row over it, and the choice moves down with it.
         ChooseRow(scene, HubWeapons.StableRoom);
         int stableAt = scene.Weapons.Chosen;
         scene.OnKey(Keys.Tab);
-        ChooseAlchemistRow(scene, "[C] - 4 BAG SLOTS FREE");
+        ChooseAlchemistRow(scene, "[B] - 4 BAG SLOTS FREE");
         scene.OnKey(Keys.H);
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
         Assert.Equal((HubWeapons.StableRoom, stableAt + 1, WeaponPlace.InTheStable(0)), (ChosenText(scene), scene.Weapons.Chosen, scene.Weapons.ChosenRow.Place));
 
-        // On C's room, the mixes that fill C's bag take it away: the choice goes to
-        // the nearest row over it that is still C's — the staff in its bag — never
+        // On B's room, the mixes that fill B's bag take it away: the choice goes to
+        // the nearest row over it that is still B's — the staff in its bag — never
         // to the first row on the page, A's hand, a page away.
         ChooseRow(scene, HubWeapons.BagRoom(3));
-        Assert.Equal(new WeaponPlace("C", 3), scene.Weapons.ChosenRow.Place);
+        Assert.Equal(new WeaponPlace("B", 3), scene.Weapons.ChosenRow.Place);
         scene.OnKey(Keys.Tab);
-        ChooseAlchemistRow(scene, "[C] - 3 BAG SLOTS FREE");
+        ChooseAlchemistRow(scene, "[B] - 3 BAG SLOTS FREE");
         for (int i = 0; i < 3; i++)
             scene.OnKey(Keys.H);
-        Assert.Equal((0, "[C] - THE BAG IS FULL"), (Farm.Batch(campaign), scene.Alchemist.ChosenRow!.Text));
+        Assert.Equal((0, "[B] - THE BAG IS FULL"), (Farm.Batch(campaign), scene.Alchemist.ChosenRow!.Text));
         scene.OnKey(Keys.Tab);
         scene.OnKey(Keys.Tab);
-        Assert.Equal(("  BAG   STAFF OF RENEWAL - WEAR 0/30", new WeaponPlace("C", 1)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
+        Assert.Equal(("  BAG   STAFF OF RENEWAL - WEAR 0/30", new WeaponPlace("B", 1)), (ChosenText(scene), scene.Weapons.ChosenRow.Place));
 
         // An empty hand is a room of its own (TheWeaponsPageListsEveryMemberAndTheStable):
         // B's, its staff still in the bag. On it, a mix into A moves it down a row and

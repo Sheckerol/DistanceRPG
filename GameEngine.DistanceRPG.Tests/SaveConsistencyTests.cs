@@ -321,7 +321,7 @@ public sealed class SaveConsistencyTests : IDisposable
 
         var visit = worn.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
         visit.OpenTurns(worn.Party, CampaignRuns.Ten);
-        var gear = Worn(worn.Party[3].WeaponIn(1)!, 7);   // D's second staff, cast with before it went back in the bag
+        var gear = Worn(worn.Party[3].WeaponIn(1)!, 7);   // D's bag staff, cast with before it went back in the bag
         Assert.Same(gear, visit.Current.Leave(worn.Party[3], 1).Weapon);
         Loads(worn, "a worn weapon put down on a floor, mid-run");
         var kept = new Drop(TestWeapons.Get("hatchet"), DefeatCount: 0, WasUniqueRoll: false);
@@ -706,26 +706,26 @@ public sealed class SaveConsistencyTests : IDisposable
         RefusedAt(Edited(entered, tree => FloorNode(tree, 0)["enemies"]![0]!["dropTaken"] = true),
             "campaign.visit.floors[0].enemies[0].dropTaken", "taken with the boss standing: nothing is handed over while the dungeon resurrects");
 
-        // The Flagship: the party earned before the door, and A since.
+        // The Flagship: the party earned before the door, and D since.
         var flagship = VisitSaveTests.Flagship();
         string text = Save(flagship.Campaign);
         var party = flagship.Campaign.Party;
         Restores(text, "the Flagship");
-        int dagger = party[0].WeaponXp[WeaponClass.Dagger];
-        int throwing = party[1].WeaponXp[WeaponClass.Throwing];
+        int dagger = party[3].WeaponXp[WeaponClass.Dagger];
+        int throwing = party[0].WeaponXp[WeaponClass.Throwing];
         const string OnlyAdds = "a visit only adds XP, and a wipe claws it back only as the run ends";
 
         // 16. What a pool held at the door is no more than it holds now: each edit
-        // puts one more at the door than the member holds — a class B never used among them.
+        // puts one more at the door than the member holds — a class A never used among them.
         Assert.Equal(0, throwing);
-        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![0]!["weaponXp"]!["Dagger"] = dagger + 1),
-            "campaign.visit.entrySnapshot.members[0].weaponXp.Dagger", $"{dagger + 1} is more than member A holds now, {dagger}: {OnlyAdds}");
-        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![1]!["weaponXp"]!["Throwing"] = throwing + 1),
-            "campaign.visit.entrySnapshot.members[1].weaponXp.Throwing", $"{throwing + 1} is more than member B holds now, {throwing}: {OnlyAdds}");
-        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![2]!["hpXp"] = party[2].HpXp + 1),
-            "campaign.visit.entrySnapshot.members[2].hpXp", $"{party[2].HpXp + 1} is more than member C holds now, {party[2].HpXp}: {OnlyAdds}");
-        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![3]!["manaXp"] = party[3].ManaXp + 1),
-            "campaign.visit.entrySnapshot.members[3].manaXp", $"{party[3].ManaXp + 1} is more than member D holds now, {party[3].ManaXp}: {OnlyAdds}");
+        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![3]!["weaponXp"]!["Dagger"] = dagger + 1),
+            "campaign.visit.entrySnapshot.members[3].weaponXp.Dagger", $"{dagger + 1} is more than member D holds now, {dagger}: {OnlyAdds}");
+        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![0]!["weaponXp"]!["Throwing"] = throwing + 1),
+            "campaign.visit.entrySnapshot.members[0].weaponXp.Throwing", $"{throwing + 1} is more than member A holds now, {throwing}: {OnlyAdds}");
+        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![1]!["hpXp"] = party[1].HpXp + 1),
+            "campaign.visit.entrySnapshot.members[1].hpXp", $"{party[1].HpXp + 1} is more than member B holds now, {party[1].HpXp}: {OnlyAdds}");
+        RefusedAt(Edited(text, tree => VisitNode(tree)["entrySnapshot"]!["members"]![2]!["manaXp"] = party[2].ManaXp + 1),
+            "campaign.visit.entrySnapshot.members[2].manaXp", $"{party[2].ManaXp + 1} is more than member C holds now, {party[2].ManaXp}: {OnlyAdds}");
 
         // 17. The promise is a stack a floor at most.
         int depth = flagship.Visit.BossFloor;
@@ -772,18 +772,18 @@ public sealed class SaveConsistencyTests : IDisposable
         // forged stack raised with its live one, a run counter with its summary's.
         // (The boss floor's is S3's, ContentBoundsTests.)
         var campaign = HallCleared();
-        campaign.Party[2].Credit(new XpCredit(XpPool.Health, null, 9));
+        campaign.Party[1].Credit(new XpCredit(XpPool.Health, null, 9));
         string hall = Save(campaign);
         var tree0 = JsonNode.Parse(hall)!.AsObject();
-        int hpXp = campaign.Party[2].HpXp;
+        int hpXp = campaign.Party[1].HpXp;
         Assert.True(hpXp > 0);
 
-        // A's weapon, its first forged modifier and one it was not forged with; D's staff and its innate.
-        var forgedTable = WeaponNode(tree0, 0, 0)["forged"]!.AsObject();
+        // D's weapon, its first forged modifier and one it was not forged with; C's staff and its innate.
+        var forgedTable = WeaponNode(tree0, 3, 0)["forged"]!.AsObject();
         string forged = forgedTable.First().Key;
         int forgedStacks = forgedTable[forged]!.GetValue<int>();
         string unforged = Enum.GetNames<ModifierType>().First(name => !forgedTable.ContainsKey(name));
-        Assert.Equal(("staff_of_renewal", "regeneration"), (WeaponNode(tree0, 3, 0)["id"]!.GetValue<string>(), WeaponNode(tree0, 3, 0)["enchantments"]![0]!["id"]!.GetValue<string>()));
+        Assert.Equal(("staff_of_renewal", "regeneration"), (WeaponNode(tree0, 2, 0)["id"]!.GetValue<string>(), WeaponNode(tree0, 2, 0)["enchantments"]![0]!["id"]!.GetValue<string>()));
         var ids = GameContent.Current.Enchantments.All.Where(def => !def.Unique).Select(def => def.Id).ToArray();
         JsonArray Entries(int count) => new(Enumerable.Range(0, count)
             .Select(i => (JsonNode?)JsonNode.Parse($$"""{ "id": "{{ids[i % ids.Length]}}", "tier": 1, "xp": 0 }"""))
@@ -806,35 +806,35 @@ public sealed class SaveConsistencyTests : IDisposable
         [
             // 0a. A forged stack: no forge goes deeper than MaxForged's clamp ceiling.
             ("a forged stack", hall,
-                tree => { WeaponNode(tree, 0, 0)["forged"]![forged] = deepestForge; WeaponNode(tree, 0, 0)["modifiers"]![forged] = deepestForge; },
-                tree => { WeaponNode(tree, 0, 0)["forged"]![forged] = deepestForge + 1; WeaponNode(tree, 0, 0)["modifiers"]![forged] = deepestForge + 1; },
-                $"campaign.party[0].inventory[0].forged.{forged}", $"{deepestForge + 1} is above {deepestForge}: no forge goes deeper (MaxForged at its most)"),
+                tree => { WeaponNode(tree, 3, 0)["forged"]![forged] = deepestForge; WeaponNode(tree, 3, 0)["modifiers"]![forged] = deepestForge; },
+                tree => { WeaponNode(tree, 3, 0)["forged"]![forged] = deepestForge + 1; WeaponNode(tree, 3, 0)["modifiers"]![forged] = deepestForge + 1; },
+                $"campaign.party[3].inventory[0].forged.{forged}", $"{deepestForge + 1} is above {deepestForge}: no forge goes deeper (MaxForged at its most)"),
             // 0b. A live stack: its forged count plus AcquiredHeadroom's clamp ceiling — forged, and not.
             ("a live stack", hall,
-                tree => WeaponNode(tree, 0, 0)["modifiers"]![forged] = forgedStacks + mostAcquired,
-                tree => WeaponNode(tree, 0, 0)["modifiers"]![forged] = forgedStacks + mostAcquired + 1,
-                $"campaign.party[0].inventory[0].modifiers.{forged}", $"{forgedStacks + mostAcquired + 1} is above {forgedStacks + mostAcquired}: {AcquiredWhy(forgedStacks)}"),
+                tree => WeaponNode(tree, 3, 0)["modifiers"]![forged] = forgedStacks + mostAcquired,
+                tree => WeaponNode(tree, 3, 0)["modifiers"]![forged] = forgedStacks + mostAcquired + 1,
+                $"campaign.party[3].inventory[0].modifiers.{forged}", $"{forgedStacks + mostAcquired + 1} is above {forgedStacks + mostAcquired}: {AcquiredWhy(forgedStacks)}"),
             ("a live stack never forged", hall,
-                tree => WeaponNode(tree, 0, 0)["modifiers"]![unforged] = mostAcquired,
-                tree => WeaponNode(tree, 0, 0)["modifiers"]![unforged] = mostAcquired + 1,
-                $"campaign.party[0].inventory[0].modifiers.{unforged}", $"{mostAcquired + 1} is above {mostAcquired}: {AcquiredWhy(0)}"),
+                tree => WeaponNode(tree, 3, 0)["modifiers"]![unforged] = mostAcquired,
+                tree => WeaponNode(tree, 3, 0)["modifiers"]![unforged] = mostAcquired + 1,
+                $"campaign.party[3].inventory[0].modifiers.{unforged}", $"{mostAcquired + 1} is above {mostAcquired}: {AcquiredWhy(0)}"),
             // 0c. A member's innate: no deeper than any stack grows.
             ("an innate stack", hall,
-                tree => MemberNode(tree, 1)["innate"] = JsonNode.Parse($$"""{ "Block": {{deepestStack}} }"""),
-                tree => MemberNode(tree, 1)["innate"] = JsonNode.Parse($$"""{ "Block": {{deepestStack + 1}} }"""),
-                "campaign.party[1].innate.Block",
+                tree => MemberNode(tree, 0)["innate"] = JsonNode.Parse($$"""{ "Block": {{deepestStack}} }"""),
+                tree => MemberNode(tree, 0)["innate"] = JsonNode.Parse($$"""{ "Block": {{deepestStack + 1}} }"""),
+                "campaign.party[0].innate.Block",
                 $"{deepestStack + 1} is above {deepestStack}: no stack grows deeper than the deepest forge plus the most headroom (MaxForged and AcquiredHeadroom at their most)"),
             // 0d. A tier: uncapped by design; the bound is where its arithmetic stops being whole.
             ("a tier", hall,
-                tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["tier"] = deepestTier,
-                tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["tier"] = deepestTier + 1,
-                "campaign.party[3].inventory[0].enchantments[0].tier",
+                tree => WeaponNode(tree, 2, 0)["enchantments"]![0]!["tier"] = deepestTier,
+                tree => WeaponNode(tree, 2, 0)["enchantments"]![0]!["tier"] = deepestTier + 1,
+                "campaign.party[2].inventory[0].enchantments[0].tier",
                 $"{deepestTier + 1} is above {deepestTier}: tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number"),
             // 0e. The entries a weapon holds: EnchantmentSlots' clamp ceiling.
             ("a weapon's entries", hall,
-                tree => WeaponNode(tree, 0, 0)["enchantments"] = Entries(mostEnchantments),
-                tree => WeaponNode(tree, 0, 0)["enchantments"] = Entries(mostEnchantments + 1),
-                "campaign.party[0].inventory[0].enchantments",
+                tree => WeaponNode(tree, 3, 0)["enchantments"] = Entries(mostEnchantments),
+                tree => WeaponNode(tree, 3, 0)["enchantments"] = Entries(mostEnchantments + 1),
+                "campaign.party[3].inventory[0].enchantments",
                 $"{mostEnchantments + 1} entries, more than the {mostEnchantments} a weapon can hold: none arrives with more than {ContentValidator.MostArrivingEnchantments}, and the enchanter fills {mostEnchantments} slots at most"),
             // 0f. The run counter, and the last run's copy of it, each at the ceiling
             // with the rest. A lock keeps its floor alone
@@ -850,18 +850,18 @@ public sealed class SaveConsistencyTests : IDisposable
             // 0i. A weapon's wear: no capacity any tuning in range gives it, the largest
             // bar plus the most a bar adds for each wear cashed (Phase 6a.1).
             ("a weapon's wear", hall,
-                tree => WeaponNode(tree, 0, 0)["wear"] = bar,
-                tree => WeaponNode(tree, 0, 0)["wear"] = bar + 1,
-                "campaign.party[0].inventory[0].wear", $"{bar + 1} is above {bar}: {WearWhy}"),
+                tree => WeaponNode(tree, 3, 0)["wear"] = bar,
+                tree => WeaponNode(tree, 3, 0)["wear"] = bar + 1,
+                "campaign.party[3].inventory[0].wear", $"{bar + 1} is above {bar}: {WearWhy}"),
             ("a weapon's wear, a bar cashed", hall,
-                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = 30; WeaponNode(tree, 0, 0)["wear"] = bar + 30 * perBar; },
-                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = 30; WeaponNode(tree, 0, 0)["wear"] = bar + 30 * perBar + 1; },
-                "campaign.party[0].inventory[0].wear", $"{bar + 30 * perBar + 1} is above {bar + 30 * perBar}: {WearWhy}"),
+                tree => { WeaponNode(tree, 3, 0)["wearCashed"] = 30; WeaponNode(tree, 3, 0)["wear"] = bar + 30 * perBar; },
+                tree => { WeaponNode(tree, 3, 0)["wearCashed"] = 30; WeaponNode(tree, 3, 0)["wear"] = bar + 30 * perBar + 1; },
+                "campaign.party[3].inventory[0].wear", $"{bar + 30 * perBar + 1} is above {bar + 30 * perBar}: {WearWhy}"),
             // 0h. A member's hit points: the largest bar plus a point for each HP XP.
             ("a member's hit points", hall,
-                tree => MemberNode(tree, 2)["body"]!["hp"] = bar + hpXp,
-                tree => MemberNode(tree, 2)["body"]!["hp"] = bar + hpXp + 1,
-                "campaign.party[2].body.hp",
+                tree => MemberNode(tree, 1)["body"]!["hp"] = bar + hpXp,
+                tree => MemberNode(tree, 1)["body"]!["hp"] = bar + hpXp + 1,
+                "campaign.party[1].body.hp",
                 $"{bar + hpXp + 1} is above {bar + hpXp}: a member holds no more hit points than the largest bar a pool opens on, {bar} (StartingPool at its most), plus a point for each HP XP"),
         ];
         foreach (var (what, text, atCeiling, past, where, problem) in ceilings)
@@ -874,8 +874,8 @@ public sealed class SaveConsistencyTests : IDisposable
         // count sanity bound, cannot wrap it below the hit points it allows.
         Restores(Edited(hall, tree =>
         {
-            MemberNode(tree, 2)["hpXp"] = ContentBounds.MostCount;
-            MemberNode(tree, 2)["body"]!["hp"] = bar + ContentBounds.MostCount;
+            MemberNode(tree, 1)["hpXp"] = ContentBounds.MostCount;
+            MemberNode(tree, 1)["body"]!["hp"] = bar + ContentBounds.MostCount;
         }), "hit points under the ceiling of the most HP XP");
 
         // 0h. A row's hit points: the largest bar plus what its revivals added — the
@@ -936,7 +936,7 @@ public sealed class SaveConsistencyTests : IDisposable
         float longest = ContentBounds.Distance * 1.5f;
         void Budgets(JsonObject tree, float whole, float cap, float left)
         {
-            var member = MemberNode(tree, 0);
+            var member = MemberNode(tree, 3);
             member["budgetBeforeMire"] = whole;
             member["effectiveMax"] = cap;
             member["distLeft"] = left;
@@ -950,55 +950,55 @@ public sealed class SaveConsistencyTests : IDisposable
 
         (string What, string Text, Action<JsonObject> AtCeiling, Action<JsonObject> Past, string Where, string Problem)[] ceilings =
         [
-            ("HP XP", hall, tree => MemberNode(tree, 1)["hpXp"] = most, tree => MemberNode(tree, 1)["hpXp"] = most + 1,
-                "campaign.party[1].hpXp", $"{most + 1} is above {most}: {countWhy}"),
-            ("weapon XP", hall, tree => MemberNode(tree, 1)["weaponXp"]!["Dagger"] = most, tree => MemberNode(tree, 1)["weaponXp"]!["Dagger"] = most + 1,
-                "campaign.party[1].weaponXp.Dagger", $"{most + 1} is above {most}: {countWhy}"),
+            ("HP XP", hall, tree => MemberNode(tree, 0)["hpXp"] = most, tree => MemberNode(tree, 0)["hpXp"] = most + 1,
+                "campaign.party[0].hpXp", $"{most + 1} is above {most}: {countWhy}"),
+            ("weapon XP", hall, tree => MemberNode(tree, 0)["weaponXp"]!["Dagger"] = most, tree => MemberNode(tree, 0)["weaponXp"]!["Dagger"] = most + 1,
+                "campaign.party[0].weaponXp.Dagger", $"{most + 1} is above {most}: {countWhy}"),
             ("an entry's XP", hall,
-                tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most,
-                tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["xp"] = most + 1,
-                "campaign.party[3].inventory[0].enchantments[0].xp", $"{most + 1} is above {most}: {countWhy}"),
+                tree => WeaponNode(tree, 2, 0)["enchantments"]![0]!["xp"] = most,
+                tree => WeaponNode(tree, 2, 0)["enchantments"]![0]!["xp"] = most + 1,
+                "campaign.party[2].inventory[0].enchantments[0].xp", $"{most + 1} is above {most}: {countWhy}"),
             // Wear cashed grows a deposit at a time, and wear a hit at a time (Phase 6a.1):
             // counts, each at the sanity bound, the wear with enough cashed that its
             // own capacity ceiling is no nearer.
             ("wear cashed", hall,
-                tree => WeaponNode(tree, 0, 0)["wearCashed"] = most,
-                tree => WeaponNode(tree, 0, 0)["wearCashed"] = most + 1,
-                "campaign.party[0].inventory[0].wearCashed", $"{most + 1} is above {most}: {countWhy}"),
+                tree => WeaponNode(tree, 3, 0)["wearCashed"] = most,
+                tree => WeaponNode(tree, 3, 0)["wearCashed"] = most + 1,
+                "campaign.party[3].inventory[0].wearCashed", $"{most + 1} is above {most}: {countWhy}"),
             ("wear", hall,
-                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = most; WeaponNode(tree, 0, 0)["wear"] = most; },
-                tree => { WeaponNode(tree, 0, 0)["wearCashed"] = most; WeaponNode(tree, 0, 0)["wear"] = most + 1; },
-                "campaign.party[0].inventory[0].wear", $"{most + 1} is above {most}: {countWhy}"),
-            ("negative wear", hall, tree => { }, tree => WeaponNode(tree, 0, 0)["wear"] = -1,
-                "campaign.party[0].inventory[0].wear", "-1 is below 0"),
-            ("mana", hall, tree => MemberNode(tree, 3)["body"]!["mana"] = most, tree => MemberNode(tree, 3)["body"]!["mana"] = most + 1,
-                "campaign.party[3].body.mana", $"{most + 1} is above {most}: {countWhy}"),
+                tree => { WeaponNode(tree, 3, 0)["wearCashed"] = most; WeaponNode(tree, 3, 0)["wear"] = most; },
+                tree => { WeaponNode(tree, 3, 0)["wearCashed"] = most; WeaponNode(tree, 3, 0)["wear"] = most + 1; },
+                "campaign.party[3].inventory[0].wear", $"{most + 1} is above {most}: {countWhy}"),
+            ("negative wear", hall, tree => { }, tree => WeaponNode(tree, 3, 0)["wear"] = -1,
+                "campaign.party[3].inventory[0].wear", "-1 is below 0"),
+            ("mana", hall, tree => MemberNode(tree, 2)["body"]!["mana"] = most, tree => MemberNode(tree, 2)["body"]!["mana"] = most + 1,
+                "campaign.party[2].body.mana", $"{most + 1} is above {most}: {countWhy}"),
             ("a held shot", hall,
-                tree => MemberNode(tree, 0)["body"]!["heldShots"] = ContentBounds.MostHeldShots,
-                tree => MemberNode(tree, 0)["body"]!["heldShots"] = ContentBounds.MostHeldShots + 1,
-                "campaign.party[0].body.heldShots",
+                tree => MemberNode(tree, 3)["body"]!["heldShots"] = ContentBounds.MostHeldShots,
+                tree => MemberNode(tree, 3)["body"]!["heldShots"] = ContentBounds.MostHeldShots + 1,
+                "campaign.party[3].body.heldShots",
                 $"{ContentBounds.MostHeldShots + 1} is above {ContentBounds.MostHeldShots}: a hold is the Overwatch value of the wielder, no more than its offset plus a stack worth for the deepest stack (Offset, PerStack, MaxForged and AcquiredHeadroom at their most)"),
             ("a status's levels", hall,
-                tree => MemberNode(tree, 0)["body"]!["statuses"] = JsonNode.Parse($$"""[ { "type": "Mire", "element": null, "levels": {{ContentBounds.MostLevels}} } ]"""),
-                tree => MemberNode(tree, 0)["body"]!["statuses"] = JsonNode.Parse($$"""[ { "type": "Mire", "element": null, "levels": {{ContentBounds.MostLevels + 1}} } ]"""),
-                "campaign.party[0].body.statuses[0].levels",
+                tree => MemberNode(tree, 3)["body"]!["statuses"] = JsonNode.Parse($$"""[ { "type": "Mire", "element": null, "levels": {{ContentBounds.MostLevels}} } ]"""),
+                tree => MemberNode(tree, 3)["body"]!["statuses"] = JsonNode.Parse($$"""[ { "type": "Mire", "element": null, "levels": {{ContentBounds.MostLevels + 1}} } ]"""),
+                "campaign.party[3].body.statuses[0].levels",
                 $"{ContentBounds.MostLevels + 1} is above {ContentBounds.MostLevels}: levels are uncapped and land a hit at a time, but past it the levels times their largest effect (EffectPerLevel at its most) would pass the largest whole number"),
-            ("x", hall, tree => MemberNode(tree, 0)["body"]!["x"] = width, tree => MemberNode(tree, 0)["body"]!["x"] = width + 1,
-                "campaign.party[0].body.x", $"{width + 1} is off the map, 0 to {width}: a map is {MapGenerator.Cols} tiles of {GameConstants.Tile} {offTheMap}"),
-            ("y", hall, tree => MemberNode(tree, 0)["body"]!["y"] = 0, tree => MemberNode(tree, 0)["body"]!["y"] = -1,
-                "campaign.party[0].body.y", $"-1 is off the map, 0 to {height}: a map is {MapGenerator.Rows} tiles of {GameConstants.Tile} {offTheMap}"),
-            ("an infinite x", hall, tree => { }, tree => MemberNode(tree, 0)["body"]!["x"] = JsonNode.Parse("1e39"),
-                "campaign.party[0].body.x", "infinity is no number play writes: a position or a budget is a finite number"),
+            ("x", hall, tree => MemberNode(tree, 3)["body"]!["x"] = width, tree => MemberNode(tree, 3)["body"]!["x"] = width + 1,
+                "campaign.party[3].body.x", $"{width + 1} is off the map, 0 to {width}: a map is {MapGenerator.Cols} tiles of {GameConstants.Tile} {offTheMap}"),
+            ("y", hall, tree => MemberNode(tree, 3)["body"]!["y"] = 0, tree => MemberNode(tree, 3)["body"]!["y"] = -1,
+                "campaign.party[3].body.y", $"-1 is off the map, 0 to {height}: a map is {MapGenerator.Rows} tiles of {GameConstants.Tile} {offTheMap}"),
+            ("an infinite x", hall, tree => { }, tree => MemberNode(tree, 3)["body"]!["x"] = JsonNode.Parse("1e39"),
+                "campaign.party[3].body.x", "infinity is no number play writes: a position or a budget is a finite number"),
             ("the whole a turn cut from", hall,
                 tree => Budgets(tree, longest, 0, 0), tree => Budgets(tree, longest + 1, 0, 0),
-                "campaign.party[0].budgetBeforeMire",
+                "campaign.party[3].budgetBeforeMire",
                 $"{longest + 1} is above {longest}: a turn opens on the budget plus the bank, at most half the budget again, and no budget is longer than tuning.json measures (MovementBudget at its most)"),
             ("a cap past its whole", hall, tree => Budgets(tree, 100, 100, 0), tree => Budgets(tree, 100, 101, 0),
-                "campaign.party[0].effectiveMax", "101 is above 100: a cap is the whole this turn cut it from less what Mire took (budgetBeforeMire)"),
+                "campaign.party[3].effectiveMax", "101 is above 100: a cap is the whole this turn cut it from less what Mire took (budgetBeforeMire)"),
             ("movement left past the cap", hall, tree => Budgets(tree, 100, 90, 90), tree => Budgets(tree, 100, 90, 91),
-                "campaign.party[0].distLeft", "91 is above 90: movement left is what is left of the cap this turn (effectiveMax)"),
-            ("a negative bank", hall, tree => MemberNode(tree, 0)["savedMovement"] = 0, tree => MemberNode(tree, 0)["savedMovement"] = -1,
-                "campaign.party[0].savedMovement", "-1 is below 0: movement is spent to nothing at most"),
+                "campaign.party[3].distLeft", "91 is above 90: movement left is what is left of the cap this turn (effectiveMax)"),
+            ("a negative bank", hall, tree => MemberNode(tree, 3)["savedMovement"] = 0, tree => MemberNode(tree, 3)["savedMovement"] = -1,
+                "campaign.party[3].savedMovement", "-1 is below 0: movement is spent to nothing at most"),
             ("the visit's turn", mid, tree => Turn(tree, most), tree => Turn(tree, most + 1),
                 "campaign.visit.turn", $"{most + 1} is above {most}: {countWhy}"),
             ("the dice rolled", mid, tree => VisitNode(tree)["diceRolled"] = most, tree => VisitNode(tree)["diceRolled"] = most + 1,
@@ -2009,9 +2009,9 @@ public sealed class SaveConsistencyTests : IDisposable
             (tree => CampaignNode(tree)["cleared"] = new JsonArray(),
                 "campaign.retired[0]: tutorial is retired and was never cleared",
                 "CAMPAIGN.JSON COULD NOT BE READ (CAMPAIGN.RETIRED[0]: TUTORIAL IS RETIRED AND WAS NEVER CLEARED) - SET ASIDE AS "),
-            (tree => WeaponNode(tree, 3, 0)["enchantments"]![0]!["tier"] = 99999,
-                $"campaign.party[3].inventory[0].enchantments[0].tier: 99999 is above {ContentBounds.DeepestTier}",
-                $"CAMPAIGN.JSON COULD NOT BE READ (CAMPAIGN.PARTY[3].INVENTORY[0].ENCHANTMENTS[0].TIER: 99999 IS ABOVE {ContentBounds.DeepestTier}) - SET ASIDE AS "),
+            (tree => WeaponNode(tree, 2, 0)["enchantments"]![0]!["tier"] = 99999,
+                $"campaign.party[2].inventory[0].enchantments[0].tier: 99999 is above {ContentBounds.DeepestTier}",
+                $"CAMPAIGN.JSON COULD NOT BE READ (CAMPAIGN.PARTY[2].INVENTORY[0].ENCHANTMENTS[0].TIER: 99999 IS ABOVE {ContentBounds.DeepestTier}) - SET ASIDE AS "),
             (tree => CampaignNode(tree)["runCounter"] = int.MaxValue,
                 $"campaign.runCounter: {int.MaxValue} is above {ContentBounds.MostRuns - 1}",
                 $"CAMPAIGN.JSON COULD NOT BE READ (CAMPAIGN.RUNCOUNTER: {int.MaxValue} IS ABOVE {ContentBounds.MostRuns - 1}) - SET ASIDE AS "),

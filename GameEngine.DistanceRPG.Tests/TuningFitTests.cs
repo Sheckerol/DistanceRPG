@@ -32,7 +32,7 @@ public class TuningFitTests
         var warnings = new List<string>();
         var fitted = Fit(BuiltIn with { PartyCarrySlots = 4 }, warnings);
         Assert.Equal(8, fitted.PartyCarrySlots);
-        Assert.Equal(["tuning.json: PartyCarrySlots 4 is 1 slot a member, and A carries 2 weapons (weakspot_stiletto, staff_of_renewal) - using 8"], warnings);
+        Assert.Equal(["tuning.json: PartyCarrySlots 4 is 1 slot a member, and A carries 2 weapons (tower_guard, staff_of_renewal) - using 8"], warnings);
         ContentValidator.ValidateParty(ShippedContent.Party, Load(fitted).Weapons, fitted);
         Assert.Throws<ContentException>(() => Load(BuiltIn with { PartyCarrySlots = 4 }));   // unfitted, the roster does not
 

@@ -188,10 +188,10 @@ public sealed class ReloadDeterminismTests : IDisposable
 
     /// <summary>
     /// One turn of the fixed sequence in the flagship's halberd room, the same
-    /// moves on whichever side plays it: the room looked over; A, B and C, in
+    /// moves on whichever side plays it: the room looked over; A, B and D, in
     /// roster order, each going for the halberd while it stands — from where it
     /// stands if its weapon reaches, else from the nearest free tile it does — and
-    /// swinging once; D casting its staff on the first of the party it can; and
+    /// swinging once; C casting its staff on the first of the party it can; and
     /// the turn ended, the enemies' run to the next player phase on the logic
     /// clock's own step (<see cref="SaveGame.LogicStepSeconds"/>).
     /// </summary>
@@ -201,7 +201,7 @@ public sealed class ReloadDeterminismTests : IDisposable
         var grid = side.Floor.Map.Grid;
         var halberd = side.Row(3, 0);
         side.Look();
-        foreach (var id in new[] { "A", "B", "C" })
+        foreach (var id in new[] { "A", "B", "D" })
         {
             var member = side.Member(id);
             if (!member.Alive || !halberd.Alive)
@@ -216,9 +216,9 @@ public sealed class ReloadDeterminismTests : IDisposable
                 side.Swing(id, halberd);
         }
 
-        var d = side.Member("D");
-        if (side.Party.FirstOrDefault(member => turns.CanCast(d, member)) is { } patient)
-            Assert.True(turns.TryCast(d, patient));
+        var c = side.Member("C");
+        if (side.Party.FirstOrDefault(member => turns.CanCast(c, member)) is { } patient)
+            Assert.True(turns.TryCast(c, patient));
 
         side.Look();
         side.EndTurn(SaveGame.LogicStepSeconds);
@@ -228,7 +228,7 @@ public sealed class ReloadDeterminismTests : IDisposable
     public void AFixedSequenceOfTurnsAfterAReloadIsTheSameWorld()
     {
         // PHASE5-030, on S6's flagship: the Spear Hall on seed 4, saved on floor 4
-        // at turn 10, mid-turn — B inside the seen halberd's reach, C just outside
+        // at turn 10, mid-turn — A inside the seen halberd's reach, B just outside
         // it. The live campaign and the one its save brings back play the same
         // turns on the same dice, and stay one world.
         var liveDie = new Dice();                       // tens: everything the flagship pins is pinned on them
@@ -245,35 +245,35 @@ public sealed class ReloadDeterminismTests : IDisposable
         Assert.Equal(text, Save(back.Campaign));
         VisitScript[] sides = [live, back];
 
-        // Where B steps and C walks in, read off the live floor once and handed to
-        // both. B steps to a tile still inside the halberd's reach, and inside or
-        // outside every other row's exactly as before: it crosses no edge. C
+        // Where A steps and B walks in, read off the live floor once and handed to
+        // both. A steps to a tile still inside the halberd's reach, and inside or
+        // outside every other row's exactly as before: it crosses no edge. B
         // crosses into the halberd's reach from just outside it.
         var halberd = live.Row(0, "halberd");
         var grid = live.Floor.Map.Grid;
-        var (b, c) = (live.Member("B"), live.Member("C"));
-        Assert.True(EnemyAi.CanHit(halberd, b, halberd.Weapon, grid));
-        Assert.False(EnemyAi.CanHit(halberd, c, halberd.Weapon, grid));
+        var (a, b) = (live.Member("A"), live.Member("B"));
+        Assert.True(EnemyAi.CanHit(halberd, a, halberd.Weapon, grid));
+        Assert.False(EnemyAi.CanHit(halberd, b, halberd.Weapon, grid));
         var others = live.Floor.Enemies.Where(row => row.Alive && !ReferenceEquals(row, halberd)).ToArray();
-        var bTile = Displacer.TileOf(b);
-        var bStep = Nearest(live, bTile, tile => Reaches(halberd, b, tile, grid)
-            && others.All(row => Reaches(row, b, tile, grid) == Reaches(row, b, bTile, grid)));
-        var cIn = Nearest(live, Displacer.TileOf(c), tile => Reaches(halberd, c, tile, grid));
-        Assert.NotEqual((-1, -1), bStep);
-        Assert.NotEqual((-1, -1), cIn);
+        var aTile = Displacer.TileOf(a);
+        var aStep = Nearest(live, aTile, tile => Reaches(halberd, a, tile, grid)
+            && others.All(row => Reaches(row, a, tile, grid) == Reaches(row, a, aTile, grid)));
+        var bIn = Nearest(live, Displacer.TileOf(b), tile => Reaches(halberd, b, tile, grid));
+        Assert.NotEqual((-1, -1), aStep);
+        Assert.NotEqual((-1, -1), bIn);
 
         var liveLog = Record(live.Turns, live.Visit);
         var backLog = Record(back.Turns, back.Visit);
 
-        // B's standing pair fires on neither side: B was inside the halberd's reach
+        // A's standing pair fires on neither side: A was inside the halberd's reach
         // before the save, the reload re-read its zone from where everyone stands,
-        // and a step inside it is no entry. C's walk in fires the brace on both.
+        // and a step inside it is no entry. B's walk in fires the brace on both.
         foreach (var side in sides)
-            side.Walk("B", bStep);
+            side.Walk("A", aStep);
         Assert.Empty(liveLog);
         Assert.Equal(liveLog, backLog);
         foreach (var side in sides)
-            side.Walk("C", cIn);
+            side.Walk("B", bIn);
         Assert.Equal(["brace 3/0"], Reactions(liveLog));
         Assert.Equal(liveLog, backLog);
         Assert.Equal(Save(live.Campaign), Save(back.Campaign));
@@ -295,7 +295,7 @@ public sealed class ReloadDeterminismTests : IDisposable
         // party's blows landed on the halberd, the enemies' on the party, and both
         // sides rolled every die of it.
         Assert.Contains(liveLog, line => line.StartsWith("hit 3/0: ", StringComparison.Ordinal));
-        Assert.Contains(liveLog, line => line.StartsWith("hit B: ", StringComparison.Ordinal) || line.StartsWith("hit C: ", StringComparison.Ordinal));
+        Assert.Contains(liveLog, line => line.StartsWith("hit A: ", StringComparison.Ordinal) || line.StartsWith("hit B: ", StringComparison.Ordinal));
         Assert.True(backDie.Rolls.Count > 10, $"{backDie.Rolls.Count} rolls");
     }
 

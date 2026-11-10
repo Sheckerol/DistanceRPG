@@ -14,7 +14,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="StartingWeaponId">A weapon id, equipped in slot 0. Must resolve in the catalogue.</param>
 /// <param name="BagWeaponIds">
 /// The remaining slots in order — the fourth field beyond §5.9's three, because
-/// the party has always started with a staff in the bag and D carries a second,
+/// the party has always started with a staff in the bag and C carries a second,
 /// debuff one (Mire, per settled.md, not Blight). Bounded by the inventory at load.
 /// </param>
 public sealed record PartyMemberDef(

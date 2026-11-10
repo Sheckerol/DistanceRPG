@@ -241,31 +241,31 @@ public sealed class StableTests : IDisposable
         // thing — and a move from it, from the stable or a bag alike, and nothing
         // moves. The stable holds weapons alone.
         var campaign = NewCampaign();
-        var a = TestPotions.Carrying(campaign, "A", (2, TestPotions.Health(2)));
-        campaign.Move(Slot("B", 1), Stable(0));
+        var d = TestPotions.Carrying(campaign, "D", (2, TestPotions.Health(2)));
+        campaign.Move(Slot("A", 1), Stable(0));
         var bags = campaign.Party.Select(member => member.Inventory.ToArray()).ToArray();
-        var onto = Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("A", 1), Slot("A", 2)));
+        var onto = Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("D", 1), Slot("D", 2)));
         Assert.Contains("PHASE 6b DECISION 1", onto.Message, StringComparison.Ordinal);
-        Assert.Throws<InvalidOperationException>(() => campaign.Move(Stable(0), Slot("A", 2)));
-        Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("A", 2), Stable(1)));
-        Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("A", 2), Slot("C", 3)));
+        Assert.Throws<InvalidOperationException>(() => campaign.Move(Stable(0), Slot("D", 2)));
+        Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("D", 2), Stable(1)));
+        Assert.Throws<InvalidOperationException>(() => campaign.Move(Slot("D", 2), Slot("B", 3)));
         Assert.Equal(bags, campaign.Party.Select(member => member.Inventory.ToArray()));
         Assert.Single(campaign.Stable);
-        Assert.Equal(((Weapon?)null, (IItem?)TestPotions.Health(2)), (campaign.WeaponAt(Slot("A", 2)), campaign.ItemAt(Slot("A", 2))));
+        Assert.Equal(((Weapon?)null, (IItem?)TestPotions.Health(2)), (campaign.WeaponAt(Slot("D", 2)), campaign.ItemAt(Slot("D", 2))));
 
         // The page lists it, grey, under its member — never chosen and never put down
-        // on — and the room left in A's bag counts the empty slots alone, from the
+        // on — and the room left in D's bag counts the empty slots alone, from the
         // first of them past the potion.
         var rows = HubWeapons.Rows(campaign);
         var potion = Assert.Single(rows, row => row.Kind == HubWeapons.RowKind.Potion);
-        Assert.Equal(("  BAG   HEALTH POTION Q2", Slot("A", 2)), (potion.Text, potion.Place));
+        Assert.Equal(("  BAG   HEALTH POTION Q2", Slot("D", 2)), (potion.Text, potion.Place));
         Assert.Equal((false, false), (potion.Choosable, potion.Target));
         Assert.Equal([new DungeonHud.Run("  BAG   HEALTH POTION Q2", DungeonHud.Grey)], HubWeapons.Runs(potion));
         int at = rows.ToList().IndexOf(potion);
-        Assert.Equal(["[A]", "  HAND  RONDEL", "  BAG   STAFF OF RENEWAL", "  BAG   HEALTH POTION Q2", HubWeapons.BagRoom(3)],
+        Assert.Equal(["[D]", "  HAND  RONDEL", "  BAG   STAFF OF RENEWAL", "  BAG   HEALTH POTION Q2", HubWeapons.BagRoom(3)],
             rows.Skip(at - 3).Take(5).Select(row => row.Kind == HubWeapons.RowKind.Weapon ? $"{row.Label}{HubWeapons.Name(row.Weapon!)}" : row.Text));
-        Assert.Equal(Slot("A", 3), rows[at + 1].Place);
-        Assert.Same(a, campaign.Party[0]);
+        Assert.Equal(Slot("D", 3), rows[at + 1].Place);
+        Assert.Same(d, campaign.Party[3]);
 
         // Every step passes over it: browsing, and carrying a weapon to put down.
         var page = new HubWeapons(campaign);
@@ -295,11 +295,11 @@ public sealed class StableTests : IDisposable
         var def = GameContent.Current.Weapons["arming_sword"];
         var sword = TestWeapons.Get("arming_sword");
         var worn = new Weapon(def, sword.Forged, sword.Modifiers, sword.Enchantments, sword.ForgedEnchantmentCount, wear: 21, wearCashed: 195);
-        campaign.Party[2].Inventory[4] = worn;
-        campaign.Move(Slot("C", 4), Stable(0));
-        campaign.Move(Slot("D", 1), Stable(1));
-        campaign.Move(Slot("A", 1), Stable(0));   // onto the sword: a swap, the sword to A's bag, A's staff first
-        campaign.Move(Slot("A", 1), Stable(2));
+        campaign.Party[1].Inventory[4] = worn;
+        campaign.Move(Slot("B", 4), Stable(0));
+        campaign.Move(Slot("C", 1), Stable(1));
+        campaign.Move(Slot("D", 1), Stable(0));   // onto the sword: a swap, the sword to D's bag, D's staff first
+        campaign.Move(Slot("D", 1), Stable(2));
         Assert.Equal(["staff_of_renewal", "staff_of_mire", "arming_sword"], campaign.Stable.Select(weapon => weapon.Id));
 
         string text = Save(campaign);
@@ -421,8 +421,8 @@ public sealed class StableTests : IDisposable
         // door, so it comes back whole with the visit held — and the door stays shut
         // until the run ends.
         var campaign = NewCampaign();
-        campaign.Move(Slot("A", 1), Stable(0));
-        campaign.Move(Slot("D", 1), Stable(1));
+        campaign.Move(Slot("D", 1), Stable(0));
+        campaign.Move(Slot("C", 1), Stable(1));
         var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
 
@@ -431,13 +431,13 @@ public sealed class StableTests : IDisposable
         Assert.NotNull(loaded.Visit);
         Assert.Equal(["staff_of_renewal", "staff_of_mire"], loaded.Stable.Select(weapon => weapon.Id));
         Assert.Equal(text, Save(loaded));
-        Assert.Throws<InvalidOperationException>(() => loaded.Move(Stable(0), Slot("A", 1)));
+        Assert.Throws<InvalidOperationException>(() => loaded.Move(Stable(0), Slot("D", 1)));
 
         // The run's end leaves the stable as it was, and the hub's door opens again.
         loaded.Visit!.OpenTurns(loaded.Party, CampaignRuns.Ten);
         Assert.Equal(RunOutcome.Retreat, CampaignRuns.Exit(loaded).Outcome);
         Assert.Equal(["staff_of_renewal", "staff_of_mire"], loaded.Stable.Select(weapon => weapon.Id));
-        loaded.Move(Stable(0), Slot("A", 1));
-        Assert.Equal("staff_of_renewal", loaded.Party[0].WeaponIn(1)!.Id);
+        loaded.Move(Stable(0), Slot("D", 1));
+        Assert.Equal("staff_of_renewal", loaded.Party[3].WeaponIn(1)!.Id);
     }
 }

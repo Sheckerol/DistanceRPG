@@ -575,11 +575,11 @@ public sealed class EnchanterTests : IDisposable
         // a staff it casts, and there is no note.
         var campaign = Opened();
         var guard = Worn("tower_guard", wear: 30);
-        var at = Give(campaign, "B", 2, guard);
+        var at = Give(campaign, "A", 2, guard);
         Assert.Equal(new Offer("regeneration", null, "NEVER FIRES ON A SWORD"), OfferOf(campaign, guard, "regeneration"));
         Assert.Equal(new Offer("vampiric", null, null), OfferOf(campaign, guard, "vampiric"));
         Assert.Equal(new Offer("regeneration", null, null), OfferOf(campaign, Carrying("staff_of_renewal", ["regeneration"]), "regeneration"));
-        Assert.Equal("NEVER FIRES ON AN AXE", OfferOf(campaign, campaign.Party[2].WeaponIn(0)!, "mire").Note);
+        Assert.Equal("NEVER FIRES ON AN AXE", OfferOf(campaign, campaign.Party[1].WeaponIn(0)!, "mire").Note);
 
         Assert.Null(Enchanter.Refusal(campaign, guard, Service.Enchant, "regeneration"));
         Enchanter.Deposit(campaign, at, Service.Enchant, "regeneration");
@@ -1097,19 +1097,19 @@ public sealed class EnchanterTests : IDisposable
         // does; and a weapon from the stable disarms nobody.
         var campaign = Opened();
         var stiletto = Worn("weakspot_stiletto", wear: 30);
-        Give(campaign, "A", 0, stiletto);
-        campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
-        Assert.Equal("[A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", Enchanter.Refusal(campaign, stiletto, Service.Enchant, "vampiric"));
-        Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, new WeaponPlace("A", 0), Service.Refine));
+        Give(campaign, "D", 0, stiletto);
+        campaign.Move(new WeaponPlace("D", 1), WeaponPlace.InTheStable(0));
+        Assert.Equal("[D] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", Enchanter.Refusal(campaign, stiletto, Service.Enchant, "vampiric"));
+        Assert.Throws<InvalidOperationException>(() => Enchanter.Deposit(campaign, new WeaponPlace("D", 0), Service.Refine));
         Assert.Equal((30, 0), (stiletto.Wear, stiletto.WearCashed));
-        Assert.Same(stiletto, campaign.Party[0].EquippedWeapon);
+        Assert.Same(stiletto, campaign.Party[3].EquippedWeapon);
 
-        // B carries two: its hand in, and its staff taken up into the hand.
-        var (guard, bStaff) = (campaign.Party[1].WeaponIn(0)!, campaign.Party[1].WeaponIn(1)!);
-        var made = Enchanter.Deposit(campaign, new WeaponPlace("B", 0), Service.Refine);
-        Assert.Same(bStaff, made.Armed);
-        Assert.Same(bStaff, campaign.Party[1].EquippedWeapon);
-        Assert.Null(campaign.Party[1].Inventory[1]);
+        // A carries two: its hand in, and its staff taken up into the hand.
+        var (guard, aStaff) = (campaign.Party[0].WeaponIn(0)!, campaign.Party[0].WeaponIn(1)!);
+        var made = Enchanter.Deposit(campaign, new WeaponPlace("A", 0), Service.Refine);
+        Assert.Same(aStaff, made.Armed);
+        Assert.Same(aStaff, campaign.Party[0].EquippedWeapon);
+        Assert.Null(campaign.Party[0].Inventory[1]);
         Assert.Same(guard, made.Entry.Weapon);
 
         // From the stable: nobody carries it, so nobody is left unarmed.

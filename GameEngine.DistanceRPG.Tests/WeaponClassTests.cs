@@ -74,21 +74,22 @@ public class WeaponClassTests
     public void AClassRowIsWhatTheClassCarries()
     {
         // §1.2-§1.4's class tables (phase-1-weapons.md: each class heading's stat
-        // and baseline, "Attack cost tracks weight", 1.3's "all share Range 100 and
-        // Cost 40", 1.4's "all share Damage 8, Cost 45, Mana 20"), held literally:
-        // REWORK DECISION 3's doc-fixed pins, so a master edit that moves one fails
-        // here by name, and its doc moves with it.
+        // and baseline, "Attack cost tracks weight", 1.3's "Cost 40", 1.4's
+        // "all share Damage 8, Cost 45, Mana 20"), held literally: REWORK DECISION
+        // 3's doc-fixed pins, so a master edit that moves one fails here by name,
+        // and its doc moves with it. Range is left out: it is the user's to tune in
+        // weapons.json (their ruling of 2026-11-09), so no test pins it.
         (WeaponClass Class, WeaponKind Kind, Stat[] Stats, ModifierType? Signature, (ModifierType Type, int Stacks)[] Baseline,
-            int Range, int Damage, int Cost, int ManaCost)[] table =
+            int Damage, int Cost, int ManaCost)[] table =
         [
-            (Dagger, WeaponKind.Melee, [Stat.DEX], CritWindow, [(CritWindow, 1), (CritMultiplier, 1)], 40, 15, 30, 0),
-            (Sword, WeaponKind.Melee, [Stat.STR, Stat.DEX], Block, [(Block, 1), (Push, 1)], 80, 10, 50, 0),
-            (Spear, WeaponKind.Melee, [Stat.STR], Brace, [(Brace, 1), (Longshot, 1)], 128, 7, 55, 0),
-            (Axe, WeaponKind.Melee, [Stat.STR], Cleave, [(Cleave, 1), (Opportunist, 1)], 60, 18, 60, 0),
-            (Ranged, WeaponKind.Ranged, [Stat.DEX], Longshot, [(CritWindow, 1), (Longshot, 1)], 320, 5, 30, 0),
-            (Throwing, WeaponKind.Ranged, [Stat.STR], Charges, [(CritMultiplier, 1), (Charges, 1)], 190, 9, 15, 0),
-            (Staff, WeaponKind.Caster, [Stat.INT], null, [(Resonant, 1)], 100, 0, 40, 20),
-            (Wand, WeaponKind.Caster, [Stat.INT], null, [(Resonant, 1)], 160, 8, 45, 20),
+            (Dagger, WeaponKind.Melee, [Stat.DEX], CritWindow, [(CritWindow, 1), (CritMultiplier, 1)], 15, 30, 0),
+            (Sword, WeaponKind.Melee, [Stat.STR, Stat.DEX], Block, [(Block, 1), (Push, 1)], 10, 50, 0),
+            (Spear, WeaponKind.Melee, [Stat.STR], Brace, [(Brace, 1), (Longshot, 1)], 7, 55, 0),
+            (Axe, WeaponKind.Melee, [Stat.STR], Cleave, [(Cleave, 1), (Opportunist, 1)], 18, 60, 0),
+            (Ranged, WeaponKind.Ranged, [Stat.DEX], Longshot, [(CritWindow, 1), (Longshot, 1)], 5, 30, 0),
+            (Throwing, WeaponKind.Ranged, [Stat.STR], Charges, [(CritMultiplier, 1), (Charges, 1)], 9, 15, 0),
+            (Staff, WeaponKind.Caster, [Stat.INT], null, [(Resonant, 1)], 0, 40, 20),
+            (Wand, WeaponKind.Caster, [Stat.INT], null, [(Resonant, 1)], 8, 45, 20),
         ];
 
         // Every class has its row, in the enum's order, and each row is the table's.
@@ -96,7 +97,7 @@ public class WeaponClassTests
         Assert.Equal(table.Select(t => t.Class), rows.Select(row => row.Class));
         foreach (var (row, t) in rows.Zip(table))
         {
-            Assert.Equal((t.Kind, t.Signature, t.Range, t.Damage, t.Cost, t.ManaCost), (row.Kind, row.Signature, row.Range, row.Damage, row.Cost, row.ManaCost));
+            Assert.Equal((t.Kind, t.Signature, t.Damage, t.Cost, t.ManaCost), (row.Kind, row.Signature, row.Damage, row.Cost, row.ManaCost));
             Assert.Equal(t.Stats, row.Stats);
             Assert.Equal(t.Baseline.OrderBy(b => b.Type), row.Baseline.OrderBy(b => b.Key).Select(b => (b.Key, b.Value)));
         }
@@ -210,22 +211,22 @@ public class WeaponClassTests
     public void AClassesStatsAreItsRows()
     {
         // The stats a class levels on are its row's: the Spear row levelling on DEX
-        // has C — the party's STR 4, DEX 2 — level spears on DEX 2, and climb the
+        // has B — the party's STR 4, DEX 2 — level spears on DEX 2, and climb the
         // ladder at DEX 2's pace rather than STR 4's (the ladder a member's
         // proficiency replays: Progression.Ladder over its governing stat).
-        var c = StartingParty.Data.Members.Single(member => member.Id == "C").Stats;
+        var b = StartingParty.Data.Members.Single(member => member.Id == "B").Stats;
         int perLevel = ShippedContent.Tuning.WeaponXpPerLevel;
-        Assert.Equal(c.STR, Progression.GoverningStat(Spear, c));
-        Assert.Equal(Progression.XpToNext(perLevel, c.STR), Progression.Ladder(0, Progression.GoverningStat(Spear, c)).XpToNext);
+        Assert.Equal(b.STR, Progression.GoverningStat(Spear, b));
+        Assert.Equal(Progression.XpToNext(perLevel, b.STR), Progression.Ladder(0, Progression.GoverningStat(Spear, b)).XpToNext);
 
         string dexterous = DataTexts.InClass(ShippedWeapons, Spear, "\"stats\": [\"STR\"]", "\"stats\": [\"DEX\"]");
         Plays(dexterous);
         using (TestContent.Use(weapons: WeaponsJson.Read(dexterous)))
         {
             Assert.Equal([Stat.DEX], Progression.Governing(Spear));
-            Assert.Equal(2, Progression.GoverningStat(Spear, c));
-            Assert.Equal(Progression.XpToNext(perLevel, 2), Progression.Ladder(0, Progression.GoverningStat(Spear, c)).XpToNext);
-            Assert.Equal(c.STR, Progression.GoverningStat(Axe, c));   // the Axe row still levels on STR
+            Assert.Equal(2, Progression.GoverningStat(Spear, b));
+            Assert.Equal(Progression.XpToNext(perLevel, 2), Progression.Ladder(0, Progression.GoverningStat(Spear, b)).XpToNext);
+            Assert.Equal(b.STR, Progression.GoverningStat(Axe, b));   // the Axe row still levels on STR
         }
     }
 

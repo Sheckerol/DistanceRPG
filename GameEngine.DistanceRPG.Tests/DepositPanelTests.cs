@@ -124,8 +124,8 @@ public sealed class DepositPanelTests : IDisposable
         // not dimmed; in its odds' place it says so. ENCHANT is refused: its price
         // is a wear at least.
         var campaign = TestShop.Opened();
-        var stiletto = campaign.Party[0].EquippedWeapon!;
-        var panel = DepositPanel.Open(campaign, new WeaponPlace("A", 0));
+        var stiletto = campaign.Party[3].EquippedWeapon!;
+        var panel = DepositPanel.Open(campaign, new WeaponPlace("D", 0));
         Assert.Equal("1  ENCHANT - ENCHANTMENT 1 NEEDS A DEPOSIT OF 30 WEAR - IT CARRIES 0", panel.Services[0].Text);
         Assert.True(panel.Services[0].Dimmed);
         var refine = panel.Services[1];
@@ -176,24 +176,24 @@ public sealed class DepositPanelTests : IDisposable
         Assert.True(scene.HandleEscape());
 
         // A member's last weapon (PHASE 6a DECISION 7): every service refused alike.
-        campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(0));
+        campaign.Move(new WeaponPlace("D", 1), WeaponPlace.InTheStable(0));
         ChooseRow(scene, "  HAND  RONDEL - WEAR 0/30");
         scene.OnKey(Keys.D);
         Assert.Equal(new[]
         {
-            "1  ENCHANT - [A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST",
-            "2  REFINE - [A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST",
-            "3  MOVE AN ENCHANTMENT ONTO IT - [A] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST",
+            "1  ENCHANT - [D] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST",
+            "2  REFINE - [D] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST",
+            "3  MOVE AN ENCHANTMENT ONTO IT - [D] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST",
         }, scene.Panel!.Services.Select(option => option.Text));
         Assert.All(BetweenRunsHud.PanelRows(scene.Panel, 10).Skip(2), row => Assert.Equal(DungeonHud.DarkGrey, row.Color));
         scene.OnKey(Keys.D2);
-        Assert.Equal(Enchanter.WouldCarryNone("A"), scene.Refusal);
+        Assert.Equal(Enchanter.WouldCarryNone("D"), scene.Refusal);
         Assert.Equal(DepositPanel.Step.Services, scene.Panel!.Current);
         Assert.True(scene.HandleEscape());
 
         // Every slot filled: ALL 5 SLOTS ARE FILLED, and refining is left.
         var full = Sword(wear: 50, cashed: 840, "vampiric", "vampiric", "vampiric", "vampiric", "vampiric");
-        var filled = DepositPanel.Open(campaign, TestShop.Give(campaign, "C", 2, full));
+        var filled = DepositPanel.Open(campaign, TestShop.Give(campaign, "B", 2, full));
         Assert.Equal("1  ENCHANT - ALL 5 SLOTS ARE FILLED", filled.Services[0].Text);
         Assert.False(filled.Services[1].Dimmed);
         Assert.Equal(Enchanter.AllFilled(5), filled.Pick(1));
@@ -208,7 +208,7 @@ public sealed class DepositPanelTests : IDisposable
         foreach (string[] seen in new[] { new[] { "cold" }, [] })
         {
             var met = CampaignState.Restore(start.Party, seen, 0, [], [], [GameContent.Current.Dungeons.Tutorial.Id], lastResult: null, visit: null, stable: []);
-            var none = DepositPanel.Open(met, TestShop.Give(met, "B", 2, Sword(wear: 36, cashed: 195, "flaming")));
+            var none = DepositPanel.Open(met, TestShop.Give(met, "A", 2, Sword(wear: 36, cashed: 195, "flaming")));
             Assert.Equal(seen.Length, none.Offers.Count(offer => offer.Refusal is not null));
             Assert.Equal(none.Offers.Count, none.Offers.Count(offer => offer.Refusal is not null));
             Assert.Equal("1  ENCHANT - NOTHING TO OFFER - NO ENCHANTMENT MET YET CAN GO ON IT", none.Services[0].Text);
@@ -482,7 +482,7 @@ public sealed class DepositPanelTests : IDisposable
         // and nothing thrown through the enchanter's doors, which refuse by throwing.
         var campaign = TestShop.Opened();
         var guard = TestShop.Worn("tower_guard", wear: 30);
-        TestShop.Give(campaign, "B", 2, guard);
+        TestShop.Give(campaign, "A", 2, guard);
         var (scene, host) = Weapons(campaign);
 
         // The weapon gone from where the panel found it.
@@ -490,23 +490,23 @@ public sealed class DepositPanelTests : IDisposable
         foreach (var key in new[] { Keys.D, Keys.D1, Keys.Enter })
             scene.OnKey(key);
         Assert.Equal(DepositPanel.Step.Confirm, scene.Panel!.Current);
-        campaign.Move(new WeaponPlace("B", 2), WeaponPlace.InTheStable(0));
+        campaign.Move(new WeaponPlace("A", 2), WeaponPlace.InTheStable(0));
         scene.OnKey(Keys.Enter);
         Assert.Equal("THE SCUTUM AND GLADIUS HAS MOVED - NOTHING DEPOSITED", scene.Refusal);
         Assert.Equal((BetweenRunsScene.HubMode.Weapons, (DepositPanel?)null), (scene.Mode, scene.Panel));
         Assert.Empty(campaign.AtTheEnchanter);
         Assert.Equal((30, 30), (guard.Wear, guard.WearCapacity));
 
-        // Where it lay still, but a gate shut since: B's bag emptied into the stable,
-        // the Scutum and Gladius in B's hand is B's last weapon, and the enchanter's own
+        // Where it lay still, but a gate shut since: A's bag emptied into the stable,
+        // the Scutum and Gladius in A's hand is A's last weapon, and the enchanter's own
         // reason is said.
         ChooseRow(scene, "  HAND  SCUTUM AND GLADIUS - WEAR 0/30");
         foreach (var key in new[] { Keys.D, Keys.D2 })
             scene.OnKey(key);
         Assert.Equal(DepositPanel.Step.Confirm, scene.Panel!.Current);
-        campaign.Move(new WeaponPlace("B", 1), WeaponPlace.InTheStable(campaign.Stable.Count));
+        campaign.Move(new WeaponPlace("A", 1), WeaponPlace.InTheStable(campaign.Stable.Count));
         scene.OnKey(Keys.Enter);
-        Assert.Equal(Enchanter.WouldCarryNone("B"), scene.Refusal);
+        Assert.Equal(Enchanter.WouldCarryNone("A"), scene.Refusal);
         Assert.Equal((BetweenRunsScene.HubMode.Weapons, (DepositPanel?)null), (scene.Mode, scene.Panel));
         Assert.Empty(campaign.AtTheEnchanter);
 
@@ -637,13 +637,13 @@ public sealed class DepositPanelTests : IDisposable
         // and ENTER again deposits both weapons as one, logged and saved.
         var campaign = TestShop.Opened();
         var sword = Sword(wear: 36, cashed: 195, "flaming");   // capacity 36: a second enchantment's slot and price met
-        TestShop.Give(campaign, "B", 2, sword);
+        TestShop.Give(campaign, "A", 2, sword);
         var knife = TestWeapons.Get("flensing_knife_unique");
-        TestShop.Give(campaign, "C", 2, knife);
-        TestShop.Give(campaign, "C", 3, TestShop.Worn("wand_of_the_nova_unique", 0));
-        TestShop.Give(campaign, "D", 2, TestWeapons.Get("rotwood"));
-        TestShop.Give(campaign, "D", 3, TestShop.Souled("wand_of_the_cone", 0, 0, ("cold", 1)));
-        var panel = DepositPanel.Open(campaign, new WeaponPlace("B", 2));
+        TestShop.Give(campaign, "B", 2, knife);
+        TestShop.Give(campaign, "B", 3, TestShop.Worn("wand_of_the_nova_unique", 0));
+        TestShop.Give(campaign, "C", 2, TestWeapons.Get("rotwood"));
+        TestShop.Give(campaign, "C", 3, TestShop.Souled("wand_of_the_cone", 0, 0, ("cold", 1)));
+        var panel = DepositPanel.Open(campaign, new WeaponPlace("A", 2));
         Assert.Equal("3  MOVE AN ENCHANTMENT ONTO IT - ONE TIER LOST - 3 IN 100 TO IMPROVE", panel.Services[2].Text);
         Assert.Null(panel.Pick(3));
         Assert.Equal((DepositPanel.Step.Sources, Service.Transfer, DepositPanel.OfferKeys), (panel.Current, panel.Service, panel.KeysLine));
@@ -653,30 +653,30 @@ public sealed class DepositPanelTests : IDisposable
             "MOVE AN ENCHANTMENT ONTO THE BUCKLER AND SWORD - BOTH WEAPONS STAY IN THE SHOP",
             "REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [A] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
             "REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [B] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
-            "REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [C] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
-            "> SERRATED ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T1 - 2 RUNS <",
-            "VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T2 - 2 RUNS",
-            "OVERHEAL ON THE NAMELESS KNIFE IN THE BAG OF [C] - ARRIVES AT T1 - 2 RUNS",
-            "FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT",
-            "BURNING ON THE NAMELESS NOVA IN THE BAG OF [C] - ARRIVES AT T1 - 2 RUNS",
-            "REGENERATION ON THE STAFF OF RENEWAL IN THE HAND OF [D] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
-            "MIRE ON THE STAFF OF MIRE IN THE BAG OF [D] - THE STAFF OF MIRE WOULD CAST NOTHING",
-            "POISON T3 ON THE ROTWOOD IN THE BAG OF [D] - THE ROTWOOD WOULD CAST NOTHING",
-            "COLD ON THE WAND OF THE CONE IN THE BAG OF [D] - CANNOT SIT WITH FLAMING",
+            "> SERRATED ON THE NAMELESS KNIFE IN THE BAG OF [B] - ARRIVES AT T1 - 2 RUNS <",
+            "VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE BAG OF [B] - ARRIVES AT T2 - 2 RUNS",
+            "OVERHEAL ON THE NAMELESS KNIFE IN THE BAG OF [B] - ARRIVES AT T1 - 2 RUNS",
+            "FLAMING ON THE NAMELESS NOVA IN THE BAG OF [B] - BURNING NEEDS FLAMING AHEAD OF IT",
+            "BURNING ON THE NAMELESS NOVA IN THE BAG OF [B] - ARRIVES AT T1 - 2 RUNS",
+            "REGENERATION ON THE STAFF OF RENEWAL IN THE HAND OF [C] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
+            "MIRE ON THE STAFF OF MIRE IN THE BAG OF [C] - THE STAFF OF MIRE WOULD CAST NOTHING",
+            "POISON T3 ON THE ROTWOOD IN THE BAG OF [C] - THE ROTWOOD WOULD CAST NOTHING",
+            "COLD ON THE WAND OF THE CONE IN THE BAG OF [C] - CANNOT SIT WITH FLAMING",
+            "REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [D] - THE STAFF OF RENEWAL WOULD CAST NOTHING",
             "FLAMING - ITS OWN - IT IS LAST ALREADY",
         }, Texts(rows));
-        Assert.Equal(DungeonHud.Yellow, rows[4].Color);
+        Assert.Equal(DungeonHud.Yellow, rows[3].Color);
         Assert.All(rows.Skip(1).Where(row => row.Text.Contains("WOULD", StringComparison.Ordinal) || row.Text.Contains("CANNOT", StringComparison.Ordinal)),
             row => Assert.Equal(DungeonHud.DarkGrey, row.Color));
-        Assert.Equal(DungeonHud.White, rows[5].Color);
+        Assert.Equal(DungeonHud.White, rows[4].Color);
 
         // A soul that would never fire on the weapon is chosen all the same, noted.
-        Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [A] - ARRIVES AT T1 - 2 RUNS - NEVER FIRES ON A SWORD",
-            DepositPanel.MoveLine(new TransferOffer(new WeaponPlace("A", 1), campaign.Party[0].WeaponIn(1), 0, campaign.Party[0].WeaponIn(1)!.Enchantments[0], 1, 2, null, Enchanter.NeverFiresOn(WeaponClass.Sword))));
+        Assert.Equal("REGENERATION ON THE STAFF OF RENEWAL IN THE BAG OF [D] - ARRIVES AT T1 - 2 RUNS - NEVER FIRES ON A SWORD",
+            DepositPanel.MoveLine(new TransferOffer(new WeaponPlace("D", 1), campaign.Party[3].WeaponIn(1), 0, campaign.Party[3].WeaponIn(1)!.Enchantments[0], 1, 2, null, Enchanter.NeverFiresOn(WeaponClass.Sword))));
         // A reorder moves one of two souls at the least (the last is last already), so
         // it takes 2 runs at the least (PHASE 6a DECISION 11).
         var own = TestShop.Opened();
-        var two = TestShop.Give(own, "B", 2, Sword(wear: 35, cashed: 160, "flaming", "vampiric"));
+        var two = TestShop.Give(own, "A", 2, Sword(wear: 35, cashed: 160, "flaming", "vampiric"));
         Assert.Equal("FLAMING - ITS OWN - MOVES TO THE END - ARRIVES AT T1 - 2 RUNS",
             DepositPanel.MoveLine(Enchanter.TransferOffers(own, own.WeaponAt(two)!).Single(move => move.Source is null && move.Index == 0)));
 
@@ -703,9 +703,9 @@ public sealed class DepositPanelTests : IDisposable
         // one that would never fire on the weapon says that: a deposit and its runs
         // would buy a lock that does nothing (the audit of Phase 6a).
         var inert = TestShop.Opened();
-        var target = TestShop.Give(inert, "B", 2, Sword(wear: 36, cashed: 195, "flaming"));
-        inert.Move(TestShop.Give(inert, "C", 2, TestWeapons.Get("feathered_death")), WeaponPlace.InTheStable(0));
-        inert.Move(TestShop.Give(inert, "C", 2, TestWeapons.Get("shieldbreaker")), WeaponPlace.InTheStable(1));
+        var target = TestShop.Give(inert, "A", 2, Sword(wear: 36, cashed: 195, "flaming"));
+        inert.Move(TestShop.Give(inert, "B", 2, TestWeapons.Get("feathered_death")), WeaponPlace.InTheStable(0));
+        inert.Move(TestShop.Give(inert, "B", 2, TestWeapons.Get("shieldbreaker")), WeaponPlace.InTheStable(1));
         var souls = Enchanter.TransferOffers(inert, inert.WeaponAt(target)!).Where(move => LootTable.IsInert(move.Soul.Def)).ToArray();
         Assert.Equal(["weightless", "momentum"], souls.Select(move => move.Soul.Id));
         Assert.All(souls, move => Assert.Equal((null, Enchanter.DoesNothingYetNote), (move.Refusal, move.Note)));
@@ -726,9 +726,9 @@ public sealed class DepositPanelTests : IDisposable
         }
         Assert.Equal(["vampiric", "overheal", "flaming", "burning"], chosen);
         panel.Move(-1);
-        Assert.Equal(("> FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT <", DungeonHud.Grey),
-            (BetweenRunsHud.PanelRows(panel, 20)[7].Text, BetweenRunsHud.PanelRows(panel, 20)[7].Color));
-        Assert.Equal("FLAMING ON THE NAMELESS NOVA IN THE BAG OF [C] - BURNING NEEDS FLAMING AHEAD OF IT", panel.ChooseOffer());
+        Assert.Equal(("> FLAMING ON THE NAMELESS NOVA IN THE BAG OF [B] - BURNING NEEDS FLAMING AHEAD OF IT <", DungeonHud.Grey),
+            (BetweenRunsHud.PanelRows(panel, 20)[6].Text, BetweenRunsHud.PanelRows(panel, 20)[6].Color));
+        Assert.Equal("FLAMING ON THE NAMELESS NOVA IN THE BAG OF [B] - BURNING NEEDS FLAMING AHEAD OF IT", panel.ChooseOffer());
         Assert.Equal(DepositPanel.Step.Sources, panel.Current);
         panel.Move(-1);
         panel.Move(-1);
@@ -755,7 +755,7 @@ public sealed class DepositPanelTests : IDisposable
         Assert.Equal((BetweenRunsScene.HubMode.Weapons, "  WORKING  BUCKLER AND SWORD - 0 OF 2 RUNS"), (scene.Mode, scene.Weapons.ChosenRow.Text));
         Assert.Contains("  HELD     NAMELESS KNIFE", scene.Weapons.Rows().Select(row => row.Text));
         Assert.Equal(1, host.HubSavesAsked);
-        Assert.Contains("[Enchanter] Deposited Buckler and Sword (arming_sword) from B's bag slot 3: Transfer vampiric (T3) from Nameless Knife (flensing_knife_unique) in C's bag slot 3,"
+        Assert.Contains("[Enchanter] Deposited Buckler and Sword (arming_sword) from A's bag slot 3: Transfer vampiric (T3) from Nameless Knife (flensing_knife_unique) in B's bag slot 3,"
             + " 36 wear cashed (capacity 36 -> 37), 2 runs, deposit #0", Log.RecentEntries.Select(entry => entry.Message));
 
         // The confirm's ENTER asks again (6a.5's review, extended): the source gone
@@ -763,9 +763,9 @@ public sealed class DepositPanelTests : IDisposable
         // for the soul — each said over the keys, nothing deposited.
         Enchanter.TakeBack(campaign, deposit);   // both to the stable
         var blade = TestShop.Worn("riposte_blade", wear: 30);
-        TestShop.Give(campaign, "B", 3, blade);
-        var from = new WeaponPlace("C", 0);
-        campaign.Move(TestShop.InTheStable(campaign, knife), from);   // the knife into C's hand, its Dane Axe to the stable
+        TestShop.Give(campaign, "A", 3, blade);
+        var from = new WeaponPlace("B", 0);
+        campaign.Move(TestShop.InTheStable(campaign, knife), from);   // the knife into B's hand, its Dane Axe to the stable
         void Confirm()
         {
             ChooseRow(scene, "  BAG   RAPIER AND DAGGER - WEAR 30/30 FULL");
@@ -774,7 +774,7 @@ public sealed class DepositPanelTests : IDisposable
             Assert.Equal((DepositPanel.Step.Confirm, knife, 1), (scene.Panel!.Current, scene.Panel.ChosenMove!.Source, scene.Panel.ChosenMove.Index));
         }
         Confirm();
-        campaign.Move(from, WeaponPlace.InTheStable(campaign.Stable.Count));   // C's hand, emptied, takes up its staff
+        campaign.Move(from, WeaponPlace.InTheStable(campaign.Stable.Count));   // B's hand, emptied, takes up its staff
         scene.OnKey(Keys.Enter);
         Assert.Equal("THE NAMELESS KNIFE HAS MOVED - NOTHING DEPOSITED", scene.Refusal);
         campaign.Move(TestShop.InTheStable(campaign, knife), from);
@@ -783,10 +783,10 @@ public sealed class DepositPanelTests : IDisposable
         scene.OnKey(Keys.Enter);
         Assert.Equal("VAMPIRIC IS NOT ON THE NAMELESS KNIFE NOW - NOTHING DEPOSITED", scene.Refusal);
         Confirm();
-        campaign.Move(new WeaponPlace("C", 3), WeaponPlace.InTheStable(campaign.Stable.Count));   // C left carrying the knife alone
-        Assert.Equal(1, campaign.Party[2].Inventory.Count(carried => carried is not null));
+        campaign.Move(new WeaponPlace("B", 3), WeaponPlace.InTheStable(campaign.Stable.Count));   // B left carrying the knife alone
+        Assert.Equal(1, campaign.Party[1].Inventory.Count(carried => carried is not null));
         scene.OnKey(Keys.Enter);
-        Assert.Equal("VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE HAND OF [C] - [C] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", scene.Refusal);
+        Assert.Equal("VAMPIRIC T3 ON THE NAMELESS KNIFE IN THE HAND OF [B] - [B] WOULD CARRY NO WEAPON - TAKE ANOTHER FROM THE STABLE FIRST", scene.Refusal);
         Assert.Equal((BetweenRunsScene.HubMode.Weapons, (DepositPanel?)null), (scene.Mode, scene.Panel));
         Assert.Empty(campaign.AtTheEnchanter);
         Assert.Equal(1, host.HubSavesAsked);   // the deposit's alone: nothing refused was saved

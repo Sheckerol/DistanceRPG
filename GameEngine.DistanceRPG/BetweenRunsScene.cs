@@ -744,8 +744,8 @@ public sealed class BetweenRunsScene : Scene
     /// <summary>
     /// A deposit, as the log says it (the plan's 1h), from what the enchanter handed
     /// back (<see cref="DepositMade"/>; Logic never logs): <c>[Enchanter] Deposited
-    /// Scutum and Gladius (tower_guard) from B's hand: Enchant vampiric, 30 wear cashed
-    /// (capacity 30 -> 31), 1 run, deposit #0; B's hand, emptied, took up Staff of
+    /// Scutum and Gladius (tower_guard) from A's hand: Enchant vampiric, 30 wear cashed
+    /// (capacity 30 -> 31), 1 run, deposit #0; A's hand, emptied, took up Staff of
     /// Renewal from the bag</c>. The ordinal is named here, in the session that made
     /// the deposit, so a finished service's improvement roll, which the run's end
     /// logs, can be keyed again from the log.

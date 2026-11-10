@@ -11,19 +11,23 @@ namespace GameEngine.DistanceRPG.Logic;
 /// (<see cref="ContentValidator.ValidateParty"/>): four members, each spread a
 /// permutation of 1–4, every weapon there and within the fitted carry, a caster
 /// in hand. The one failure a data file can cause is a <c>weapons.json</c> that
-/// renames a weapon only the roster names — A's <c>weakspot_stiletto</c>, C's
+/// renames a weapon only the roster names — D's <c>weakspot_stiletto</c>, B's
 /// <c>great_axe</c> — so a failure here is stamped with that file, naming the
 /// member, the rule and the weapon.
 /// </para>
 /// <para>
 /// The §2.1 table's spreads and starting weapons, with the slot-1 staff the
-/// party has always carried and D's second, debuff staff in the bag. Every
+/// party has always carried and C's second, debuff staff in the bag. Every
 /// spread is a permutation of 1–4, so no member is better endowed than another;
 /// the pairs mirror each other, which is what makes each stat somebody's 4
-/// exactly once and leaves D the party's only CON 1 — the caster as the single
-/// thing that must not be reached. The axe goes to C, the only STR 4, and D
+/// exactly once and leaves C the party's only CON 1 — the caster as the single
+/// thing that must not be reached. The axe goes to B, the only STR 4, and C
 /// gives up the second spear for a staff, because a party with no caster never
 /// discovers half the game.
+/// </para>
+/// <para>
+/// The letters follow each member's 4 (the user's ruling of 2026-11-08): A the
+/// high CON, B the high STR, C the high INT, D the high DEX.
 /// </para>
 /// Expect these to move after playing: the permutation rule is the part worth
 /// keeping, and which member gets which permutation is a first guess.
@@ -34,10 +38,10 @@ public static class StartingParty
     public static PartyData Data { get; } = new(
     [
         //             id   name       STR DEX CON INT   equipped                bag
-        Member("A", "Dagger", 1, 4, 2, 3, "weakspot_stiletto", "staff_of_renewal"),
-        Member("B", "Shield", 3, 1, 4, 2, "tower_guard", "staff_of_renewal"),
-        Member("C", "Axe", 4, 2, 3, 1, "great_axe", "staff_of_renewal"),
-        Member("D", "Caster", 2, 3, 1, 4, "staff_of_renewal", "staff_of_mire"),
+        Member("A", "Shield", 3, 1, 4, 2, "tower_guard", "staff_of_renewal"),
+        Member("B", "Axe", 4, 2, 3, 1, "great_axe", "staff_of_renewal"),
+        Member("C", "Caster", 2, 3, 1, 4, "staff_of_renewal", "staff_of_mire"),
+        Member("D", "Dagger", 1, 4, 2, 3, "weakspot_stiletto", "staff_of_renewal"),
     ]);
 
     private static PartyMemberDef Member(string id, string name, int str, int dex, int con, int @int,

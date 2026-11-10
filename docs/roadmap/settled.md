@@ -456,7 +456,11 @@
   budget a three-way trade between weapons, potions and haul.
 - **The starting party is dagger, sword, axe, staff** — both spears go, one to
   an axe on C and one to a staff on D, with a debuff staff in D's bag. Brace is
-  taught by enemy spear dummies instead of a party spear.
+  taught by enemy spear dummies instead of a party spear. **Relettered by the
+  user's ruling of 2026-11-08, each member keeping its spread and gear: A is the
+  shield (high CON, was B), B the axe (high STR, was C), C the caster (high INT,
+  was D), D the dagger (high DEX, was A).** Plans and decisions dated before that
+  use the old letters.
 - **The tutorial is consumed by beating it**; every other dungeon is picked
   from the hub and repeatable. Rushing its boss permanently forfeits its themed
   drops, which is the game's central decision delivered once in miniature.
