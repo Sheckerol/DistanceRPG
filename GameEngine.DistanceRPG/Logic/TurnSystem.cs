@@ -669,7 +669,7 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Where a revived member gets up (§7.3): the centre of the nearest floor tile
-    /// to the leader that no living actor stands on — breadth-first from the
+    /// to the leader where it overlaps no living body — breadth-first from the
     /// leader's own tile across floor only (<see cref="GridUtils.NearestFreeTile"/>),
     /// so it is in the leader's room or corridor and never through a wall. Members
     /// revived together fill the tiles in roster order, each one standing before
@@ -690,8 +690,20 @@ public sealed class TurnSystem
         if (leader is null) return (member.X, member.Y);
 
         var (r, c) = GridUtils.NearestFreeTile(_grid, TileOf(leader.X, leader.Y),
-            tile => _party.Any(m => m.Alive && TileOf(m.X, m.Y) == tile) || _enemies.Any(e => e.Alive && TileOf(e.X, e.Y) == tile));
-        return ((c + 0.5f) * GameConstants.Tile, (r + 0.5f) * GameConstants.Tile);
+            tile => _party.Any(m => m.Alive && Overlaps(m, tile)) || _enemies.Any(e => e.Alive && Overlaps(e, tile)));
+        return Centre(r, c);
+
+        // Taken where the member, stood at the tile's centre, would overlap a
+        // living body: a body off its tile's centre, or one wider than a tile (a
+        // boss's), reaches into the tiles around it.
+        bool Overlaps(ActorState body, (int R, int C) tile)
+        {
+            var (x, y) = Centre(tile.R, tile.C);
+            float dx = body.X - x, dy = body.Y - y, reach = body.Radius + member.Radius;
+            return dx * dx + dy * dy < reach * reach;
+        }
+
+        static (float X, float Y) Centre(int row, int col) => ((col + 0.5f) * GameConstants.Tile, (row + 0.5f) * GameConstants.Tile);
     }
 
     // ── Player actions ───────────────────────────────────────────────────────

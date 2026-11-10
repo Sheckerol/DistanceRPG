@@ -325,6 +325,26 @@ public sealed class EncounterEndTests : IDisposable
         Assert.Equal((10, 9), TileOf(c));    // then left
     }
 
+    [Theory]
+    [InlineData(EnemyState.DummyRadius, 9)]   // a dummy two tiles up leaves the tile between free: up
+    [InlineData(20f, 11)]                     // a boss's wider body reaches into it: down instead
+    public void ARevivedMember_NeverGetsUpOverlappingABody(float radius, int expectedRow)
+    {
+        var grid = new int[30, 30];
+        var a = Member("A", 0, 0);
+        var b = Member("B", 0, 0);
+        var enemy = new EnemyState { BodyRadius = radius };
+        Centre(a, 10, 10);
+        Centre(b, 2, 2);
+        Centre(enemy, 8, 10);
+        var turns = new TurnSystem(grid, new[] { a, b }, new[] { enemy }, () => 10) { Leader = () => a };
+        Fall(b);
+
+        Assert.True(turns.CheckEncounterEnd());   // the enemy is not in view
+
+        Assert.Equal((expectedRow, 10), TileOf(b));
+    }
+
     [Fact]
     public void InACorridor_TheyGetUpAlongIt_NeverThroughAWall()
     {
