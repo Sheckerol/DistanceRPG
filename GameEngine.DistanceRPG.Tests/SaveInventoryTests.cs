@@ -286,6 +286,8 @@ public class SaveInventoryTests
             new("PotionDrunk", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh for the drink's beat and log line"),
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
             new("CombatEnded", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
+            new("CharacterRevived", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
+            new("DeathCost", Kept.Derived, "set by OpenTurns: the cut against the visit's saved entry snapshot at the tuning's DeathXpLossPercent"),
         ],
     };
 

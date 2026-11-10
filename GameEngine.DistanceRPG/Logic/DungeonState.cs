@@ -1034,6 +1034,9 @@ public sealed class DungeonState
             firstTurn: _turn, carry: _carry, boss: floor.Boss)
         {
             ResurrectionActive = !BossDefeated,
+            // A death costs the share of the member's run gain (§7.1): against the
+            // door's snapshot, so nothing earned before the run is ever touched.
+            DeathCost = member => EntrySnapshot.ClawBack([member], GameContent.Current.Tuning.DeathXpLossPercent),
         };
         turns.BossDefeated += _ => RecordBossDefeated();
         turns.GameOver += () =>

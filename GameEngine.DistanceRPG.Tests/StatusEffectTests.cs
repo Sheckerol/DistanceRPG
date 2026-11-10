@@ -548,7 +548,9 @@ public sealed class StatusEffectTests : IDisposable
         var b = Char("B", 5 * Tile, 7 * Tile);   // survives, so A's fall is not a wipe
         var enemy = new EnemyState { X = 18 * Tile, Y = 18 * Tile, Hp = 3 };
         enemy.ApplyStatus(Poison, null, 5);
-        var turns = new TurnSystem(grid, new[] { a, b }, new[] { enemy }, () => 10);
+        var watcher = new EnemyState { X = 18 * Tile, Y = 2 * Tile };   // stays in view: the encounter goes on, so A stays down (§7.2)
+        var turns = new TurnSystem(grid, new[] { a, b }, new[] { enemy, watcher }, () => 10);
+        turns.NotifyEnemyInView(watcher, true);
 
         int died = 0, defeated = 0;
         turns.CharacterDied += _ => died++;
@@ -626,7 +628,9 @@ public sealed class StatusEffectTests : IDisposable
     public void DeadActor_ShedsEverything_AtTheRoundsEndToo()
     {
         // A member cut down during the enemy phase carries nothing into the next round.
-        var (turns, _, b) = Scene();
+        // The enemy is in view, so the encounter goes on and b stays down (§7.2).
+        var (turns, _, b, enemy) = SceneWithEnemy();
+        turns.NotifyEnemyInView(enemy, true);
         b.ApplyStatus(Sundered, null, 3);
         b.ApplyStatus(Regeneration, null, 2);
         turns.EndTurn();                       // b's turn ends alive: regen ticks (2, then level 1), Sundered waits for the round

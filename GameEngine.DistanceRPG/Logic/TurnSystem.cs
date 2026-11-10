@@ -112,6 +112,23 @@ public sealed class TurnSystem
     /// </summary>
     public event Action? CombatEnded;
 
+    /// <summary>
+    /// A fallen member got up as the encounter ended (§7.1): at 1 HP (PHASE 7
+    /// DECISION 6), mana as it was capped at the new maximum, and the XP the
+    /// revive cost — every pool that lost anything (<see cref="DeathCost"/>), empty
+    /// when there was no run gain left to lose. Raised before
+    /// <see cref="CombatEnded"/>, one member at a time, in roster order.
+    /// </summary>
+    public event Action<PartyMemberState, IReadOnlyList<XpClawback>>? CharacterRevived;
+
+    /// <summary>
+    /// What a revive costs the member (§7.1): the visit's per-death cut, a share
+    /// of each pool's gain since the entry snapshot, applied and returned
+    /// (<see cref="DungeonState.OpenTurns"/> sets it). Null — a system built
+    /// outside a visit — and a revive costs nothing.
+    /// </summary>
+    public Func<PartyMemberState, IReadOnlyList<XpClawback>>? DeathCost { get; set; }
+
     // ── Events for the presentation layer ────────────────────────────────────
     public event Action<float>? TurnEnded;                                 // total movement banked
     public event Action? PlayerTurnStarted;
@@ -581,8 +598,9 @@ public sealed class TurnSystem
 
     /// <summary>
     /// The encounter's end (§7.2): no live enemy in view, and an encounter open
-    /// or a member down — then <see cref="CombatEnded"/>, and the encounter is
-    /// closed. Runs at every player turn's start (<see cref="StartPlayerTurn"/>)
+    /// or a member down — then every fallen member revives (<see cref="Revive"/>),
+    /// the zones are re-read with them standing, <see cref="CombatEnded"/> is
+    /// raised, and the encounter is closed. Runs at every player turn's start (<see cref="StartPlayerTurn"/>)
     /// and is called by the scene on a floor arrival once the arrival's lighting
     /// has told this system who is in view; a resumed turn is not an arrival, so
     /// a member saved down revives at the next turn's start (PHASE 7 DECISION 3).
@@ -597,8 +615,33 @@ public sealed class TurnSystem
         if (!_encounterOpen && !anyDown) return false;
 
         _encounterOpen = false;
+        if (anyDown)
+        {
+            foreach (var member in _party)
+                if (!member.Alive)
+                    Revive(member);
+            SnapshotZones();   // a member back up is in reach again, on both sides; standing inside never fires
+        }
         CombatEnded?.Invoke();
         return true;
+    }
+
+    /// <summary>
+    /// A fallen member gets up (§7.1): the death's XP cut first
+    /// (<see cref="DeathCost"/>), since the maxima are derived from XP; then
+    /// standing, at 1 HP (PHASE 7 DECISION 6) — never above a maximum, which is
+    /// always at least 1 — and mana as it was, capped at the new
+    /// <see cref="ActorState.UsableMaxMana"/> (PHASE 7 DECISION 4). Statuses were
+    /// shed at death. Where it stands is where it fell; the budget is refilled by
+    /// the turn's start, as every living member's is.
+    /// </summary>
+    private void Revive(PartyMemberState member)
+    {
+        var clawbacks = DeathCost?.Invoke(member) ?? Array.Empty<XpClawback>();
+        member.Alive = true;
+        member.Hp = Math.Min(1, member.MaxHp);
+        member.Mana = Math.Min(member.Mana, member.UsableMaxMana);
+        CharacterRevived?.Invoke(member, clawbacks);
     }
 
     // ── Player actions ───────────────────────────────────────────────────────
@@ -1536,11 +1579,12 @@ public sealed class TurnSystem
         foreach (var roster in _rosters)
             foreach (var actor in roster)
                 actor.HeldShots = 0;
-        SnapshotZones();
 
         // The encounter's end (§7.2), after resurrections — a dummy getting up in
-        // sight keeps the fight on — and before the budgets refill.
+        // sight keeps the fight on — and before the zones arm and the budgets
+        // refill, so a revived member stands in both.
         CheckEncounterEnd();
+        SnapshotZones();
 
         // The player phase opens for every member, the fallen included — the
         // boundary events are the roster's; only the budget refill is the living's.

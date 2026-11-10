@@ -1490,6 +1490,13 @@ public class DungeonScene : Scene
         // RunEnded put the summary up. What is left here is the log line.
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER - the party is defeated");
         _turns.CombatEnded += () => Log.Info("[Turns] The encounter is over - no live enemy in view");
+        _turns.CharacterRevived += (member, clawbacks) =>
+        {
+            int index = _party.FindIndex(p => p.State == member);
+            Log.Info($"[Combat] {member.Id} revived at {member.Hp} HP"
+                + (clawbacks.Count == 0 ? " - no run gain to lose" : $" - {string.Join(", ", clawbacks.Select(c => $"{c.Pool} XP {c.Before} -> {c.After}"))}"));
+            SetColor(_party[index], MemberColor(member, index));
+        };
     }
 
     /// <summary>
