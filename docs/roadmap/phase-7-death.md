@@ -1,15 +1,18 @@
 # Phase 7 — Death, revives and the wipe
 
+**Shipped 2026-11-09** (steps 7.1–7.6, each with an *As built* note below where
+it departed from the plan; save version 4).
+
 A new plan on top of the shipped Phases 0–6b. It **replaces the death rules
 §4.4 shipped** — a fallen member stays down for the rest of the run, and only a
 whole-party wipe costs XP (`DeathXpLossPercent` of the run's gain) — with a
 death that costs the fight you are in and a share of the run's XP, and a wipe
 that costs all of it. The decision and its reasons are recorded in
 [settled](settled.md) under *Death, revives and the wipe*, with the user's
-rulings on it (PHASE 7 DECISIONS 1–5, 2026-11-03).
+rulings on it (PHASE 7 DECISIONS 1–5, 2026-11-03, and 6, 2026-11-09).
 
-The older documents keep describing what shipped, with a pointer here at each
-rule this phase changes (§4.4, §5.1, §5.3, §6.1, §6.3).
+The older documents keep their reasoning, with a note at each rule this phase
+changed saying what shipped (§4.4, §5.1, §5.3, §6.1, §6.3).
 
 | | Shipped (Phase 4) | Phase 7 |
 | --- | --- | --- |
@@ -234,6 +237,11 @@ touches `MapGenerator`, `Mulberry32` or `Pathfinder`, and no RNG stream is added
    themselves; both chain pool by pool (a member's next death finds at least what
    its last left). The summary tells a line a member who died
    (`B DIED 2 TIMES: SWORD -10, HP -4`), and the wipe's headline is `PARTY WIPE`.
+   *As built (step 6):* the revive floats `REVIVED` and the levels the cut took
+   (`DungeonHud.RevivedText`: a class's ladder levels and the pools' points,
+   each replayed before and after the cut), or `REVIVED` alone when it crossed
+   none; settled.md's Phase 7 section is marked shipped, and §4.4, §5.1, §5.3,
+   §6.1 and §6.3 say what shipped.
 6. **7.6 — HUD and docs.** The `REVIVED` float text; settled.md's PHASE 7
    decisions marked shipped; the pointers in §4.4, §5.1, §5.3, §6.1, §6.3 updated
    from "Phase 7 replaces this" to the shipped wording.

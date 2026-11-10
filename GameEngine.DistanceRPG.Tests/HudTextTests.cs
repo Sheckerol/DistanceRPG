@@ -1524,6 +1524,24 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
+    public void ARevive_FloatsTheLevelsItsDeathTook()
+    {
+        // §7.6: REVIVED, and each pool's levels the cut took back — a class's ladder
+        // levels, the health and mana pools' points — in the cut's order; REVIVED
+        // alone when the cut crossed no level, or there was nothing to take.
+        var member = Holding("arming_sword");
+        int swordStat = Progression.GoverningStat(WeaponClass.Sword, member.Stats);
+        int swordLost = Progression.Ladder(2000, swordStat).Level - Progression.Ladder(0, swordStat).Level;
+        int hpLost = Progression.Pool(900, member.Stats.CON).Points - Progression.Pool(100, member.Stats.CON).Points;
+        Assert.True(swordLost > 0 && hpLost > 0);   // the cuts below cross levels, so the text has something to say
+
+        Assert.Equal($"REVIVED  -{swordLost} SWORD  -{hpLost} HP", DungeonHud.RevivedText(member,
+            [new XpClawback("A", "Sword", 2000, 0), new XpClawback("A", XpSnapshot.HpPool, 900, 100)]));
+        Assert.Equal("REVIVED", DungeonHud.RevivedText(member, []));
+        Assert.Equal("REVIVED", DungeonHud.RevivedText(member, [new XpClawback("A", XpSnapshot.ManaPool, 1, 0)]));   // XP, but no level crossed
+    }
+
+    [Fact]
     public void TheRunSummaryNamesTheOutcome()
     {
         // 4.4's three outcomes, as the run's end shows them: what the run was, where

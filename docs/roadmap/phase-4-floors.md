@@ -503,12 +503,14 @@ happened:
 | --- | --- | --- | --- |
 | **Boss kill** | Collected on the way out | Kept | — (a win, not a mercy) |
 | **Retreat** (leave alive, boss unfought) | Forfeited | **Kept** | Yes |
-| **Death** (party wipe) | Forfeited | **Clawed back by `DeathXpLossPercent`** | Yes |
+| **Party wipe** | Forfeited | **Reset to the entry snapshot** (Phase 7; Phase 4 clawed back `DeathXpLossPercent`) | Yes |
 
-> **Phase 7 replaces the death rules** — see [phase-7-death](phase-7-death.md).
-> A member is down for the encounter, not the run; each death costs half their
-> run XP; a wipe resets to the entry snapshot. This section describes what
-> shipped.
+> **Phase 7 replaced the death rules** (shipped 2026-11-09) — see
+> [phase-7-death](phase-7-death.md). A member is down for the encounter, not the
+> run, and gets up at 1 HP when it ends; each death costs `DeathXpLossPercent`
+> (50) of their run XP; a wipe resets every pool to the entry snapshot and reads
+> `PARTY WIPE` (`RunOutcome.PartyWipe`). The text below is what Phase 4 shipped,
+> kept for the reasoning: "the loss" it describes is now each death's.
 
 Retreating and dying already share the mercy tick (§6.3) — they should not
 also share an XP outcome. A fighting retreat means the party survived, so the

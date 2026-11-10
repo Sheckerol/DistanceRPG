@@ -217,8 +217,9 @@
   gain, rolled back from a snapshot taken at dungeon entry. Retreat and death
   already shared the mercy tick (§6.3, floor 3+); they no longer share an XP
   outcome — surviving the climb out is what earns the difference. (§4.4, §5.1.)
-  **Superseded by Phase 7** (*Death, revives and the wipe*, below): the third
-  outcome is the wipe, which resets the run's XP rather than clawing back a share.
+  **Superseded by Phase 7** (*Death, revives and the wipe*, below; shipped
+  2026-11-09): the third outcome is the party wipe, which resets the run's XP
+  rather than clawing back a share, and each death along the way costs the share.
 - **Finding a dungeon's boss floor does not commit you to fighting it.**
   Declining and retreating instead is a legitimate choice — it re-rolls the
   depth for next visit, accepted as part of the risk/reward rather than an
@@ -800,7 +801,7 @@
 - **A fully worn weapon is not broken.** It swings identically; it simply stops
   banking, so further hits are work done for free. That is the entire penalty,
   and it is the right one — this design has no punishment mechanics (Phase 7
-  narrows this to gear: death takes run XP, never equipment), and
+  narrowed this to gear: death takes run XP, never equipment), and
   degradation would be a death spiral in a game whose way out of trouble is to
   fight. It also supplies the bound on hoarding that §6.4's deposit-timing
   decision needed: you cannot wait past full.
@@ -4455,12 +4456,14 @@ its number, and this pass records the ruling when it is made.
   whose line for the farm growing has the room to say which count: `THE FARM
   GROWS TO 3 DUNGEONS BEYOND THE TUTORIAL`.
 
-## Death, revives and the wipe — Phase 7 (2026-11-02, planned)
+## Death, revives and the wipe — Phase 7 (2026-11-02, shipped 2026-11-09)
 
 Supersedes "dead for the rest of the run" and the earlier single
 `DeathXpLossPercent` clawback, which applied only to a party wipe (§4.4, as
 shipped in Phase 4). Planned as its own phase rather than rewritten into §4.4:
-see [phase-7-death](phase-7-death.md).
+see [phase-7-death](phase-7-death.md). Every decision below shipped as ruled,
+with two departures from the plan's wording, noted where they fall and in
+*As shipped* at the end.
 
 - **A fallen member is down for the encounter, not the run.** Losing a body for
   the rest of the dungeon was a death spiral: every later fight harder, the next
@@ -4480,7 +4483,10 @@ see [phase-7-death](phase-7-death.md).
 - **A revived member gets up beside the leader, not where they fell** —
   nearest free tile behind the leader along the march trail. Reviving in place
   would put them back in a fight the party just escaped, and marching would drag
-  the other three after them.
+  the other three after them. (As shipped: the nearest free floor tile to the
+  leader, searched across floor only so never through a wall, and free of every
+  living body's footprint — the march trail restarts whenever marching does, so
+  after a fight there is none to read.)
 - **A wipe is the whole party down within one encounter.** It resets every
   member's XP to the entry snapshot, levels included — fixed at 100%, not tuned —
   and ejects the party from the dungeon, forfeiting loot and `DefeatCount` and
@@ -4520,3 +4526,17 @@ see [phase-7-death](phase-7-death.md).
   for the member's recovery with a cast, a potion or the next entry's rest, or
   takes them into the next fight one hit from going down again. Healing them
   back feeds their HP XP as any healing does (§2.2).
+
+*As shipped (Phase 7.1–7.6, 2026-11-09).* `TurnSystem` keeps the live enemies in
+view and asks `CheckEncounterEnd` at every player turn's start and on every floor
+arrival; it raises `CombatEnded` when a fight was open or anyone is down (the plan
+said only when someone is down — marching reads the same moment), and revives each
+fallen member there at 1 HP beside the leader. Every death is paid through one door,
+`DungeonState.PayDeath` — the encounter's end and a body carried out the way out —
+which cuts the member's pools and records the death; the run's result carries the
+record (`RunResult.Deaths`), and the summary tells a line a member who died
+(`B DIED 2 TIMES: SWORD -10, HP -4`). A wipe resets to the door
+(`CampaignState.WipeLossPercent`, 100) and reads `PARTY WIPE`. Save version 4
+renames a version-3 `Death` outcome and saves the death record on the visit and the
+last result (checks 36 and 37). A revive floats `REVIVED` with the levels the cut
+took (`REVIVED  -1 SWORD  -2 HP`), or `REVIVED` alone when it crossed none.

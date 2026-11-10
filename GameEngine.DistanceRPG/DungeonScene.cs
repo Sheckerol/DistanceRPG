@@ -1499,6 +1499,7 @@ public class DungeonScene : Scene
             var obj = _party[index];
             SetColor(obj, MemberColor(member, index));
             obj.SyncTransform();   // up beside the leader, not where it fell
+            _hud.AddFloatingText(obj.Position, DungeonHud.RevivedText(member, clawbacks), HealColor, -52f);   // and the levels the death took (§7.6)
         };
     }
 

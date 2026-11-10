@@ -78,9 +78,10 @@ trouble is to fight (§4.3). So the cost of running a weapon dry is **the work
 you did for free**, which is a cost the player can choose to pay and can always
 see coming.
 
-> **Phase 7 narrows "no punishment mechanics" to gear** — see
-> [phase-7-death](phase-7-death.md). Equipment still never makes you weaker;
-> death is the one thing that takes back, and it takes run XP, never wear.
+> **Phase 7 narrowed "no punishment mechanics" to gear** (shipped 2026-11-09) —
+> see [phase-7-death](phase-7-death.md). Equipment still never makes you weaker;
+> death is the one thing that takes back, and it takes run XP, never wear: a
+> wipe keeps every weapon's wear (PHASE 6a DECISION 1).
 
 It also does something the design wanted anyway: **it is the bound on hoarding.**
 §6.4 makes waiting before a deposit genuinely worth it, and without a ceiling the
@@ -370,10 +371,11 @@ So the three failure shapes are genuinely different, and none of them is free:
 | **Turn back deep** | A fighting retreat through everything you farmed |
 | **Die** | The run and the haul, but the attempt still counted |
 
-> Under **Phase 7** ([phase-7-death](phase-7-death.md)) "died" in these tables
-> means **wiped** — the whole party down in one encounter. A single death no
-> longer ends the run, and a wipe also resets the run's XP. The ticks are
-> unchanged.
+> Since **Phase 7** (shipped 2026-11-09, [phase-7-death](phase-7-death.md)) "died"
+> in these tables means **wiped** — the whole party down in one encounter, the
+> outcome `PARTY WIPE`. A single death no longer ends the run, and a wipe also
+> resets the run's XP. The ticks are unchanged: a wipe with the boss down still
+> counts and locks, and one deep enough still takes the mercy tick.
 
 Three floors is the bar because it cannot be cleared by walking in and turning
 around, and because by the third floor a retreat is already a real fight rather
