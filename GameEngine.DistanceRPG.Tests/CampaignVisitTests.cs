@@ -272,8 +272,7 @@ public class CampaignVisitTests
     {
         // The party walks into every dungeon whole: alive, HP and mana full,
         // every status shed, a turn's budget with nothing banked — taken at the
-        // entry and not when the last run ended, so a run's end shows the fallen
-        // as fallen. The permanent half is untouched: what they carry, what they
+        // entry and not when the last run ended. The permanent half is untouched: what they carry, what they
         // have learned.
         var campaign = new CampaignState(Party());
         var (a, b) = (campaign.Party[0], campaign.Party[1]);
@@ -295,9 +294,10 @@ public class CampaignVisitTests
         b.Alive = false;
         b.Hp = 0;
 
-        // Leaving rests nobody.
+        // Leaving rests nobody — but a body carried out gets up as it leaves, at
+        // 1 HP, and pays its death (§7.5).
         Leave(campaign);
-        Assert.Equal((12, false), (a.Hp, b.Alive));
+        Assert.Equal((12, true, 1), (a.Hp, b.Alive, b.Hp));
 
         var kept = campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => (w as Weapon)?.Id)))).ToArray();
         campaign.Enter("tutorial", 1, EnemyPlacer.Unprotected);

@@ -283,14 +283,16 @@ public sealed class BetweenRunsHud : IDisposable
         if (result.Spoiled is { Count: > 0 } spoiled)
             lines.Add(new Run(SpoiledLine(spoiled.Count), DungeonHud.Yellow));
 
-        // The XP: kept, or the share of each pool's gain a wipe took back, member by member.
+        // The XP: kept, or reset to the door by a wipe (§7.4) — the whole run's
+        // gain, member by member. A result a save kept from before Phase 7 says
+        // what that run's wipe took, a share, and is told the same way.
         if (result.Outcome != RunOutcome.Death)
             lines.Add(new Run("XP KEPT", DungeonHud.Green));
         else if (result.Clawbacks.Count == 0)
-            lines.Add(new Run("XP KEPT - NOTHING CLAWED BACK", DungeonHud.Green));   // nothing gained, or a share of 0
+            lines.Add(new Run("XP RESET - NOTHING GAINED TO LOSE", DungeonHud.Green));
         else
         {
-            lines.Add(new Run("XP CLAWED BACK:", DungeonHud.Red));
+            lines.Add(new Run("XP RESET TO THE DUNGEON DOOR:", DungeonHud.Red));
             foreach (var member in result.Clawbacks.GroupBy(c => c.MemberId))
                 lines.AddRange(Wrapped($"{member.Key}:", member.Select(c => $"{c.Pool.ToUpperInvariant()} -{c.Before - c.After}"), DungeonHud.Red));
         }

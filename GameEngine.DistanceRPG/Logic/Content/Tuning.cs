@@ -371,9 +371,11 @@ public sealed record Tuning
     public int MercyFloor { get; init; }
 
     /// <summary>
-    /// The percentage of this run's gain in each XP pool a wipe claws back
-    /// (§4.4). 100 erases the run's progress, 0 makes death a pure loot
-    /// forfeiture; it ships as data and never as a hardcoded 100%.
+    /// The percentage of this run's gain in each XP pool one death costs the
+    /// member who fell, paid as they revive (§7.1) — at the encounter's end, or
+    /// on the way out with the body carried (§7.5). Each death halves what is
+    /// left at 50. A wipe no longer reads it: a wipe resets to the door
+    /// (<see cref="CampaignState.WipeLossPercent"/>, §7.4).
     /// <para>
     /// <strong>Provisional.</strong> settled.md fixes the mechanism and leaves the
     /// number open ("nobody can pick this number on paper"), so 50 is picked

@@ -325,11 +325,11 @@ public sealed class RunOutcomeTests : IDisposable
     }
 
     [Fact]
-    public void ADeathLosesTheSpoils_AndClawsBackAShareOfEachPoolsGain()
+    public void ADeathLosesTheSpoils_AndResetsEveryPoolToTheDoor()
     {
-        // PHASE4-107, -111: a wipe forfeits the run's loot and rolls each XP pool
-        // back by DeathXpLossPercent of its gain since the entry snapshot — the
-        // pools as they stood at the door are never touched. Spoils, not gear:
+        // PHASE4-107, -111, and §7.4: a wipe forfeits the run's loot and resets each
+        // XP pool to the entry snapshot — the whole run's gain, whatever the tuned
+        // share of one death — and the pools as they stood at the door are never touched. Spoils, not gear:
         // what is taken is exactly this run's pickups still in a bag, from
         // wherever they sit, the hand included; nothing the party carried in.
         Assert.Equal(50, GameContent.Current.Tuning.DeathXpLossPercent);
@@ -382,20 +382,20 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Same(tower, party[3].Inventory[1]);
         Assert.Same(dagger, party[3].Inventory[2]);
 
-        // Every pool at half its gain gone, truncated, and never below the door.
+        // Every pool back at the door exactly: the whole gain gone, nothing below it.
         foreach (var member in party)
         {
             var then = entry.Members.Single(m => m.MemberId == member.Id);
             var now = atWipe[member.Id];
-            int Kept(int before, int at) => at - (at - before) * 50 / 100;
+            int Kept(int before, int at) => at - (at - before) * CampaignState.WipeLossPercent / 100;
             Assert.Equal(then.WeaponXp.Zip(now.Weapons, Kept), Enum.GetValues<WeaponClass>().Select(c => member.WeaponXp[c]));
             Assert.Equal((Kept(then.HpXp, now.HpXp), Kept(then.ManaXp, now.ManaXp)), (member.HpXp, member.ManaXp));
         }
-        Assert.Equal(200 + 45 - 22, party[2].WeaponXp[Axe]);   // 45 gained, 22 taken: never the 200 C walked in with
-        Assert.Contains(new XpClawback("C", "Axe", 245, 223), result.Clawbacks);
+        Assert.Equal(200, party[2].WeaponXp[Axe]);   // 45 gained, 45 taken: never the 200 C walked in with
+        Assert.Contains(new XpClawback("C", "Axe", 245, 200), result.Clawbacks);
         Assert.Contains(result.Clawbacks, c => c.MemberId == "A" && c.Pool == "Dagger");   // the kills' XP, clawed too
-        Assert.Contains(new XpClawback("B", XpSnapshot.HpPool, entry.Members[1].HpXp + 13, entry.Members[1].HpXp + 13 - 6), result.Clawbacks);
-        Assert.Contains(new XpClawback("D", XpSnapshot.ManaPool, entry.Members[3].ManaXp + 7, entry.Members[3].ManaXp + 7 - 3), result.Clawbacks);
+        Assert.Contains(new XpClawback("B", XpSnapshot.HpPool, entry.Members[1].HpXp + 13, entry.Members[1].HpXp), result.Clawbacks);
+        Assert.Contains(new XpClawback("D", XpSnapshot.ManaPool, entry.Members[3].ManaXp + 7, entry.Members[3].ManaXp), result.Clawbacks);
 
         // The run's end rests nobody; the next entry does, and it arms the hand the
         // wipe emptied from the bag: D walks into the next dungeon holding its Scutum and Gladius.
@@ -408,12 +408,12 @@ public sealed class RunOutcomeTests : IDisposable
     }
 
     [Fact]
-    public void TheClawbackIsDeathXpLossPercentOfTheGain()
+    public void AWipeResetsToTheDoor_WhateverOneDeathCosts()
     {
-        // PHASE4-109: the loss is a tunable percentage of this run's gain in each
-        // pool — weapon XP per class, HP XP and mana XP — never a hard revert. At
-        // 100 death erases the run's progress, at 0 it is a pure loot forfeiture,
-        // and between them the share is taken in whole points, truncated.
+        // §7.4, replacing PHASE4-109: a wipe takes the whole run's gain in every
+        // pool — weapon XP per class, HP XP and mana XP — fixed at 100% and never
+        // tuned. DeathXpLossPercent is one death's share now (§7.1), so turning it
+        // moves nothing here.
         foreach (int percent in new[] { 0, 50, 100 })
         {
             using var _ = TestContent.UsePremise(tuning: t => t with { DeathXpLossPercent = percent });
@@ -433,31 +433,70 @@ public sealed class RunOutcomeTests : IDisposable
             a.ManaXp += 1;
             var result = Wipe(campaign, turns);
 
-            int Kept(int before, int gain) => before + gain - gain * percent / 100;
-            Assert.Equal((Kept(300, 45), Kept(0, 7), Kept(hp, 13), Kept(mana, 1)), (a.WeaponXp[Dagger], a.WeaponXp[Axe], a.HpXp, a.ManaXp));
+            Assert.Equal((300, 0, hp, mana), (a.WeaponXp[Dagger], a.WeaponXp[Axe], a.HpXp, a.ManaXp));   // the door, exactly
             Assert.All(party.Skip(1), m => Assert.Equal(0, m.WeaponXp.Total));   // nobody else gained, so nobody else lost
-            Assert.All(result.Clawbacks, c => Assert.Equal("A", c.MemberId));
-
-            XpClawback[] expected = percent switch
-            {
-                0 => Array.Empty<XpClawback>(),
-                50 =>
-                [
-                    new XpClawback("A", "Dagger", 345, 323),            // 45 gained, 22 taken: 22.5 truncated
-                    new XpClawback("A", "Axe", 7, 4),                   // 7 gained, 3 taken
-                    new XpClawback("A", XpSnapshot.HpPool, hp + 13, hp + 7),
-                    // mana gained 1, and half of one point is none: no clawback to record
-                ],
-                _ =>
+            Assert.Equal(
                 [
                     new XpClawback("A", "Dagger", 345, 300),
                     new XpClawback("A", "Axe", 7, 0),
                     new XpClawback("A", XpSnapshot.HpPool, hp + 13, hp),
                     new XpClawback("A", XpSnapshot.ManaPool, mana + 1, mana),
                 ],
-            };
-            Assert.Equal(expected, result.Clawbacks);
+                result.Clawbacks);
         }
+    }
+
+    [Fact]
+    public void AWipeAfterEarlierDeaths_EndsAtTheDoorExactly()
+    {
+        // §7.4: deaths along the way took their shares; the wipe takes the rest, so
+        // the pools end where they stood at the door, not a share below it.
+        var party = Party();
+        var a = party[0];
+        var campaign = new CampaignState(party);
+        var visit = campaign.Enter("tutorial", GoldenSeed, EnemyPlacer.Unprotected);
+        var turns = visit.OpenTurns(party, Ten);
+        int door = a.HpXp;
+        a.HpXp += 40;
+        turns.DeathCost!(a);   // one death's cut, as a revive takes it
+        Assert.Equal(door + 20, a.HpXp);
+
+        Wipe(campaign, turns);
+
+        Assert.Equal(door, a.HpXp);
+    }
+
+    [Fact]
+    public void ABodyCarriedOut_GetsUpAndPaysTheCut_AndTheNextEntrySnapshotsAfterIt()
+    {
+        // §7.5, PHASE 7 DECISION 1: leaving ends the encounter. A fallen member
+        // taken out the way out revives and pays one death's share before the run
+        // ends; the rest keep everything; and the next entry's door is what they
+        // walked out with.
+        var campaign = Campaign();
+        var party = campaign.Party;
+        var visit = campaign.Enter("spear_hall", FiveDeep, EnemyPlacer.Unprotected);
+        visit.OpenTurns(party, Ten);
+        var door = visit.EntrySnapshot;
+        party[1].WeaponXp[Spear] += 60;
+        party[2].ManaXp += 11;
+        party[1].Hp = 0;
+        party[1].Alive = false;   // carried
+        int spear = door.Members[1].WeaponXp[(int)Spear];
+        int mana = party[2].ManaXp;
+
+        var result = Exit(campaign);
+
+        Assert.Equal(RunOutcome.Retreat, result.Outcome);
+        Assert.Empty(result.Clawbacks);   // a wipe's record; the carried death's goes in the run's death record (§7.7)
+        Assert.True(party[1].Alive);
+        Assert.Equal(1, party[1].Hp);
+        int share = 60 * GameContent.Current.Tuning.DeathXpLossPercent / 100;
+        Assert.Equal(spear + 60 - share, party[1].WeaponXp[Spear]);
+        Assert.Equal(mana, party[2].ManaXp);   // only the fallen pay
+
+        var next = campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected);
+        Assert.Equal(spear + 60 - share, next.EntrySnapshot.Members[1].WeaponXp[(int)Spear]);
     }
 
     [Fact]
@@ -571,7 +610,7 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Equal(RunOutcome.Death, result.Outcome);
         Assert.Same(result, campaign.LastResult);
         Assert.Null(campaign.Visit);
-        Assert.All(party, m => Assert.Equal(20, m.WeaponXp[Dagger]));   // 40 gained, half taken back
+        Assert.All(party, m => Assert.Equal(0, m.WeaponXp[Dagger]));   // 40 gained, all of it reset (§7.4)
 
         // The visit holds no reference to the campaign — no field of it, or of a
         // floor, is one — and after the run nothing of the campaign's is left on
@@ -684,7 +723,7 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Equal(new[] { ("spear_hall", 6) }, campaign.LockedInOrder);
         Assert.True(campaign.HasCleared("spear_hall"));
         Assert.False(campaign.IsSelectable(SpearHall));
-        Assert.Equal(new XpClawback("B", "Spear", spearAtTheDoor + 40, spearAtTheDoor + 20), Assert.Single(run.Clawbacks));
+        Assert.Equal(new XpClawback("B", "Spear", spearAtTheDoor + 40, spearAtTheDoor), Assert.Single(run.Clawbacks));
 
         // Recorded at the turn the boss fell, before the wipe; the feed that drained
         // after it found the kill already written and moved nothing.

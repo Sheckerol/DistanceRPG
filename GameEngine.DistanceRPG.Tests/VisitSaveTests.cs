@@ -719,8 +719,8 @@ public sealed class VisitSaveTests : IDisposable
     {
         // PHASE5-006, re-pinning PHASE5-007: the party's XP at the door is in the
         // Run group, so a wipe after a reload claws back from it exactly what a
-        // wipe without the reload would — DeathXpLossPercent of each pool's gain
-        // since the door, and nothing the party walked in with.
+        // wipe without the reload would — each pool's whole gain since the door
+        // (§7.4), and nothing the party walked in with.
         var campaign = NewCampaign();
         campaign.Party[3].Credit(new XpCredit(XpPool.Weapon, WeaponClass.Dagger, 60));
         campaign.Party[1].Credit(new XpCredit(XpPool.Health, null, 20));
@@ -744,13 +744,12 @@ public sealed class VisitSaveTests : IDisposable
         Assert.Equal(live.Clawbacks, afterReload.Clawbacks);
         StateAssert.Equivalent(script.Campaign.Party, reloaded.Campaign.Party, "party");
 
-        // Only the gain since the door is clawed, at DeathXpLossPercent: what each
+        // Only the gain since the door is clawed, all of it (§7.4): what each
         // pool walked in with — 60 dagger XP, 20 HP XP, 40 mana XP — is kept whole.
-        int loss = GameContent.Current.Tuning.DeathXpLossPercent;
         foreach (var (member, pool, atDoor) in new[] { ("D", nameof(WeaponClass.Dagger), 60), ("B", XpSnapshot.HpPool, 20), ("C", XpSnapshot.ManaPool, 40) })
         {
             var clawed = afterReload.Clawbacks.Single(back => back.MemberId == member && back.Pool == pool);
-            Assert.Equal(clawed.Before - (clawed.Before - atDoor) * loss / 100, clawed.After);
+            Assert.Equal(atDoor, clawed.After);
         }
     }
 

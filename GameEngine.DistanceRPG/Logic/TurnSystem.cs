@@ -648,10 +648,23 @@ public sealed class TurnSystem
     {
         var clawbacks = DeathCost?.Invoke(member) ?? Array.Empty<XpClawback>();
         (member.X, member.Y) = RevivalPlace(member);
+        StandUp(member);
+        CharacterRevived?.Invoke(member, clawbacks);
+    }
+
+    /// <summary>
+    /// A fallen member stands, its death's cut already taken: at 1 HP (PHASE 7
+    /// DECISION 6), never above a maximum, and mana as it was capped at the
+    /// <see cref="ActorState.UsableMaxMana"/> the cut left (PHASE 7 DECISION 4).
+    /// The one rule a revive in a fight's end and a body carried out the way out
+    /// (<see cref="CampaignState.EndRun"/>) both stand by.
+    /// </summary>
+    internal static void StandUp(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
         member.Alive = true;
         member.Hp = Math.Min(1, member.MaxHp);
         member.Mana = Math.Min(member.Mana, member.UsableMaxMana);
-        CharacterRevived?.Invoke(member, clawbacks);
     }
 
     /// <summary>

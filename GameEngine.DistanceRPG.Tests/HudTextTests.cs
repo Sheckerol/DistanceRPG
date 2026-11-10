@@ -1575,7 +1575,7 @@ public sealed class HudTextTests : IDisposable
             "THE SPEAR HALL - DEEPEST FLOOR 5",
             "THE SPEAR WARDEN FELL ON FLOOR 5",
             "SPOILS LOST: SCUTUM AND GLADIUS",
-            "XP CLAWED BACK:",
+            "XP RESET TO THE DUNGEON DOOR:",
             "A: DAGGER -22, HP -6",
             "C: AXE -15",
             "RUN COUNTED - 3 RUNS SO FAR",
@@ -1595,7 +1595,7 @@ public sealed class HudTextTests : IDisposable
             "THE TUTORIAL - DEEPEST FLOOR 2",
             "THE STONE GOLEM STILL STANDS",
             "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
-            "XP KEPT - NOTHING CLAWED BACK",
+            "XP RESET - NOTHING GAINED TO LOSE",
             "RUN NOT COUNTED - 0 RUNS SO FAR",
             "ENTER TO CONTINUE",
         }, Lines(shallow));
@@ -1733,7 +1733,7 @@ public sealed class HudTextTests : IDisposable
         Assert.Contains(BetweenRunsHud.MoreAtTheEnchanter(ContentBounds.MostWorked - DungeonHud.DungeonServiceLines), texts);
         Assert.Contains(texts, text => text.StartsWith(BetweenRunsHud.StalledHeading, StringComparison.Ordinal));
         int pools = Enum.GetNames<WeaponClass>().Length + 2;
-        var clawed = texts.SkipWhile(text => text != "XP CLAWED BACK:").Skip(1).TakeWhile(text => !text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).ToArray();
+        var clawed = texts.SkipWhile(text => text != "XP RESET TO THE DUNGEON DOOR:").Skip(1).TakeWhile(text => !text.StartsWith("RUN COUNTED", StringComparison.Ordinal)).ToArray();
         Assert.Equal(members.Length * pools, clawed.Sum(text => text.Split(" -").Length - 1));   // every pool named once
         Assert.True(clawed.Length >= 3 * members.Length, $"the claw-backs wrap to {clawed.Length} lines");
         Assert.StartsWith(DungeonHud.ContinueHint, texts[^1], StringComparison.Ordinal);
