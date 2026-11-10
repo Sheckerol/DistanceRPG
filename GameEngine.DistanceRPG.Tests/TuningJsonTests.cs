@@ -844,8 +844,11 @@ public class TuningJsonTests
         var v3Keys = TuningSchema.Keys.Where(k => k.Played && k.HashedFrom == 3).Select(k => k.Name).ToArray();
         Assert.NotEmpty(v3Keys);
         Assert.Equal([nameof(Tuning.EnchantmentTierScale), .. TuningSchema.Keys.Where(k => k.Group == TuningGroup.Consumables).Select(k => k.Name)], v3Keys);
-        Assert.Equal(3, SaveCodec.CurrentVersion);
+        // Version 4 (Phase 7) began to play no key, so its hash is version 3's.
+        Assert.Equal(4, SaveCodec.CurrentVersion);
+        Assert.DoesNotContain(TuningSchema.Keys, k => k.Played && k.HashedFrom == 4);
         Assert.Equal(TuningJson.Hash(BuiltIn, version: 3), TuningJson.Hash(BuiltIn));
+        Assert.Equal(TuningJson.Hash(BuiltIn, version: 4), TuningJson.Hash(BuiltIn));
         string one = TuningJson.Hash(BuiltIn, version: 1), two = TuningJson.Hash(BuiltIn, version: 2), three = TuningJson.Hash(BuiltIn, version: 3);
         Assert.Equal(3, new[] { one, two, three }.Distinct().Count());
         foreach (string name in v3Keys)

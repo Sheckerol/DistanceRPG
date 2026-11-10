@@ -486,8 +486,8 @@ public sealed class ReloadDeterminismTests : IDisposable
 
         var tree = JsonNode.Parse(Save(script.Campaign))!.AsObject();
         var visit = tree["campaign"]!["visit"]!.AsObject();
-        // dungeonsCleared was appended after it, so diceRolled stands last but one.
-        Assert.Equal(("diceRolled", rolled), (visit.ElementAt(visit.Count - 2).Key, (int)visit["diceRolled"]!));
+        // dungeonsCleared and deaths were appended after it, so diceRolled stands last but two.
+        Assert.Equal(("diceRolled", rolled), (visit.ElementAt(visit.Count - 3).Key, (int)visit["diceRolled"]!));
         Assert.Equal(rolled, Load(tree.ToJsonString()).Campaign.Visit!.DiceRolled);
 
         visit.Remove("diceRolled");
@@ -628,7 +628,7 @@ public sealed class ReloadDeterminismTests : IDisposable
         Assert.Null(campaign.Visit);
         var result = Assert.Single(results);
         Assert.Same(result, campaign.LastResult);
-        Assert.Equal(("spear_hall", RunOutcome.Death), (result.DungeonId, result.Outcome));
+        Assert.Equal(("spear_hall", RunOutcome.PartyWipe), (result.DungeonId, result.Outcome));
         Assert.All(campaign.Party, member => Assert.False(member.Alive));
 
         Assert.True(SaveGame.IsSafePoint(campaign));
@@ -636,6 +636,6 @@ public sealed class ReloadDeterminismTests : IDisposable
         Assert.Null(SaveCodec.Read(text).Campaign.Visit);
         var back = Load(text).Campaign;
         Assert.Null(back.Visit);
-        Assert.Equal(RunOutcome.Death, back.LastResult!.Outcome);
+        Assert.Equal(RunOutcome.PartyWipe, back.LastResult!.Outcome);
     }
 }

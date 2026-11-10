@@ -706,7 +706,7 @@ public sealed class VisitSaveTests : IDisposable
             var party = side.Party;
             var result = Wipe(side);
             results.Add(result);
-            Assert.Equal(RunOutcome.Death, result.Outcome);
+            Assert.Equal(RunOutcome.PartyWipe, result.Outcome);
             Assert.Empty(result.SpoilsKept);
             Assert.Null(party[3].Inventory[2]);                                 // the spoil taken out of the bag
             Assert.Equal("staff_of_mire", party[2].WeaponIn(1)!.Id);           // the gear never a spoil

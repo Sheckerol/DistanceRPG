@@ -446,7 +446,7 @@ public sealed class CampaignState
     /// while the dungeon resurrects), the XP kept, and a mercy tick only from
     /// <see cref="Tuning.MercyFloor"/> down.</description></item>
     /// <item><term>Wiped</term><description>
-    /// <see cref="RunOutcome.Death"/>: the spoils still in a bag are taken out of
+    /// <see cref="RunOutcome.PartyWipe"/>: the spoils still in a bag are taken out of
     /// it and lost, every XP pool is reset to the entry snapshot (§7.4,
     /// <see cref="WipeLossPercent"/>), and the run ticks as a boss kill would
     /// if the boss was down, or as a failure otherwise.</description></item>
@@ -454,7 +454,9 @@ public sealed class CampaignState
     /// <para>
     /// <strong>A body carried out</strong> (§7.5): walking out ends the encounter,
     /// so a fallen member gets up first and pays one death's cut,
-    /// <see cref="Tuning.DeathXpLossPercent"/> of its run gain.
+    /// <see cref="Tuning.DeathXpLossPercent"/> of its run gain
+    /// (<see cref="DungeonState.PayDeath"/>). Every death the run paid for goes to
+    /// the result (<see cref="RunResult.Deaths"/>), on every ending.
     /// </para>
     /// <para>
     /// <strong>The clear.</strong> A run with the boss dead — out or wiped (§6.3:
@@ -518,9 +520,10 @@ public sealed class CampaignState
         if (ending == RunEnding.Exited)
             foreach (var member in _party.Where(member => !member.Alive))
             {
-                visit.EntrySnapshot.ClawBack([member], tuning.DeathXpLossPercent);
+                visit.PayDeath(member);
                 TurnSystem.StandUp(member);
             }
+        var deaths = visit.Deaths.ToArray();   // every death the run paid for, the carried-out ones last
 
         // The tick first (§6.3): a win ticks once at any depth; a failure only deep.
         bool mercy = !bossDown && deepest >= tuning.MercyFloor;
@@ -594,11 +597,12 @@ public sealed class CampaignState
         int yielded = Farm.Yield(clears, tick);
 
         var result = new RunResult(def.Id,
-            ending == RunEnding.Wiped ? RunOutcome.Death : bossDown ? RunOutcome.BossKill : RunOutcome.Retreat,
+            ending == RunEnding.Wiped ? RunOutcome.PartyWipe : bossDown ? RunOutcome.BossKill : RunOutcome.Retreat,
             bossDown, deepest, deepest >= visit.BossFloor ? visit.BossFloor : null,
             ServiceTick: tick, MercyTick: mercy, RunCounter, lockedUntil, retired,
             kept, lost, clawbacks, services.Count > 0 ? services : null,
-            FarmYield: yielded, FarmClears: clears, FirstClear: firstClear, Spoiled: spoiled.Count > 0 ? spoiled : null);
+            FarmYield: yielded, FarmClears: clears, FirstClear: firstClear, Spoiled: spoiled.Count > 0 ? spoiled : null,
+            Deaths: deaths.Length > 0 ? deaths : null);
         LastResult = result;
         RunEnded?.Invoke(result);
         return result;

@@ -144,7 +144,8 @@ public class Phase6aSaveTests
             // none writes null, each member's potions, appended by Phase 6b.1 and
             // written null for none, and what the farm did at the last run's end,
             // appended by Phase 6b.3 and written at its defaults: nothing yielded at no
-            // clears, no first clear, nothing spoiled — a run of version 2 made no batch.
+            // clears, no first clear, nothing spoiled — a run of version 2 made no batch —
+            // and the deaths the run paid for, appended by Phase 7.5 and written null.
             var again = SaveGame.Capture(campaign, loaded.View);
             Assert.Equal((TuningJson.Hash(played), SaveCodec.CurrentVersion), (again.TuningHash, again.TuningHashVersion));
             var captured = JsonNode.Parse(SaveCodec.Write(again))!.AsObject();
@@ -152,7 +153,7 @@ public class Phase6aSaveTests
             migrated["version"] = SaveCodec.CurrentVersion;
             static bool SetAside(string path, string name) => (path == "$" && name is "tuningHash" or "tuningHashVersion" or "savedAt")
                 || (Regex.IsMatch(path, @"^\$\.campaign\.party\[[0-9]+\]$") && name == "potions")
-                || (path == "$.campaign.lastResult" && SaveCodec.FarmMembers.Contains(name));
+                || (path == "$.campaign.lastResult" && (SaveCodec.FarmMembers.Contains(name) || name == SaveCodec.DeathsMember));
             if (FirstDifference(migrated, captured, "$", SetAside) is { } difference)
                 Assert.Fail($"captured again, the document is not the migrated save: {difference}");
             var rows = captured["campaign"]!["party"]!.AsArray();
@@ -167,6 +168,8 @@ public class Phase6aSaveTests
             Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{ "farmYield": 0, "farmClears": 0, "firstClear": false, "spoiled": null }"""),
                 new JsonObject(SaveCodec.FarmMembers.Select(name => KeyValuePair.Create(name, last[name]?.DeepClone())))));
             Assert.All(SaveCodec.FarmMembers, name => Assert.False(migrated["campaign"]!["lastResult"]!.AsObject().ContainsKey(name)));
+            Assert.True(last.ContainsKey(SaveCodec.DeathsMember));
+            Assert.Null(last[SaveCodec.DeathsMember]);
         }
     }
 

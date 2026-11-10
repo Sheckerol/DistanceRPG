@@ -575,6 +575,9 @@ public sealed class DungeonState
     // them are still in a bag.
     private readonly List<Weapon> _spoils = new();
 
+    // The deaths paid for this visit (PayDeath), in the order paid.
+    private readonly List<RunDeath> _deaths = new();
+
     private DungeonState(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, Floor[] floors, XpSnapshot entrySnapshot)
     {
         Def = def;
@@ -584,6 +587,7 @@ public sealed class DungeonState
         Floors = floors;
         EntrySnapshot = entrySnapshot;
         Spoils = _spoils.AsReadOnly();
+        Deaths = _deaths.AsReadOnly();
     }
 
     /// <summary>The dungeon being visited.</summary>
@@ -784,6 +788,31 @@ public sealed class DungeonState
     public event Action? Wiped;
 
     /// <summary>
+    /// Every death this visit has paid for, in the order paid (§7.1, §7.5): each
+    /// fallen member that got up, and what its cut took (<see cref="PayDeath"/>).
+    /// The run's end hands it to the result's summary
+    /// (<see cref="RunResult.Deaths"/>), and §5.1's Run group saves it.
+    /// </summary>
+    public IReadOnlyList<RunDeath> Deaths { get; }
+
+    /// <summary>
+    /// A fallen member's death paid (§7.1): <see cref="Tuning.DeathXpLossPercent"/>
+    /// of each pool's gain since the door (<see cref="EntrySnapshot"/>) clawed
+    /// back, and the death recorded (<see cref="Deaths"/>). The one door both
+    /// ways a body gets up go through: the encounter's end
+    /// (<see cref="TurnSystem.DeathCost"/>, wired by <see cref="OpenTurns"/>) and a
+    /// body carried out (<see cref="CampaignState.EndRun"/>).
+    /// </summary>
+    /// <returns>What the cut took from each pool: empty when nothing was left to lose.</returns>
+    internal IReadOnlyList<XpClawback> PayDeath(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        var cut = EntrySnapshot.ClawBack([member], GameContent.Current.Tuning.DeathXpLossPercent);
+        _deaths.Add(new RunDeath(member.Id, cut));
+        return cut;
+    }
+
+    /// <summary>
     /// A weapon <see cref="Pickup.Take"/> just put into a bag off a corpse: one of
     /// this visit's spoils (<see cref="Spoils"/>), recorded once whatever happens
     /// to it after.
@@ -869,6 +898,8 @@ public sealed class DungeonState
     /// <param name="carry">This turn's counters, or null for none: only this turn's, since a carry from an earlier one is dead weight.</param>
     /// <param name="spoils">The spoils in the order taken, each the very weapon where it now is.</param>
     /// <param name="diceRolled">How many d20s the visit's own die had rolled (<see cref="DiceRolled"/>): where it rolls on from.</param>
+    /// <param name="dungeonsCleared">The campaign's clears at entry (<see cref="DungeonsCleared"/>).</param>
+    /// <param name="deaths">The deaths paid for so far, in the order paid (<see cref="Deaths"/>); null for none.</param>
     /// <exception cref="ArgumentException">
     /// The floors are not the dungeon's depth, out of order, or visited other than
     /// down to the deepest; the floor or the deepest is out of the dungeon; the
@@ -878,7 +909,7 @@ public sealed class DungeonState
     /// <exception cref="ArgumentOutOfRangeException">The depth is below one floor, or the promise, the clock or the die's count is negative.</exception>
     internal static DungeonState Restore(DungeonDef def, long mapSeed, int bossFloor, int promisedStacks, XpSnapshot entrySnapshot, Floor[] floors,
         int floorIndex, int deepestFloorIndex, int turn, bool bossDefeated, int bossDefeatedAtTurn, TurnCarry? carry, IReadOnlyList<Weapon> spoils,
-        int diceRolled, int dungeonsCleared = EnemyPlacer.Unprotected)
+        int diceRolled, int dungeonsCleared = EnemyPlacer.Unprotected, IReadOnlyList<RunDeath>? deaths = null)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(entrySnapshot);
@@ -936,6 +967,8 @@ public sealed class DungeonState
         visit._turn = turn;
         visit._carry = carry;
         visit._spoils.AddRange(spoils);
+        if (deaths is not null)
+            visit._deaths.AddRange(deaths);
         return visit;
     }
 
@@ -1035,8 +1068,9 @@ public sealed class DungeonState
         {
             ResurrectionActive = !BossDefeated,
             // A death costs the share of the member's run gain (§7.1): against the
-            // door's snapshot, so nothing earned before the run is ever touched.
-            DeathCost = member => EntrySnapshot.ClawBack([member], GameContent.Current.Tuning.DeathXpLossPercent),
+            // door's snapshot, so nothing earned before the run is ever touched,
+            // and recorded for the run's summary.
+            DeathCost = PayDeath,
         };
         turns.BossDefeated += _ => RecordBossDefeated();
         turns.GameOver += () =>

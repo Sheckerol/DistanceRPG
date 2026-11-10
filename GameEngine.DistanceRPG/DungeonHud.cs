@@ -1037,8 +1037,12 @@ public sealed class DungeonHud
 
     // ── The run's end ────────────────────────────────────────────────────────
 
-    /// <summary>A wiped run's headline (§4.4), on its summary and on the defeat screen: the run is over, not the game.</summary>
-    internal const string DefeatHeadline = "DEFEATED";
+    /// <summary>
+    /// A wiped run's headline (§4.4, §7.6), on its summary and on the defeat
+    /// screen: the whole party down in one encounter — one member's death is no
+    /// longer the run's end (PHASE 7 DECISION 2) — and the run is over, not the game.
+    /// </summary>
+    internal const string DefeatHeadline = "PARTY WIPE";
 
     /// <summary>
     /// The one key a run's end answers: the summary is modal, ENTER moves on to

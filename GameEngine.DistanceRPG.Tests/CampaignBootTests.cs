@@ -974,7 +974,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.True(boot.Loaded);
             Assert.Null(boot.Campaign!.Visit);
             Assert.Null(boot.View);
-            Assert.Equal(("spear_hall", RunOutcome.Death), (boot.Campaign!.LastResult!.DungeonId, boot.Campaign!.LastResult.Outcome));
+            Assert.Equal(("spear_hall", RunOutcome.PartyWipe), (boot.Campaign!.LastResult!.DungeonId, boot.Campaign!.LastResult.Outcome));
             store.ClearResuming();
         });
     }

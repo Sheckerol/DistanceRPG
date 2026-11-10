@@ -182,7 +182,7 @@ public sealed class FarmTests : IDisposable
         // and yields at its new count, as the enchanter ticks.
         var campaign = TutorialBeaten();
         var wiped = WipeWithTheBossDown(campaign, "spear_hall");
-        Assert.Equal((RunOutcome.Death, true, true), (wiped.Outcome, wiped.BossDefeated, wiped.ServiceTick));
+        Assert.Equal((RunOutcome.PartyWipe, true, true), (wiped.Outcome, wiped.BossDefeated, wiped.ServiceTick));
         Assert.Equal((true, 1, PerClear), (wiped.FirstClear, wiped.FarmClears, wiped.FarmYield));
         Assert.True(Farm.AlchemistHasArrived(campaign));
     }
@@ -242,7 +242,7 @@ public sealed class FarmTests : IDisposable
         Carrying(campaign, "D", (3, Health(1)));
         var wiping = campaign.Enter("long_gallery", FiveDeep, EnemyPlacer.Unprotected);
         var wiped = CampaignRuns.Wipe(campaign, wiping.OpenTurns(campaign.Party, CampaignRuns.Ten));
-        Assert.Equal(RunOutcome.Death, wiped.Outcome);
+        Assert.Equal(RunOutcome.PartyWipe, wiped.Outcome);
         Assert.Equal([Mana(2), Health(1)], wiped.Spoiled!);
         Assert.All(campaign.Party, member => Assert.Empty(member.Potions));
     }

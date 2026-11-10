@@ -160,7 +160,7 @@ public sealed class SaveConsistencyTests : IDisposable
         foreach (var member in campaign.Party)
             member.Alive = false;
         var result = campaign.EndRun(RunEnding.Wiped);
-        Assert.Equal((RunOutcome.Death, false), (result.Outcome, result.BossDefeated));
+        Assert.Equal((RunOutcome.PartyWipe, false), (result.Outcome, result.BossDefeated));
         Assert.NotEmpty(result.SpoilsLost);
         Assert.NotEmpty(result.Clawbacks);
         return result;
@@ -180,7 +180,7 @@ public sealed class SaveConsistencyTests : IDisposable
         visit.Current.Boss!.Alive = false;
         visit.RecordBossDefeated();
         var result = CampaignRuns.Wipe(campaign, turns);
-        Assert.Equal((RunOutcome.Death, true, true), (result.Outcome, result.BossDefeated, result.ServiceTick));
+        Assert.Equal((RunOutcome.PartyWipe, true, true), (result.Outcome, result.BossDefeated, result.ServiceTick));
         Assert.NotNull(result.LockedUntilRun);
         return result;
     }
@@ -433,7 +433,7 @@ public sealed class SaveConsistencyTests : IDisposable
         RunResult potionWipe;
         using (TestContent.UsePremise(tuning: t => t with { FarmYieldPerClear = 7 }))   // the yield the potions laid after it are mixed from: this case's own number
             potionWipe = CampaignRuns.Wipe(potions, potionTurns);
-        Assert.Equal((RunOutcome.Death, true, true), (potionWipe.Outcome, potionWipe.BossDefeated, potionWipe.ServiceTick));
+        Assert.Equal((RunOutcome.PartyWipe, true, true), (potionWipe.Outcome, potionWipe.BossDefeated, potionWipe.ServiceTick));
         Assert.Equal([TestPotions.Health(3)], potionWipe.Spoiled!);   // C's, still carried: spoiled by the wipe, never forfeited as gear
         Assert.Equal(("long_gallery", true, 2, 14), (potionWipe.DungeonId, potionWipe.FirstClear, potionWipe.FarmClears, potionWipe.FarmYield));   // its first clear: the farm grows
         Loads(potions, "a wipe that spoiled a potion");

@@ -367,7 +367,7 @@ public sealed class RunOutcomeTests : IDisposable
         var atWipe = party.ToDictionary(m => m.Id, m => (Weapons: Enum.GetValues<WeaponClass>().Select(c => m.WeaponXp[c]).ToArray(), m.HpXp, m.ManaXp));
 
         var result = Wipe(campaign, back);
-        Assert.Equal((RunOutcome.Death, true), (result.Outcome, result.BossDefeated));
+        Assert.Equal((RunOutcome.PartyWipe, true), (result.Outcome, result.BossDefeated));
 
         // The spoils, out of the bags: lost, in the order they were taken.
         Assert.Equal(new[] { golemDrop.Weapon, dummyDrop.Weapon }, result.SpoilsLost);
@@ -461,9 +461,12 @@ public sealed class RunOutcomeTests : IDisposable
         turns.DeathCost!(a);   // one death's cut, as a revive takes it
         Assert.Equal(door + 20, a.HpXp);
 
-        Wipe(campaign, turns);
+        var result = Wipe(campaign, turns);
 
         Assert.Equal(door, a.HpXp);
+        var death = Assert.Single(result.Deaths!);   // the death before the wipe is the run's record; the reset is the wipe's
+        Assert.Equal(new RunDeath(a.Id, [new XpClawback(a.Id, XpSnapshot.HpPool, door + 40, door + 20)]).MemberId, death.MemberId);
+        Assert.Equal(new XpClawback(a.Id, XpSnapshot.HpPool, door + 40, door + 20), Assert.Single(death.Clawbacks));
     }
 
     [Fact]
@@ -489,6 +492,8 @@ public sealed class RunOutcomeTests : IDisposable
 
         Assert.Equal(RunOutcome.Retreat, result.Outcome);
         Assert.Empty(result.Clawbacks);   // a wipe's record; the carried death's goes in the run's death record (§7.7)
+        var carried = Assert.Single(result.Deaths!);
+        Assert.Equal((party[1].Id, nameof(Spear)), (carried.MemberId, Assert.Single(carried.Clawbacks).Pool));
         Assert.True(party[1].Alive);
         Assert.Equal(1, party[1].Hp);
         int share = 60 * GameContent.Current.Tuning.DeathXpLossPercent / 100;
@@ -607,7 +612,7 @@ public sealed class RunOutcomeTests : IDisposable
         Assert.Equal(TurnPhase.GameOver, turns.Phase);
         Assert.Equal(1, wipes);
         var result = Assert.Single(ended);
-        Assert.Equal(RunOutcome.Death, result.Outcome);
+        Assert.Equal(RunOutcome.PartyWipe, result.Outcome);
         Assert.Same(result, campaign.LastResult);
         Assert.Null(campaign.Visit);
         Assert.All(party, m => Assert.Equal(0, m.WeaponXp[Dagger]));   // 40 gained, all of it reset (§7.4)
@@ -644,7 +649,7 @@ public sealed class RunOutcomeTests : IDisposable
         var above = Up(visit, party);
         var result = Wipe(campaign, above);
 
-        Assert.Equal((RunOutcome.Death, true, 5, (int?)5), (result.Outcome, result.BossDefeated, result.DeepestFloor, result.BossFloorRevealed));
+        Assert.Equal((RunOutcome.PartyWipe, true, 5, (int?)5), (result.Outcome, result.BossDefeated, result.DeepestFloor, result.BossFloorRevealed));
         Assert.Equal((true, false), (result.ServiceTick, result.MercyTick));   // the success tick, not a mercy
         Assert.Equal((1, 1), (result.RunCounter, campaign.RunCounter));
         Assert.Equal(1 + 5, result.LockedUntilRun);
@@ -716,7 +721,7 @@ public sealed class RunOutcomeTests : IDisposable
         var run = ended ?? throw new Xunit.Sdk.XunitException("The wipe ended no run.");
         Assert.Same(run, campaign.LastResult);
         Assert.Null(campaign.Visit);
-        Assert.Equal((RunOutcome.Death, true, 5, (int?)5), (run.Outcome, run.BossDefeated, run.DeepestFloor, run.BossFloorRevealed));
+        Assert.Equal((RunOutcome.PartyWipe, true, 5, (int?)5), (run.Outcome, run.BossDefeated, run.DeepestFloor, run.BossFloorRevealed));
         Assert.Equal((true, false), (run.ServiceTick, run.MercyTick));   // the success tick, never a mercy
         Assert.Equal((1, 1), (run.RunCounter, campaign.RunCounter));
         Assert.Equal(1 + 5, run.LockedUntilRun);
@@ -762,7 +767,7 @@ public sealed class RunOutcomeTests : IDisposable
             results.Add(die ? Wipe(campaign, bottom) : Exit(campaign));
         }
 
-        Assert.Equal(new[] { RunOutcome.Retreat, RunOutcome.Death, RunOutcome.Retreat, RunOutcome.Death }, results.Select(r => r.Outcome));
+        Assert.Equal(new[] { RunOutcome.Retreat, RunOutcome.PartyWipe, RunOutcome.Retreat, RunOutcome.PartyWipe }, results.Select(r => r.Outcome));
         Assert.Equal(new[] { 1, 2, 2, 2 }, results.Select(r => r.DeepestFloor));
         Assert.All(results, r => Assert.Equal((false, false, 0), (r.ServiceTick, r.MercyTick, r.RunCounter)));
         Assert.Equal(0, campaign.RunCounter);
@@ -1334,7 +1339,7 @@ public sealed class RunOutcomeTests : IDisposable
             }
             else
             {
-                Assert.Equal(RunOutcome.Death, result.Outcome);
+                Assert.Equal(RunOutcome.PartyWipe, result.Outcome);
                 Assert.Equal(new[] { kept, retaken }, result.SpoilsLost);
                 Assert.Empty(result.SpoilsKept);
                 Assert.Equal(new Weapon?[] { null, null }, party[1].Inventory[1..3]);

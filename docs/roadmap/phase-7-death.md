@@ -223,6 +223,17 @@ touches `MapGenerator`, `Mulberry32` or `Pathfinder`, and no RNG stream is added
    save with a fallen member round-trips and revives on the next turn start. The
    pinned pre-rework and Phase 6a saves, and a version 3 save with a `"Death"`
    result, still load.
+   *As built (step 5):* every death goes through one door, `DungeonState.PayDeath`
+   (the encounter's end through `TurnSystem.DeathCost`, and a body carried out
+   through `CampaignState.EndRun`), which cuts and records a `RunDeath` — the
+   member and its pool cuts — on `DungeonState.Deaths`; the run's result carries
+   them all (`RunResult.Deaths`, a wipe's reset staying `Clawbacks`). Saved as
+   `deaths` on the visit and the last result, each `{ memberId, cuts: [{ pool,
+   before, after }] }`, null while empty. `SaveConsistency` check 36 holds the
+   visit's to the door and the pools now, and check 37 the last result's to
+   themselves; both chain pool by pool (a member's next death finds at least what
+   its last left). The summary tells a line a member who died
+   (`B DIED 2 TIMES: SWORD -10, HP -4`), and the wipe's headline is `PARTY WIPE`.
 6. **7.6 — HUD and docs.** The `REVIVED` float text; settled.md's PHASE 7
    decisions marked shipped; the pointers in §4.4, §5.1, §5.3, §6.1, §6.3 updated
    from "Phase 7 replaces this" to the shipped wording.

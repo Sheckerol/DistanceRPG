@@ -27,6 +27,13 @@ namespace GameEngine.DistanceRPG.Logic;
 // older reader ignored: a version-2 member's `potions` would otherwise read as
 // potions the campaign never mixed, and a version-2 last result's `farmYield` as a
 // batch no run made.
+//
+// Version 4 (Phase 7) renames a wipe's outcome, `Death` to `PartyWipe` (PHASE 7
+// DECISION 2): the outcome is written by name, so its step rewrites a version-3
+// last result's, and a Phase 6b build refuses a version-4 save rather than misread
+// it. The death record it appends — the visit's and the last result's `deaths` —
+// carries its default, and the step removes a stray one a hand gave an older
+// document: to version 3 a death ended the run, so there was none to record.
 
 /// <summary>
 /// One campaign, saved (§5.1): the version of this format it was written in,
@@ -254,12 +261,22 @@ public sealed record EnchantmentDto(string Id, int Tier, int Xp);
 /// being this less what the bags hold (PHASE 6b DECISION 6) — the clears it
 /// yielded at, whether it was a first clear, and the potions that spoiled as it
 /// ended, or null for none, which is what a capture writes; null and <c>[]</c>
+/// read alike. The outcome is <c>PartyWipe</c> for a wipe from version 4, whose
+/// step renames version 3's <c>Death</c>. And every death the run paid for
+/// (appended by Phase 7.5, with its default: a result written before had none to
+/// record), or null for none, which is what a capture writes; null and <c>[]</c>
 /// read alike.
 /// </summary>
 public sealed record RunResultDto(string DungeonId, string Outcome, bool BossDefeated, int DeepestFloor, int? BossFloorRevealed, bool ServiceTick,
     bool MercyTick, int RunCounter, int? LockedUntilRun, bool Retired, IReadOnlyList<WeaponDto> SpoilsKept, IReadOnlyList<WeaponDto> SpoilsLost,
     IReadOnlyList<ClawbackDto> Clawbacks, IReadOnlyList<ServiceDto>? Services = null, int FarmYield = 0, int FarmClears = 0, bool FirstClear = false,
-    IReadOnlyList<SpoiledPotionDto>? Spoiled = null);
+    IReadOnlyList<SpoiledPotionDto>? Spoiled = null, IReadOnlyList<RunDeathDto>? Deaths = null);
+
+/// <summary>One death a run paid for (<see cref="RunDeath"/>): the member by id, and what its cut took from each pool, in the order taken — none when it had no run gain left to lose.</summary>
+public sealed record RunDeathDto(string MemberId, IReadOnlyList<PoolCutDto> Cuts);
+
+/// <summary>What one death's cut took from one pool: the pool by name — a weapon class, <c>HP</c> or <c>Mana</c> — what it held, and what it holds after.</summary>
+public sealed record PoolCutDto(string Pool, int Before, int After);
 
 /// <summary>A potion that spoiled at a run's end (<see cref="RunResult.Spoiled"/>): its type by <see cref="PotionType"/> name, and its quality, 1 at least. Where it lay is gone with it.</summary>
 public sealed record SpoiledPotionDto(string Type, int Quality);
@@ -329,9 +346,15 @@ public sealed record ClawbackDto(string MemberId, string Pool, int Before, int A
 /// its default: a document written before it was entered uncapped, and reads so
 /// (<see cref="EnemyPlacer.Unprotected"/>).
 /// </param>
+/// <param name="Deaths">
+/// Every death the visit has paid for, in the order paid (<see cref="DungeonState.Deaths"/>),
+/// or null for none, which is what a capture writes; null and <c>[]</c> read
+/// alike. Appended by Phase 7.5, with its default: a visit written before it had
+/// no death to record, since a death ended the run.
+/// </param>
 public sealed record VisitDto(string DungeonId, long MapSeed, int BossFloor, int PromisedStacks, int FloorIndex, int DeepestFloorIndex, int Turn,
     bool BossDefeated, int BossDefeatedAtTurn, XpSnapshotDto EntrySnapshot, IReadOnlyList<SpoilDto> Spoils, CarryDto? Carry, IReadOnlyList<FloorDto> Floors,
-    int DiceRolled = 0, int DungeonsCleared = EnemyPlacer.Unprotected);
+    int DiceRolled = 0, int DungeonsCleared = EnemyPlacer.Unprotected, IReadOnlyList<RunDeathDto>? Deaths = null);
 
 /// <summary>
 /// One visited floor (§5.1's per-floor group): what a visit changed there, and

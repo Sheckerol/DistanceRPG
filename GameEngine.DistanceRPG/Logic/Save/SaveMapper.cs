@@ -121,8 +121,14 @@ internal static class SaveMapper
             Carry(visit.CurrentCarry(), party, visit),
             floors,
             visit.DiceRolled,
-            visit.DungeonsCleared);
+            visit.DungeonsCleared,
+            DeathsOf(visit.Deaths));
     }
+
+    /// <summary>The deaths a run paid for, as the document holds them: null for none, as the shop and the potions are.</summary>
+    private static RunDeathDto[]? DeathsOf(IReadOnlyList<RunDeath>? deaths) => deaths is { Count: > 0 }
+        ? deaths.Select(death => new RunDeathDto(death.MemberId, death.Clawbacks.Select(c => new PoolCutDto(c.Pool, c.Before, c.After)).ToArray())).ToArray()
+        : null;
 
     /// <summary>
     /// A visited floor: its rows in spawn order, what each lies on (pinned — the
@@ -330,7 +336,8 @@ internal static class SaveMapper
         result.FirstClear,
         result.Spoiled is { Count: > 0 } spoiled   // null for none, as a bag's potions are
             ? spoiled.Select(potion => new SpoiledPotionDto(Name(potion.Type), potion.Quality)).ToArray()
-            : null);
+            : null,
+        DeathsOf(result.Deaths));
 
     /// <summary>An enum-keyed count table by member name, in the enum's order — the order its entries come in.</summary>
     private static OrderedDictionary<string, int> Table<T>(IEnumerable<(T Key, int Count)> entries) where T : struct, Enum
@@ -851,8 +858,7 @@ internal static class SaveMapper
             var clawback = clawbacks[i];
             if (!party.Any(member => member.Id == clawback.MemberId))
                 throw new SaveFormatException($"{where}.memberId", $"'{clawback.MemberId}' is no member of the party");
-            if (clawback.Pool is not (XpSnapshot.HpPool or XpSnapshot.ManaPool) && !Enum.GetNames<WeaponClass>().Contains(clawback.Pool, StringComparer.Ordinal))
-                throw new SaveFormatException($"{where}.pool", $"'{clawback.Pool}' is no XP pool: a weapon class, {XpSnapshot.HpPool} or {XpSnapshot.ManaPool}");
+            Pool(clawback.Pool, $"{where}.pool");
             taken[i] = new XpClawback(clawback.MemberId, clawback.Pool, Count(clawback.Before, $"{where}.before"), NotNegative(clawback.After, $"{where}.after"));
         }
 
@@ -868,9 +874,52 @@ internal static class SaveMapper
         int farmClears = Count(row.FarmClears, $"{at}.farmClears");
         var spoiled = row.Spoiled is { Count: > 0 } gone ? Spoiled(gone, $"{at}.spoiled") : null;
 
+        // The deaths it paid for (Phase 7.5): null and [] alike, read as none.
+        var deaths = row.Deaths is { Count: > 0 } paid ? Deaths(paid, party, $"{at}.deaths") : null;
+
         return new RunResult(row.DungeonId, outcome, row.BossDefeated, deepest, bossFloor, row.ServiceTick, row.MercyTick,
             runCounter, lockedUntil, row.Retired, Spoils(row.SpoilsKept, $"{at}.spoilsKept"), Spoils(row.SpoilsLost, $"{at}.spoilsLost"), taken,
-            services, farmYield, farmClears, row.FirstClear, spoiled);
+            services, farmYield, farmClears, row.FirstClear, spoiled, deaths);
+    }
+
+    /// <summary>A pool's name: a <see cref="WeaponClass"/>'s, or <see cref="XpSnapshot.HpPool"/> or <see cref="XpSnapshot.ManaPool"/>.</summary>
+    private static void Pool(string pool, string at)
+    {
+        if (pool is not (XpSnapshot.HpPool or XpSnapshot.ManaPool) && !Enum.GetNames<WeaponClass>().Contains(pool, StringComparer.Ordinal))
+            throw new SaveFormatException(at, $"'{pool}' is no XP pool: a weapon class, {XpSnapshot.HpPool} or {XpSnapshot.ManaPool}");
+    }
+
+    /// <summary>
+    /// The deaths a run paid for (<see cref="RunDeath"/>), each read on its own:
+    /// a member of the party, and each cut a pool by name — once a death, since
+    /// one cut takes from each pool once — what it held a count and what it holds
+    /// not negative. How each stands against the pools and the door is asked with
+    /// the other cross-checks (SaveConsistency, checks 36 and 37).
+    /// </summary>
+    private static RunDeath[] Deaths(IReadOnlyList<RunDeathDto> dtos, IReadOnlyList<PartyMemberState> party, string at)
+    {
+        var rows = Rows(dtos, at, "death");
+        var deaths = new RunDeath[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var death = rows[i];
+            if (!party.Any(member => member.Id == death.MemberId))
+                throw new SaveFormatException($"{where}.memberId", $"'{death.MemberId}' is no member of the party");
+            var cuts = Rows(death.Cuts, $"{where}.cuts", "cut");
+            var taken = new XpClawback[cuts.Count];
+            var pools = new HashSet<string>(StringComparer.Ordinal);
+            for (int j = 0; j < cuts.Count; j++)
+            {
+                string cutAt = $"{where}.cuts[{j}]";
+                Pool(cuts[j].Pool, $"{cutAt}.pool");
+                if (!pools.Add(cuts[j].Pool))
+                    throw new SaveFormatException($"{cutAt}.pool", $"the {cuts[j].Pool} pool is cut twice: a death cuts each pool once");
+                taken[j] = new XpClawback(death.MemberId, cuts[j].Pool, Count(cuts[j].Before, $"{cutAt}.before"), NotNegative(cuts[j].After, $"{cutAt}.after"));
+            }
+            deaths[i] = new RunDeath(death.MemberId, taken);
+        }
+        return deaths;
     }
 
     /// <summary>
@@ -961,9 +1010,10 @@ internal static class SaveMapper
 
         var spoils = Spoils(row.Spoils, party, floors, row.DeepestFloorIndex, $"{at}.spoils");
         var carry = row.Carry is { } counters ? Carry(counters, party, floors, row, $"{at}.carry") : null;
+        var deaths = row.Deaths is { Count: > 0 } paid ? Deaths(paid, party, $"{at}.deaths") : null;
 
         return DungeonState.Restore(def, row.MapSeed, row.BossFloor, row.PromisedStacks, snapshot, floors, row.FloorIndex, row.DeepestFloorIndex,
-            row.Turn, row.BossDefeated, row.BossDefeatedAtTurn, carry, spoils, row.DiceRolled, row.DungeonsCleared);
+            row.Turn, row.BossDefeated, row.BossDefeatedAtTurn, carry, spoils, row.DiceRolled, row.DungeonsCleared, deaths);
     }
 
     /// <summary>The party's XP at the door: the party's members, each once, in roster order, every pool a count play could have written.</summary>

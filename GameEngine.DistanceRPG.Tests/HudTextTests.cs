@@ -1565,16 +1565,25 @@ public sealed class HudTextTests : IDisposable
         }, Lines(retreat));
         Assert.DoesNotContain(Lines(retreat), line => line.Contains('7'));
 
-        // Killed the boss and died on the way out: the clear stands, the spoils
-        // and a share of the XP do not.
-        var died = new RunResult("spear_hall", RunOutcome.Death, true, 5, 5, true, false, 3, 8, false, [], [tower],
-            [new XpClawback("A", "Dagger", 345, 323), new XpClawback("A", XpSnapshot.HpPool, 90, 84), new XpClawback("C", "Axe", 30, 15)]);
+        // Killed the boss and wiped on the way out: the clear stands, the spoils
+        // and the run's XP do not. The deaths paid before the wipe are told first,
+        // a member a line in the order each first died, its deaths' cost together.
+        var died = new RunResult("spear_hall", RunOutcome.PartyWipe, true, 5, 5, true, false, 3, 8, false, [], [tower],
+            [new XpClawback("A", "Dagger", 345, 323), new XpClawback("A", XpSnapshot.HpPool, 90, 84), new XpClawback("C", "Axe", 30, 15)],
+            Deaths:
+            [
+                new RunDeath("C", [new XpClawback("C", "Axe", 50, 30), new XpClawback("C", XpSnapshot.HpPool, 20, 16)]),
+                new RunDeath("A", []),
+                new RunDeath("C", [new XpClawback("C", "Axe", 40, 35)]),
+            ]);
         Assert.Equal(new[]
         {
             DungeonHud.DefeatHeadline,
             "THE SPEAR HALL - DEEPEST FLOOR 5",
             "THE SPEAR WARDEN FELL ON FLOOR 5",
             "SPOILS LOST: SCUTUM AND GLADIUS",
+            "C DIED 2 TIMES: AXE -25, HP -4",
+            "A DIED ONCE - NOTHING GAINED TO LOSE",
             "XP RESET TO THE DUNGEON DOOR:",
             "A: DAGGER -22, HP -6",
             "C: AXE -15",
@@ -1582,16 +1591,22 @@ public sealed class HudTextTests : IDisposable
             "THE SPEAR HALL IS LOCKED FOR 5 RUNS",
             "ENTER TO CONTINUE",
         }, Lines(died));
-        Assert.Equal("DEFEATED", DungeonHud.DefeatHeadline);
+        Assert.Equal("PARTY WIPE", DungeonHud.DefeatHeadline);
+
+        // Walked out with a death paid along the way: told, and the XP otherwise kept.
+        var paid = retreat with { Deaths = [new RunDeath("B", [new XpClawback("B", "Sword", 30, 20)])] };
+        var told = Lines(paid);
+        Assert.Contains("B DIED ONCE: SWORD -10", told);
+        Assert.Equal(Array.IndexOf(told, "XP KEPT") - 1, Array.IndexOf(told, "B DIED ONCE: SWORD -10"));
 
         // Dead in the tutorial, the golem standing: nothing counted, and nothing
         // clawed back, the run having gained nothing (or the share being 0). Its two
         // floors never reach the mercy floor and never change, so the summary points
         // at no floor 3 it does not have and promises no new depth.
-        var shallow = new RunResult("tutorial", RunOutcome.Death, false, 2, null, false, false, 0, null, false, [], [], []);
+        var shallow = new RunResult("tutorial", RunOutcome.PartyWipe, false, 2, null, false, false, 0, null, false, [], [], []);
         Assert.Equal(new[]
         {
-            "DEFEATED",
+            "PARTY WIPE",
             "THE TUTORIAL - DEEPEST FLOOR 2",
             "THE STONE GOLEM STILL STANDS",
             "NO SPOILS - NOTHING DROPS WHILE THE BOSS STANDS",
@@ -1696,7 +1711,7 @@ public sealed class HudTextTests : IDisposable
         // split of the slots makes more lines.
         int carry = GameContent.Current.Tuning.PartyCarrySlots;
         int bagSlots = carry - members.Length;   // the hand keeps a weapon
-        RunResult Split(int potions) => new("spear_hall", RunOutcome.Death, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul[..(carry - potions)],
+        RunResult Split(int potions) => new("spear_hall", RunOutcome.PartyWipe, true, 99, 99, true, false, 9999, 9999 + 99 * 99, false, [], haul[..(carry - potions)],
             members.SelectMany(Pools).ToArray(), reports, FarmYield: 2 * ContentBounds.MostYieldPerClear, FarmClears: 2, FirstClear: true,
             Spoiled: potions == 0 ? null : Enumerable.Repeat(TestPotions.Health(1), potions).ToArray());
         var worst = Split(1);

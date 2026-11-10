@@ -445,7 +445,7 @@ public sealed class WearTests : IDisposable
         Assert.True(a.WeaponXp[WeaponClass.Dagger] > xpAtTheDoor);
 
         var result = CampaignRuns.Wipe(campaign, turns);
-        Assert.Equal(RunOutcome.Death, result.Outcome);
+        Assert.Equal(RunOutcome.PartyWipe, result.Outcome);
         Assert.Contains(result.Clawbacks, clawback => clawback.MemberId == a.Id && clawback.Pool == nameof(WeaponClass.Dagger));
         Assert.Same(knife, a.Inventory[0]);
         Assert.Equal((1, 0), (knife.Wear, knife.WearCashed));

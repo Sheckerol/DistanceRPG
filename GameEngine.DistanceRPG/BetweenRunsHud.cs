@@ -283,10 +283,13 @@ public sealed class BetweenRunsHud : IDisposable
         if (result.Spoiled is { Count: > 0 } spoiled)
             lines.Add(new Run(SpoiledLine(spoiled.Count), DungeonHud.Yellow));
 
+        // The deaths the run paid for (§7.6), a member at a time, before the XP.
+        lines.AddRange(DeathLines(result));
+
         // The XP: kept, or reset to the door by a wipe (§7.4) — the whole run's
         // gain, member by member. A result a save kept from before Phase 7 says
         // what that run's wipe took, a share, and is told the same way.
-        if (result.Outcome != RunOutcome.Death)
+        if (result.Outcome != RunOutcome.PartyWipe)
             lines.Add(new Run("XP KEPT", DungeonHud.Green));
         else if (result.Clawbacks.Count == 0)
             lines.Add(new Run("XP RESET - NOTHING GAINED TO LOSE", DungeonHud.Green));
@@ -323,6 +326,31 @@ public sealed class BetweenRunsHud : IDisposable
             lines.Add(new Run($"{dungeon} IS LOCKED FOR {DungeonHud.Runs(until - result.RunCounter)}", DungeonHud.Yellow));
 
         return lines;
+    }
+
+    /// <summary>
+    /// The summary's lines for the deaths a run paid for (§7.6), in red: a line a
+    /// member who died, in the order each first died — how many times, and what
+    /// its deaths cost each pool together, wrapped as the spoils are
+    /// (<c>A DIED 2 TIMES: DAGGER -22 HP -6</c>) — or that it had nothing to lose
+    /// (<c>B DIED ONCE - NOTHING GAINED TO LOSE</c>). None when nobody died.
+    /// </summary>
+    internal static IEnumerable<Run> DeathLines(RunResult result)
+    {
+        foreach (var member in (result.Deaths ?? []).GroupBy(death => death.MemberId))
+        {
+            int times = member.Count();
+            string died = $"{member.Key} DIED {(times == 1 ? "ONCE" : $"{times} TIMES")}";
+            var cost = member.SelectMany(death => death.Clawbacks)
+                .GroupBy(cut => cut.Pool)
+                .Select(pool => $"{pool.Key.ToUpperInvariant()} -{pool.Sum(cut => cut.Before - cut.After)}")
+                .ToArray();
+            if (cost.Length == 0)
+                yield return new Run($"{died} - NOTHING GAINED TO LOSE", DungeonHud.Red);
+            else
+                foreach (var line in Wrapped($"{died}:", cost, DungeonHud.Red))
+                    yield return line;
+        }
     }
 
     /// <summary>
