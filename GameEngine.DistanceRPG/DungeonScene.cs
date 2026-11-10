@@ -209,12 +209,12 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// The boss's stand-in (§4.3): stone-grey where every dummy is orange — the
-    /// golem is carved, not trained — and a size larger, so the one thing on the
-    /// floor that is not a dummy reads as such across a room. Grey again, and
-    /// darker, once it falls, as every corpse is.
+    /// golem is carved, not trained — and drawn as much larger as its body is
+    /// (<see cref="EnemyState.BodyRadius"/> over a dummy's), so the one thing on
+    /// the floor that is not a dummy reads as such across a room and its figure
+    /// fits its base. Grey again, and darker, once it falls, as every corpse is.
     /// </summary>
     private static readonly Vector4 BossColor = Rgb(0xa9a595);
-    private const float BossSize = 1.4f;
 
     /// <summary>
     /// Each stair's colour, on its slab and on its label (§4.2): down violet, up
@@ -961,6 +961,7 @@ public class DungeonScene : Scene
         BuildStairs();
         SpawnEnemies();
         BuildReachOverlay();
+        BuildMiniBases();
         BuildFogOverlay();
         BuildFogParticles();
     }
@@ -1134,7 +1135,7 @@ public class DungeonScene : Scene
     {
         foreach (var state in _floor.Enemies)
         {
-            var enemy = new EnemyObject(state, state.Alive ? LiveColor(state) : DeadColor, state == _floor.Boss ? BossSize : 1f);
+            var enemy = new EnemyObject(state, state.Alive ? LiveColor(state) : DeadColor, state.Radius / EnemyState.DummyRadius);
             if (!state.Alive)
                 enemy.SetDefeatedVisual(true, snap: true);
             _enemies.Add(enemy);
@@ -1154,6 +1155,37 @@ public class DungeonScene : Scene
         _reachOverlay.TileShown = (r, c) => _fog.Seen[r, c];
         _reachKey = null;
         AddFloorObject(reachObject);
+    }
+
+    // Added after the reach overlay, so a base sits over the zones it touches,
+    // and before the fog overlay, so the shroud blends over it.
+    private void BuildMiniBases()
+    {
+        var baseObject = new TransformNodeObject();
+        baseObject.AddComponent<MiniBaseRenderer>().Bases = MiniBases;
+        AddFloorObject(baseObject);
+    }
+
+    private readonly List<MiniBaseRenderer.MiniBase> _miniBases = new();
+
+    /// <summary>
+    /// The bases standing now: one under each living member and each living
+    /// enemy in sight, at its body's radius and where its figure is drawn (so a
+    /// shove's slide carries the base with it), rimmed in its colour.
+    /// </summary>
+    private IReadOnlyList<MiniBaseRenderer.MiniBase> MiniBases()
+    {
+        _miniBases.Clear();
+        for (int i = 0; i < _party.Count; i++)
+        {
+            var member = _party[i];
+            if (member.IsActive && member.State.Alive)
+                _miniBases.Add(new(member.Position.X, member.Position.Z, member.State.Radius * WorldSpace.LogicToWorld, PartyColors[i]));
+        }
+        foreach (var enemy in _enemies)
+            if (enemy.IsActive && enemy.State.Alive)
+                _miniBases.Add(new(enemy.Position.X, enemy.Position.Z, enemy.State.Radius * WorldSpace.LogicToWorld, LiveColor(enemy.State)));
+        return _miniBases;
     }
 
     private void BuildFogOverlay()
@@ -2574,8 +2606,9 @@ public class DungeonScene : Scene
     /// The reach overlay, in combat during the party's phase with no menu open
     /// (hidden otherwise): where the active member can walk with the movement it
     /// has left, around walls and live enemies — the very blockers its steps collide
-    /// with (<see cref="LiveEnemyBlockers"/>) — and where a target would be in
-    /// its weapon's reach and sight from where it stands; a ring under each
+    /// with (<see cref="LiveEnemyBlockers"/>) — and how far its weapon reaches
+    /// from where it stands, out to the tip (<see cref="ReachFields.WeaponReach"/>:
+    /// a target whose base touches it is in range); a ring under each
     /// visible enemy a click would hit now (<see cref="EnemyCue"/> ready); and,
     /// for the enemy under the mouse, its own walk on its next turn's budget
     /// (after Mire, as the turn system pays it) and its weapon's reach.
@@ -2618,13 +2651,12 @@ public class DungeonScene : Scene
         _reachDirty = false;
 
         var grid = _map.Grid;
-        float enemyRadius = _enemies.Count > 0 ? _enemies[0].State.Radius : active.Radius;
         var layers = new List<ReachOverlayRenderer.Layer>
         {
             MemberWalk.On(ReachFields.Walkable(grid, active.X, active.Y, active.Radius, active.DistLeft, LiveEnemyBlockers())),
         };
         if (held != null)
-            layers.Add(MemberReach.On(ReachFields.InReach(grid, active.X, active.Y, active.Radius, enemyRadius, held.Range)));
+            layers.Add(MemberReach.On(ReachFields.WeaponReach(grid, active.X, active.Y, active.Radius, held.Range)));
 
         if (hovered != null)
         {
@@ -2635,7 +2667,7 @@ public class DungeonScene : Scene
                 if (enemy.State.Alive && enemy.State != hovered) bodies.Add(new GridCollision.Circle(enemy.State.X, enemy.State.Y, enemy.State.Radius));
             float budget = StatusBehaviours.MiredBudget(hovered, hovered.MoveBudget);   // what StartEnemyAction will refill it to
             layers.Add(EnemyWalk.On(ReachFields.Walkable(grid, hovered.X, hovered.Y, hovered.Radius, budget, bodies)));
-            layers.Add(EnemyReach.On(ReachFields.InReach(grid, hovered.X, hovered.Y, hovered.Radius, GameConstants.PlayerHalf, hovered.Weapon.Range)));
+            layers.Add(EnemyReach.On(ReachFields.WeaponReach(grid, hovered.X, hovered.Y, hovered.Radius, hovered.Weapon.Range)));
         }
 
         var rings = hittable

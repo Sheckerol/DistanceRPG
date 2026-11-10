@@ -19,7 +19,7 @@ public class DungeonsJsonTests
 
     private static readonly string[] Fields = ["id", "name", "theme", "attunement", "bossFloorMin", "bossFloorMax", "boss", "retiresOnClear"];
 
-    private static readonly string[] BossFields = ["id", "name", "maxHp", "movementBudget", "innate"];
+    private static readonly string[] BossFields = ["id", "name", "maxHp", "movementBudget", "radius", "innate"];
 
     private static ContentLoad Load(string dungeons, string? restricted = null)
         => ShippedData.Load(DataTexts.Shipped with { Dungeons = dungeons, Restricted = restricted ?? DataTexts.Shipped.Restricted });
@@ -97,7 +97,7 @@ public class DungeonsJsonTests
         Assert.Equal(("tutorial", ContentValidator.RuleFileShape, "dungeons.json: dungeons[0].boss.innate.Block: is the text 3, not a whole number"),
             (innate.EntryId, innate.Rule, innate.Detail));
         var bossField = Assert.Throws<ContentException>(() => DungeonsJson.Read(DataTexts.InRow(Shipped, "tutorial", $"\"maxHp\": {golem.MaxHp},", $"\"hp\": {golem.MaxHp},")));
-        Assert.Equal(("tutorial", "dungeons.json: dungeons[0].boss.hp: is not a member here - the members are id, name, maxHp, movementBudget, innate"),
+        Assert.Equal(("tutorial", "dungeons.json: dungeons[0].boss.hp: is not a member here - the members are id, name, maxHp, movementBudget, radius, innate"),
             (bossField.EntryId, bossField.Detail));
     }
 

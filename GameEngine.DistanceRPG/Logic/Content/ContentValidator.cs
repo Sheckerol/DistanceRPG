@@ -798,7 +798,8 @@ public static class ContentValidator
         => pinned is null ? $"{TuningJson.FileName} {key}" : row.Field;
 
     /// <summary>
-    /// A dungeon's boss: a statline (a hit point, a unit of movement), innate
+    /// A dungeon's boss: a statline (a hit point, a unit of movement, a unit of
+    /// body radius), innate
     /// modifiers that each stack — walked in <see cref="ModifierType"/> order so
     /// the one reported is the same every run — and the theme among them; then
     /// each of those numbers in its range (<see cref="RuleNumberInRange"/>), the
@@ -817,6 +818,9 @@ public static class ContentValidator
         if (boss.MovementBudget < 1)
             throw new ContentException(def.Id, RuleBossStatline,
                 ContentBounds.Detail(ContentBounds.BossMovementBudget, ContentBounds.BossMovementBudget.Field, boss.MovementBudget));
+        if (boss.Radius < 1)
+            throw new ContentException(def.Id, RuleBossStatline,
+                ContentBounds.Detail(ContentBounds.BossRadius, ContentBounds.BossRadius.Field, boss.Radius));
 
         var innate = boss.Innate ?? new Dictionary<ModifierType, int>();
         foreach (var (t, n) in innate.OrderBy(kv => kv.Key))
@@ -833,6 +837,7 @@ public static class ContentValidator
         // And then the range rule, the rules above having kept each floor.
         RequireInRange(def.Id, ContentBounds.BossMaxHp, boss.MaxHp, ContentBounds.BossMaxHp.Field);
         RequireInRange(def.Id, ContentBounds.BossMovementBudget, boss.MovementBudget, ContentBounds.BossMovementBudget.Field);
+        RequireInRange(def.Id, ContentBounds.BossRadius, boss.Radius, ContentBounds.BossRadius.Field);
         foreach (var (t, n) in innate.OrderBy(kv => kv.Key))
             RequireInRange(def.Id, ContentBounds.BossInnate, n, InnateField(t));
     }

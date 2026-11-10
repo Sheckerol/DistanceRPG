@@ -305,8 +305,9 @@ public sealed class BossTests : IDisposable
             Assert.Equal(bottom.Enemies.Count - 1, boss.SpawnIndex);
             Assert.All(bottom.Enemies.SkipLast(1), e => Assert.True(e.SpawnIndex < boss.SpawnIndex));
 
-            Assert.Equal((def.Boss.Name, def.Boss.MaxHp, def.Boss.MaxHp, (float)def.Boss.MovementBudget),
-                (boss.Title, boss.MaxHp, boss.Hp, boss.MoveBudget));
+            Assert.Equal((def.Boss.Name, def.Boss.MaxHp, def.Boss.MaxHp, (float)def.Boss.MovementBudget, (float)def.Boss.Radius),
+                (boss.Title, boss.MaxHp, boss.Hp, boss.MoveBudget, boss.Radius));
+            Assert.True(boss.Radius > EnemyState.DummyRadius);   // every shipped boss is reached from further back than a dummy
             Assert.Equal(def.Attunement, boss.Attunement);
             Assert.Equal((0, 2, true), (boss.DefeatCount, boss.TurnsSinceSeen, boss.Alive));   // waiting in its lair until seen
 

@@ -47,7 +47,7 @@ public static class DungeonsJson
         ["id", "name", "theme", "attunement", "bossFloorMin", "bossFloorMax", "boss", "retiresOnClear"];
 
     /// <summary>A boss's fields, in the record's parameter order.</summary>
-    private static readonly string[] BossFields = ["id", "name", "maxHp", "movementBudget", "innate"];
+    private static readonly string[] BossFields = ["id", "name", "maxHp", "movementBudget", "radius", "innate"];
 
     /// <summary>
     /// Read a <c>dungeons.json</c>'s text into its rows, in file order. A failure
@@ -101,6 +101,7 @@ public static class DungeonsJson
             Name: shape.String(Get("name"), At("name"), entry, "a name in quotes"),
             MaxHp: shape.Int(Get("maxHp"), At("maxHp"), entry),
             MovementBudget: shape.Int(Get("movementBudget"), At("movementBudget"), entry),
+            Radius: shape.Int(Get("radius"), At("radius"), entry),
             Innate: shape.Modifiers(Get("innate"), At("innate"), entry, "a table of modifiers to stack counts"));
     }
 }

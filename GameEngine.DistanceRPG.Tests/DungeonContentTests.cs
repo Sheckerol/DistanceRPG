@@ -55,7 +55,7 @@ public class DungeonContentTests
     /// <summary>An unpinned, unattuned dungeon themed on <paramref name="theme"/>, its boss carrying the theme.</summary>
     private static DungeonDef Themed(string id, ModifierType theme)
         => new(id, id, theme, Attunement: null, BossFloorMin: null, BossFloorMax: null,
-            new BossDef(id + "_boss", "Boss", MaxHp: 200, MovementBudget: 70, new Dictionary<ModifierType, int> { [theme] = 3 }),
+            new BossDef(id + "_boss", "Boss", MaxHp: 200, MovementBudget: 70, Radius: 20, new Dictionary<ModifierType, int> { [theme] = 3 }),
             RetiresOnClear: false);
 
     private static DungeonDef WithInnate(DungeonDef def, params (ModifierType Type, int Stacks)[] innate)

@@ -29,9 +29,9 @@ public class EnemyObject : PrimitiveBoxObject
 
     /// <summary>
     /// How much larger than a dummy's box this stand-in is drawn: 1 for rank and
-    /// file, more for a boss, which should read as the one thing on the floor that
-    /// is not a dummy. Only the drawing grows — its plate and its click target
-    /// with it — never its reach or its footprint, which are the logic's.
+    /// file, and for a boss as much larger as its body is
+    /// (<see cref="EnemyState.BodyRadius"/>), so its figure fits the base it is
+    /// measured from — its plate and its click target grow with it.
     /// </summary>
     public float Size { get; }
 

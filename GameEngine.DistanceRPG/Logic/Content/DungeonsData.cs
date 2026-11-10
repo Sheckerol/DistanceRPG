@@ -10,6 +10,12 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="Name">The name its plate reads.</param>
 /// <param name="MaxHp">Its hit points; at least 1 (<see cref="ContentValidator.RuleBossStatline"/>).</param>
 /// <param name="MovementBudget">Its movement per turn, in logic units (32 per tile) — the golem's 40 against a dummy's 100 is what "slow" means; at least 1.</param>
+/// <param name="Radius">
+/// Its body's radius, in logic units (32 per tile): the circle every reach is
+/// measured from, its collisions are, and its base is drawn at — a dummy's is
+/// 14, so a boss written larger is reached from further back and blocks more of
+/// a hall; at least 1.
+/// </param>
 /// <param name="Innate">
 /// Modifiers carried on the actor rather than on its weapon (§4.3): the theme
 /// among them, whatever it holds. Innate is not forged — it raises no weapon's
@@ -17,7 +23,7 @@ namespace GameEngine.DistanceRPG.Logic;
 /// only a stack that would do nothing (<see cref="ModifierRules.NeverStacked"/>)
 /// or a count below 1 is refused.
 /// </param>
-public sealed record BossDef(string Id, string Name, int MaxHp, int MovementBudget, IReadOnlyDictionary<ModifierType, int> Innate);
+public sealed record BossDef(string Id, string Name, int MaxHp, int MovementBudget, int Radius, IReadOnlyDictionary<ModifierType, int> Innate);
 
 /// <summary>
 /// One row of §5.8 <c>dungeons.json</c>: name, theme, attunement, the boss's

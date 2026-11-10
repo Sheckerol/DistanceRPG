@@ -1446,8 +1446,9 @@ public sealed class DungeonState
     /// <summary>
     /// A boss as its dungeon makes it (§4.3, §5.8): an enemy row with
     /// <paramref name="def"/>'s boss statline — its hit points
-    /// (<see cref="EnemyState.BaseMaxHp"/>) and its movement
-    /// (<see cref="EnemyState.MoveBudget"/>) — its name on the plate, and its
+    /// (<see cref="EnemyState.BaseMaxHp"/>), its movement
+    /// (<see cref="EnemyState.MoveBudget"/>) and its body
+    /// (<see cref="EnemyState.BodyRadius"/>) — its name on the plate, and its
     /// innate modifiers, the theme among them, carried on the actor whatever it
     /// holds (<see cref="ActorState.Innate"/>): weapon plus innate at resolution,
     /// and never a weapon's ceiling, its own included. It is attuned and themed as
@@ -1472,6 +1473,7 @@ public sealed class DungeonState
             Weapon = weapon,
             BaseMaxHp = boss.MaxHp,
             MoveBudget = boss.MovementBudget,
+            BodyRadius = boss.Radius,
             Innate = ModifierSet.Of(boss.Innate.Select(kv => (kv.Key, kv.Value)).ToArray()),
             Title = boss.Name,
             Attunement = def.Attunement,

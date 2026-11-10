@@ -87,7 +87,9 @@ public sealed class ReachArea
 /// and be hit — surface distance within the weapon's range
 /// (<see cref="CombatRules.InAttackRange"/>) and line of sight from the
 /// attacker's centre (<see cref="LineOfSight"/>), the two halves of
-/// <see cref="EnemyAi.CanHit"/>.</item>
+/// <see cref="EnemyAi.CanHit"/>. <see cref="WeaponReach"/> is it for a target
+/// of no size: the weapon's reach out to its tip, which a body touches when it
+/// is in range.</item>
 /// </list>
 /// An enemy walks A* tile paths rather than steering, but its tiles step the
 /// same eight ways at the same octile cost, so its walkable area reads off the
@@ -220,6 +222,20 @@ public static class ReachFields
         }
         return new ReachArea(row0, col0, rows, cols, inside, null);
     }
+
+    /// <summary>
+    /// How far a weapon reaches, drawn to its tip: every lattice node within
+    /// <paramref name="range"/> of the attacker's edge and in its sight —
+    /// <see cref="InReach"/> for a target of no size. What the overlay draws:
+    /// a target whose body touches it is in range (<see cref="CombatRules.InAttackRange"/>,
+    /// surface to surface), whatever the target's size, so one zone serves a
+    /// dummy and a boss alike. Sight is still taken centre to centre
+    /// (<see cref="EnemyAi.CanHit"/>), so a body that only pokes into the zone
+    /// round a corner may be touched and still unseen: the ring under an enemy
+    /// says it can be hit now.
+    /// </summary>
+    public static ReachArea WeaponReach(int[,] grid, float x, float y, float attackerRadius, float range)
+        => InReach(grid, x, y, attackerRadius, 0f, range);
 
     /// <summary>
     /// Could a body of <paramref name="radius"/> stand centred at (x, y)?
