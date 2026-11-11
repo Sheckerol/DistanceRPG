@@ -23,7 +23,7 @@ moving *while* the party moves, so turns cannot simply be removed.
 | Mode | Entered | Ends | The clock | The party | The enemies |
 | --- | --- | --- | --- | --- | --- |
 | **Exploring** | Arriving on a floor with no live enemy in view; combat ending; a rest ending without a sighting | A live enemy comes into view; the player rests | One turn per `MovementBudget` the leader walks; still while nobody walks | Walks freely as a marching line, no budget, no pause | Awake ones move at the same time, at their budget's share of the party's speed |
-| **Resting** | Chosen by the player while exploring (`R`, or the REST button) | Every living member at full HP and mana, or a live enemy comes into view, or the player stops it (`R`, or the STOP RESTING button), or the pause menu opens | Runs on its own, fast-forwarded | Stands still, regains HP and mana, earns no XP | Move as in exploring |
+| **Resting** | Chosen by the player while exploring (`R`, or the REST button) | Every living member at full HP and mana with no negative status, or a live enemy comes into view, or the player stops it (`R`, or the STOP RESTING button), or the pause menu opens | Runs on its own, fast-forwarded | Stands still, regains HP and mana, earns no XP | Move as in exploring |
 | **Combat** | A live enemy comes into view in either mode above | The start of a party turn with no live enemy in view (PHASE 7 DECISION 5) | One turn per side's phase, as today | Turn-based, as today; opens on a fresh party turn | Turn-based, as today |
 
 ## Decisions
@@ -65,10 +65,15 @@ moving *while* the party moves, so turns cannot simply be removed.
   rows do). Only the key, the button and the pause menu (DECISION 18) stop a rest:
   the walking keys do nothing while resting. The buttons are the HUD's own for now
   and move onto the action bar when that phase lands (open question 11).
-- **PHASE 8 DECISION 9 — a rest runs with a status ticking (2026-11-11).** The
-  party may rest poisoned or bleeding; the status ticks on every rest turn as on
-  any world turn. A rest that can never fill the pools is the player's to stop
-  (DECISION 8).
+- **PHASE 8 DECISION 9 — a rest waits out negative statuses (2026-11-11).** A
+  rest is how the party gets rid of them: it ends on its own only when every
+  living member is at full HP, full mana and has no negative status — Poison,
+  Bleeding, Searing, Mire, Sundered, Weakened or Softened. (`StatusEffectType`
+  has no such split yet; 8.4 adds it.) The statuses tick on every rest turn as on
+  any world turn, harm and all: poison still deals its damage while the rest heals
+  through it, and each status decays a level a round as in combat, so every rest
+  ends. Regeneration, Ward and the Overheal pool don't hold a rest open. This
+  narrows DECISION 5's end.
 - **PHASE 8 DECISION 10 — a rest turn restores a share of max HP (2026-11-11).**
   `RestHealthPercent` (new `tuning.json` key, provisionally 10): each rest turn
   every living member regains that percentage of its max HP, rounded down and
@@ -173,17 +178,19 @@ enemy that is not passive — and are out of this phase.
 ## 8.4 Resting
 
 `R` (or the REST button) while exploring starts a rest, and the party stands
-where it is. A party already full ends the rest before its first turn.
+where it is. A party already full and clear of negative statuses ends the rest
+before its first turn.
 
 - **The clock runs on its own,** `RestTurnsPerSecond` turns a second (DECISION
-  12), and every rest turn is a world turn as in 8.2: statuses tick — a rest runs
-  poisoned (DECISION 9) — timers run (a farm included, DECISION 17), and awake
+  12), and every rest turn is a world turn as in 8.2: statuses tick, harm and all —
+  a rest runs poisoned and waits the poison out (DECISION 9) — timers run (a farm included, DECISION 17), and awake
   enemies move as in 8.3, drawn walking.
 - **Each rest turn restores** to every living member `RestHealthPercent` of its
   max HP, rounded down and at least 1 (DECISION 10), and a whole turn's movement
   as mana through `RegenManaFromUnusedMovement` (DECISION 11) — through a door
   that credits no XP (DECISION 6), never the heal applier that does.
-- **It ends** when every living member is at full HP and `UsableMaxMana`; when a
+- **It ends** when every living member is at full HP and `UsableMaxMana` and
+  carries no negative status (DECISION 9); when a
   live enemy comes into view (combat, the party first, on a new turn); when the
   player stops it — `R` again, or the **STOP RESTING** button (DECISION 8); or
   when the pause menu opens (DECISION 18). Stopping drops the rest turn in
@@ -229,6 +236,8 @@ combat. The older documents
 - `DungeonHud`: the mode readout, and the REST / STOP RESTING buttons through
   `ClickZones`.
 - `EnemyState`: the spot where it last saw the party.
+- `StatusRules`: which statuses are negative (DECISION 9), the rest's end check
+  reading it.
 - `EnemyAi`: a walking plan sized to world time rather than a budget, a pursuer's
   to its last-seen spot.
 - Save: version 5 (8.5) — the mode, the walking clock, each enemy's last-seen
@@ -252,8 +261,9 @@ Each step lands with its tests and keeps the golden tests green.
    combat with the party first, on a new turn.
 4. **8.4 — Resting.** `R` and the REST / STOP RESTING buttons, the rest turns, the
    restore without XP, the ways it ends. Tests: a rest stops on `R` and on the
-   button alike; it stops on a sighting and when all are full; poisoned, it runs
-   until stopped; no XP is credited.
+   button alike; it stops on a sighting; it ends when all are full and clear;
+   poisoned, it takes the poison's damage and runs on past full HP until the
+   poison has worn off; no XP is credited.
 5. **8.5 — Save version 5.** The mode and the clock saved; the migration from
    `MarchingThisTurn`; older saves load.
 6. **8.6 — HUD and docs.**
@@ -271,7 +281,7 @@ DECISIONS 9–19, with DECISION 8 added by the user):
 | 4 | Which enemies move while exploring | Awake ones; a pursuer to its last-seen spot (DECISION 14) |
 | 5 | The fight's first turn | A new world turn (DECISION 15) |
 | 6 | Mana from unspent movement | Combat only (DECISION 16) |
-| 7 | Stopping a rest; resting with a status | `R` and a STOP RESTING button (DECISION 8); resting poisoned allowed (DECISION 9) |
+| 7 | Stopping a rest; resting with a status | `R` and a STOP RESTING button (DECISION 8); a rest waits out negative statuses, harm and all, and ends only once they are gone (DECISION 9) |
 | 8 | Resting next to a farm | Accepted (DECISION 17) |
 | 9 | Saving during a rest | The pause menu ends the rest (DECISION 18) |
 | 10 | Taking the stairs while exploring | The leader takes the line (DECISION 19) |

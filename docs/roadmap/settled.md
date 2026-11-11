@@ -4577,9 +4577,11 @@ button to stop a rest (DECISION 8).
   `R` toggles the rest and a click does what the key does. Only the key, the
   button and the pause menu stop a rest. The buttons move onto the action bar
   when it lands.
-- **PHASE 8 DECISION 9 — a rest runs with a status ticking, ruled 2026-11-11.**
-  Resting poisoned is allowed; a rest that cannot fill the pools is the player's
-  to stop.
+- **PHASE 8 DECISION 9 — a rest waits out negative statuses, ruled 2026-11-11.**
+  A rest ends on its own only when every living member is at full HP and mana and
+  has no negative status (Poison, Bleeding, Searing, Mire, Sundered, Weakened,
+  Softened). They tick on every rest turn, harm and all, and decay as in combat,
+  so the rest always ends.
 - **PHASE 8 DECISION 10 — a rest turn restores `RestHealthPercent` of max HP,
   ruled 2026-11-11.** Rounded down, at least 1, a potion's shape (provisionally
   10).
