@@ -4618,4 +4618,6 @@ actions without XP outside combat (DECISION 21).
   XP of any kind or banks wear, so free casts and a rest's mana are never a farm.
   Enchantments included: one that fires outside combat still pays its trigger mana,
   but teaches no mana XP, nor weapon XP for a staff's forged entries. The party
-  may act during a full rest without stopping it.
+  may act during a full rest without stopping it. *To revisit after play:* if healing a
+  member through a status outside combat feels unrewarding, narrow it to no mana
+  or weapon XP, keeping HP XP, which only HP really lost can feed.

@@ -137,7 +137,14 @@ moving *while* the party moves, so turns cannot simply be removed.
   entries apply teach no weapon XP — whether a cast set it off or it fired on its
   own at a world turn's boundary (a rest turn's included). The party may act
   during a full rest as well, and acting does not stop it (only DECISION 8's ways
-  do). This narrows DECISION 6's cast and potion healing to combat.
+  do).
+  *To revisit after play.* The user called the rule "cheap, but wise": it drives
+  players to take risks, but since DECISION 9 a status can still kill outside
+  combat, and healing a member through it teaches nothing. If that feels
+  unrewarding in play, the narrower rule is ready: no mana XP or weapon XP outside
+  combat — which is all the farm needs, since only free mana (and a staff's free
+  status levels) make one — while HP XP still counts, being bounded by HP really
+  lost, which outside combat only a status brought from a fight can take. This narrows DECISION 6's cast and potion healing to combat.
 - *Ruled before (open-questions, 2026-11-08):* **leaving combat is checked at the
   start of the party's turn only** — any live enemy in view keeps the party in
   combat; none drops it to exploring. Killing the last enemy in view mid-turn
