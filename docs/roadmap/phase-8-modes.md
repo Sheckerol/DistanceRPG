@@ -24,7 +24,7 @@ moving *while* the party moves, so turns cannot simply be removed.
 | Mode | Entered | Ends | The clock | The party | The enemies |
 | --- | --- | --- | --- | --- | --- |
 | **Exploring** | Arriving on a floor with no live enemy in view; combat ending; a rest ending without a sighting | A live enemy comes into view; the player rests | One turn per `MovementBudget` the leader walks; still while nobody walks | Walks freely as a marching line, no budget, no pause; acts without spending movement, earning no XP; Space rests one turn | Awake ones move at the same time, at their budget's share of the party's speed |
-| **Resting** | Chosen by the player while exploring (`R`, or the REST button) | Every living member at full HP and mana with no negative status, or a live enemy comes into view, or the player stops it (`R`, or the STOP RESTING button), or the pause menu opens | Runs on its own, fast-forwarded | Stands still, regains HP and mana, earns no XP | Move as in exploring |
+| **Resting** | Chosen by the player while exploring (`R`, or the REST button) | Every living member at full HP and mana with no negative status, or a live enemy comes into view, or the player stops it (`R`, or the STOP RESTING button), or the pause menu opens | Runs on its own, fast-forwarded | Stands still, regains HP and mana, earns no XP; may act as while exploring, free and teaching nothing | Move as in exploring |
 | **Combat** | A live enemy comes into view in either mode above | The start of a party turn with no live enemy in view (PHASE 7 DECISION 5) | One turn per side's phase, as today | Turn-based, as today; opens on a fresh party turn | Turn-based, as today |
 
 ## Decisions
@@ -127,11 +127,12 @@ moving *while* the party moves, so turns cannot simply be removed.
   world turn, restoring nothing: a way to wait a turn. Pressed during a full rest,
   it finishes the rest turn in progress and stops there.
 - **PHASE 8 DECISION 21 — actions outside combat are free and teach nothing
-  (2026-11-11).** While exploring a cast or a potion spends no movement (there is
-  no budget, 8.2); a cast still pays its mana and a potion is still used up. So
-  that free casts and the rest's mana never make an XP farm (DECISION 6), nothing
-  done outside combat credits XP of any kind — mana, HP or a weapon's — and no
-  cast banks wear. This narrows DECISION 6's cast and potion healing to combat.
+  (2026-11-11).** While exploring or resting a cast or a potion spends no
+  movement (there is no budget, 8.2); a cast still pays its mana and a potion is
+  still used up. So that free casts and the rest's mana never make an XP farm
+  (DECISION 6), nothing done while exploring or resting credits XP of any kind —
+  mana, HP or a weapon's — and no cast banks wear. The party may act during a full
+  rest as well, and acting does not stop it (only DECISION 8's ways do). This narrows DECISION 6's cast and potion healing to combat.
 - *Ruled before (open-questions, 2026-11-08):* **leaving combat is checked at the
   start of the party's turn only** — any live enemy in view keeps the party in
   combat; none drops it to exploring. Killing the last enemy in view mid-turn
@@ -219,6 +220,9 @@ before its first turn.
   rest turn in progress: what a rest restores comes in whole turns. A dummy whose timer runs
   out during a rest may get up in view and end it. The walking keys do nothing
   while resting.
+- **The party may act during a rest** — heal, drink, swap — as while exploring:
+  no movement spent, no XP credited, no wear banked (DECISION 21), and the rest
+  goes on.
 - **Space rests one turn** while exploring (DECISION 20): one rest turn, then the
   party is exploring again and can act — a heal cast, a potion — before the next.
   It is how a member is saved from a status that deals more than a rest restores.
@@ -267,7 +271,7 @@ combat. The older documents
   reading it.
 - XP and wear: `CreditXp` and the wear a cast banks read the mode, crediting
   nothing outside combat (DECISION 21); casts and drinks spend no movement while
-  exploring.
+  exploring or resting.
 - `EnemyAi`: a walking plan sized to world time rather than a budget, a pursuer's
   to its last-seen spot.
 - Save: version 5 (8.5) — the mode, the walking clock, each enemy's last-seen
@@ -295,8 +299,8 @@ Each step lands with its tests and keeps the golden tests green.
    poisoned, it takes the poison's damage and runs on past full HP until the
    poison has worn off; no XP is credited. Space plays exactly one rest turn, and
    one world turn at full; during a full rest it stops after the turn in
-   progress; a heal cast or a potion while exploring spends no movement and
-   credits no XP or wear.
+   progress; a heal cast or a potion while exploring or during a rest spends no
+   movement, credits no XP or wear, and leaves the rest running.
 5. **8.5 — Save version 5.** The mode and the clock saved; the migration from
    `MarchingThisTurn`; older saves load.
 6. **8.6 — HUD and docs.**

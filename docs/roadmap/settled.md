@@ -4613,6 +4613,7 @@ actions without XP outside combat (DECISION 21).
   full it passes one world turn anyway; during a full rest it stops after the turn
   in progress. In combat Space stays End Turn.
 - **PHASE 8 DECISION 21 — actions outside combat are free and teach nothing,
-  ruled 2026-11-11.** Casts and potions spend no movement while exploring (mana
-  and the potion are still paid), and nothing done outside combat credits XP of
-  any kind or banks wear, so free casts and a rest's mana are never a farm.
+  ruled 2026-11-11.** Casts and potions spend no movement while exploring or
+  resting (mana and the potion are still paid), and nothing done in either credits
+  XP of any kind or banks wear, so free casts and a rest's mana are never a farm.
+  The party may act during a full rest without stopping it.
