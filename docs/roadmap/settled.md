@@ -4547,8 +4547,7 @@ Replaces the three checks that stand in for a mode (marching's turn-start grant,
 the turn's sightings, each enemy's reactions) and the pause every couple of spaces
 while exploring. Planned as its own phase: see [phase-8-modes](phase-8-modes.md).
 Its open questions were ruled on 2026-11-11 (DECISIONS 9–19), and the user added a
-button to stop a rest (DECISION 8) and made statuses' ticks outside combat explicit
-(DECISION 20).
+button to stop a rest (DECISION 8).
 
 - **PHASE 8 DECISION 1 — three modes, held in `Logic/`, ruled 2026-11-09.**
   Exploring, resting and combat, exactly one at a time; everything that today
@@ -4605,7 +4604,3 @@ button to stop a rest (DECISION 8) and made statuses' ticks outside combat expli
   stops it; save version 5 holds no rest state.
 - **PHASE 8 DECISION 19 — the leader takes the line down the stairs, ruled
   2026-11-11.** While exploring; combat keeps today's rule.
-- **PHASE 8 DECISION 20 — statuses tick a turn's worth per world turn outside
-  combat, ruled 2026-11-11.** Every status on every actor ticks and decays as over
-  one combat round, once per world turn: each `MovementBudget` walked and each
-  rest turn. Standing still passes no turn, so nothing ticks then.

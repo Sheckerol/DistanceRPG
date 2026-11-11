@@ -5,9 +5,8 @@ dungeon the mode Phase 7 (§7.2) already speaks of and no code holds: three mode
 — **exploring**, **resting** and **combat** — with turns kept as the world's clock
 in all three. The decisions and their reasons are recorded in
 [settled](settled.md) under *Exploring, resting and combat*, with the user's
-rulings (PHASE 8 DECISIONS 1–7, 8–19, which answered the plan's open questions
-on 2026-11-11 and added the stop-resting button, and 20, on statuses outside
-combat). It replaces the open question *One
+rulings (PHASE 8 DECISIONS 1–7, and 8–19, which answered the plan's open questions
+on 2026-11-11 and added the stop-resting button). It replaces the open question *One
 combat/movement mode, and exploring without the pause* in
 [open-questions](open-questions.md).
 
@@ -111,13 +110,6 @@ moving *while* the party moves, so turns cannot simply be removed.
   (2026-11-11).** While exploring, `E` with the leader on the stairs takes the
   whole marching line; the members need not be gathered on them. In combat the
   rule stays as today.
-- **PHASE 8 DECISION 20 — statuses tick a turn's worth per world turn outside
-  combat (2026-11-11).** Every status — Poison, Bleeding, Searing, Regeneration,
-  Mire and the rest — on every actor, party and enemies alike, ticks and decays
-  exactly as over one combat round, once for each world turn: every
-  `MovementBudget` the leader walks (8.2) and every rest turn (8.4). Standing
-  still while exploring passes no turn (DECISION 4), so nothing ticks then; a
-  rest is how a status is waited out.
 - *Ruled before (open-questions, 2026-11-08):* **leaving combat is checked at the
   start of the party's turn only** — any live enemy in view keeps the party in
   combat; none drops it to exploring. Killing the last enemy in view mid-turn
@@ -152,8 +144,7 @@ far as the player likes, and `AutoEndTurnWhenDry` goes. `TurnSystem` counts the
 ground the leader walks, and each `MovementBudget` of it is one turn of the world:
 
 - the turn boundaries the party and the enemies already raise — status ticks
-  (`TurnEnd`, `RoundEnd`: a round's ticks and decay, DECISION 20), held shots
-  lapsing, reaction uses restored;
+  (`TurnEnd`, `RoundEnd`), held shots lapsing, reaction uses restored;
 - `TurnsSinceSeen`, counted as at an enemy turn's start;
 - `TurnCount` moves on, and every dummy whose wait has run out gets up
   (resurrection timers count walking turns, as they counted ended turns).
@@ -262,7 +253,7 @@ Each step lands with its tests and keeps the golden tests green.
 4. **8.4 — Resting.** `R` and the REST / STOP RESTING buttons, the rest turns, the
    restore without XP, the ways it ends. Tests: a rest stops on `R` and on the
    button alike; it stops on a sighting and when all are full; poisoned, it runs
-   until stopped, ticking once a rest turn; no XP is credited.
+   until stopped; no XP is credited.
 5. **8.5 — Save version 5.** The mode and the clock saved; the migration from
    `MarchingThisTurn`; older saves load.
 6. **8.6 — HUD and docs.**
