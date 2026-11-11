@@ -4616,4 +4616,6 @@ actions without XP outside combat (DECISION 21).
   ruled 2026-11-11.** Casts and potions spend no movement while exploring or
   resting (mana and the potion are still paid), and nothing done in either credits
   XP of any kind or banks wear, so free casts and a rest's mana are never a farm.
-  The party may act during a full rest without stopping it.
+  Enchantments included: one that fires outside combat still pays its trigger mana,
+  but teaches no mana XP, nor weapon XP for a staff's forged entries. The party
+  may act during a full rest without stopping it.
