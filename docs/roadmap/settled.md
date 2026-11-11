@@ -4547,7 +4547,8 @@ Replaces the three checks that stand in for a mode (marching's turn-start grant,
 the turn's sightings, each enemy's reactions) and the pause every couple of spaces
 while exploring. Planned as its own phase: see [phase-8-modes](phase-8-modes.md).
 Its open questions were ruled on 2026-11-11 (DECISIONS 9–19), and the user added a
-button to stop a rest (DECISION 8).
+button to stop a rest (DECISION 8), Space's one-turn rest (DECISION 20) and free
+actions without XP outside combat (DECISION 21).
 
 - **PHASE 8 DECISION 1 — three modes, held in `Logic/`, ruled 2026-11-09.**
   Exploring, resting and combat, exactly one at a time; everything that today
@@ -4606,3 +4607,12 @@ button to stop a rest (DECISION 8).
   stops it; save version 5 holds no rest state.
 - **PHASE 8 DECISION 19 — the leader takes the line down the stairs, ruled
   2026-11-11.** While exploring; combat keeps today's rule.
+- **PHASE 8 DECISION 20 — Space rests one turn outside combat, ruled 2026-11-11.**
+  Added by the user: while exploring, Space plays one rest turn and stops, so the
+  party can heal or drink between turns when a status out-damages the rest. At
+  full it passes one world turn anyway; during a full rest it stops after the turn
+  in progress. In combat Space stays End Turn.
+- **PHASE 8 DECISION 21 — actions outside combat are free and teach nothing,
+  ruled 2026-11-11.** Casts and potions spend no movement while exploring (mana
+  and the potion are still paid), and nothing done outside combat credits XP of
+  any kind or banks wear, so free casts and a rest's mana are never a farm.

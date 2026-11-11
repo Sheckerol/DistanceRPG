@@ -5,8 +5,9 @@ dungeon the mode Phase 7 (§7.2) already speaks of and no code holds: three mode
 — **exploring**, **resting** and **combat** — with turns kept as the world's clock
 in all three. The decisions and their reasons are recorded in
 [settled](settled.md) under *Exploring, resting and combat*, with the user's
-rulings (PHASE 8 DECISIONS 1–7, and 8–19, which answered the plan's open questions
-on 2026-11-11 and added the stop-resting button). It replaces the open question *One
+rulings (PHASE 8 DECISIONS 1–7; 8–19, which answered the plan's open questions
+on 2026-11-11 and added the stop-resting button; and 20–21, Space's one-turn rest
+and free actions without XP outside combat). It replaces the open question *One
 combat/movement mode, and exploring without the pause* in
 [open-questions](open-questions.md).
 
@@ -22,7 +23,7 @@ moving *while* the party moves, so turns cannot simply be removed.
 
 | Mode | Entered | Ends | The clock | The party | The enemies |
 | --- | --- | --- | --- | --- | --- |
-| **Exploring** | Arriving on a floor with no live enemy in view; combat ending; a rest ending without a sighting | A live enemy comes into view; the player rests | One turn per `MovementBudget` the leader walks; still while nobody walks | Walks freely as a marching line, no budget, no pause | Awake ones move at the same time, at their budget's share of the party's speed |
+| **Exploring** | Arriving on a floor with no live enemy in view; combat ending; a rest ending without a sighting | A live enemy comes into view; the player rests | One turn per `MovementBudget` the leader walks; still while nobody walks | Walks freely as a marching line, no budget, no pause; acts without spending movement, earning no XP; Space rests one turn | Awake ones move at the same time, at their budget's share of the party's speed |
 | **Resting** | Chosen by the player while exploring (`R`, or the REST button) | Every living member at full HP and mana with no negative status, or a live enemy comes into view, or the player stops it (`R`, or the STOP RESTING button), or the pause menu opens | Runs on its own, fast-forwarded | Stands still, regains HP and mana, earns no XP | Move as in exploring |
 | **Combat** | A live enemy comes into view in either mode above | The start of a party turn with no live enemy in view (PHASE 7 DECISION 5) | One turn per side's phase, as today | Turn-based, as today; opens on a fresh party turn | Turn-based, as today |
 
@@ -53,7 +54,8 @@ moving *while* the party moves, so turns cannot simply be removed.
   view — whichever is first — and the party is exploring or fighting again.
 - **PHASE 8 DECISION 6 — resting teaches nothing (2026-11-09).** HP and mana
   regained by resting earn no XP, so taking damage and resting is never an HP-XP
-  farm. Healing by a cast or a potion still earns HP XP (§2.2).
+  farm. Healing by a cast or a potion still earns HP XP (§2.2) — in combat only,
+  since DECISION 21.
 - **PHASE 8 DECISION 7 — the party opens every fight (2026-11-09).** Combat begins
   on a fresh party turn with every member's full movement, wherever the party
   stands when the enemy comes into view. Spotting the enemy is the party's
@@ -62,8 +64,9 @@ moving *while* the party moves, so turns cannot simply be removed.
   user: while resting the HUD shows a clickable **STOP RESTING  R** button, and
   while exploring a **REST  R** button. `R` toggles the rest, and clicking a
   button does exactly what its key does (`ClickZones.Press`, as the inventory's
-  rows do). Only the key, the button and the pause menu (DECISION 18) stop a rest:
-  the walking keys do nothing while resting. The buttons are the HUD's own for now
+  rows do). Only the key, the button, Space (which finishes the rest turn in
+  progress first, DECISION 20) and the pause menu (DECISION 18) stop a rest: the
+  walking keys do nothing while resting. The buttons are the HUD's own for now
   and move onto the action bar when that phase lands (open question 11).
 - **PHASE 8 DECISION 9 — a rest waits out negative statuses (2026-11-11).** A
   rest is how the party gets rid of them: it ends on its own only when every
@@ -115,6 +118,20 @@ moving *while* the party moves, so turns cannot simply be removed.
   (2026-11-11).** While exploring, `E` with the leader on the stairs takes the
   whole marching line; the members need not be gathered on them. In combat the
   rule stays as today.
+- **PHASE 8 DECISION 20 — Space rests one turn outside combat (2026-11-11).**
+  Added by the user: while exploring, Space — End Turn in combat, as today — plays
+  exactly one rest turn (the restore, the status ticks, the enemies moving, as in
+  8.4) and stops, so the party can act between turns. When a status deals more
+  than a rest restores, the player steps turn by turn and heals or drinks in
+  between to save a member. With every member full and clear it still passes one
+  world turn, restoring nothing: a way to wait a turn. Pressed during a full rest,
+  it finishes the rest turn in progress and stops there.
+- **PHASE 8 DECISION 21 — actions outside combat are free and teach nothing
+  (2026-11-11).** While exploring a cast or a potion spends no movement (there is
+  no budget, 8.2); a cast still pays its mana and a potion is still used up. So
+  that free casts and the rest's mana never make an XP farm (DECISION 6), nothing
+  done outside combat credits XP of any kind — mana, HP or a weapon's — and no
+  cast banks wear. This narrows DECISION 6's cast and potion healing to combat.
 - *Ruled before (open-questions, 2026-11-08):* **leaving combat is checked at the
   start of the party's turn only** — any live enemy in view keeps the party in
   combat; none drops it to exploring. Killing the last enemy in view mid-turn
@@ -164,6 +181,10 @@ with the leader on the stairs takes the whole line (DECISION 19).
 When a fight starts mid-walk, the walking turn in progress is dropped and
 `TurnCount` moves on: combat opens on a new turn (DECISION 15).
 
+The party may act while exploring — heal, drink, swap — without spending
+movement, and nothing it does credits XP or banks wear (DECISION 21). Space plays
+one rest turn (8.4, DECISION 20); time otherwise passes only by walking.
+
 ## 8.3 Enemies moving at the same time
 
 While the party walks, every awake enemy — one not yet passive, `TurnsSinceSeen`
@@ -192,11 +213,16 @@ before its first turn.
 - **It ends** when every living member is at full HP and `UsableMaxMana` and
   carries no negative status (DECISION 9); when a
   live enemy comes into view (combat, the party first, on a new turn); when the
-  player stops it — `R` again, or the **STOP RESTING** button (DECISION 8); or
-  when the pause menu opens (DECISION 18). Stopping drops the rest turn in
-  progress: what a rest restores comes in whole turns. A dummy whose timer runs
+  player stops it — `R` again, or the **STOP RESTING** button (DECISION 8); when
+  the pause menu opens (DECISION 18); or on Space, which finishes the rest turn in
+  progress and then stops (DECISION 20). Stopping by `R` or the button drops the
+  rest turn in progress: what a rest restores comes in whole turns. A dummy whose timer runs
   out during a rest may get up in view and end it. The walking keys do nothing
   while resting.
+- **Space rests one turn** while exploring (DECISION 20): one rest turn, then the
+  party is exploring again and can act — a heal cast, a potion — before the next.
+  It is how a member is saved from a status that deals more than a rest restores.
+  With the party full and clear it passes one world turn anyway.
 - A member Phase 7 revived at 1 HP is who a rest is for: the fight over, the
   party rests back to full before walking on.
 
@@ -216,7 +242,8 @@ rest: the pause menu ends it first (DECISION 18).
 
 A mode readout (EXPLORING, RESTING, COMBAT); `SPOTTED!` over the enemy that
 starts a fight; a clickable **REST  R** button while exploring and **STOP RESTING
-R** while resting (DECISION 8), each doing what its key does; a rest's progress —
+R** while resting (DECISION 8), each doing what its key does; a **SPACE: REST 1
+TURN** hint while exploring (DECISION 20); a rest's progress —
 every member's HP and mana filling; the reach overlay and the ruler only in
 combat. The older documents
 (§1.2's turns, §6.1, the marching rules) gain a note saying what Phase 8 changes.
@@ -231,13 +258,16 @@ combat. The older documents
 - `DungeonScene`: movement without a ledger while exploring; marching followers as
   today; `EvaluateMarchingForTurn`, `_marchingThisTurn` and `AutoEndTurnWhenDry`
   removed; the overlay and swap cost read the mode; followers path into
-  formation; `R` toggles a rest; the pause menu ends one; the leader takes the
-  line down the stairs.
+  formation; `R` toggles a rest; Space rests one turn outside combat; the pause
+  menu ends a rest; the leader takes the line down the stairs.
 - `DungeonHud`: the mode readout, and the REST / STOP RESTING buttons through
   `ClickZones`.
 - `EnemyState`: the spot where it last saw the party.
 - `StatusRules`: which statuses are negative (DECISION 9), the rest's end check
   reading it.
+- XP and wear: `CreditXp` and the wear a cast banks read the mode, crediting
+  nothing outside combat (DECISION 21); casts and drinks spend no movement while
+  exploring.
 - `EnemyAi`: a walking plan sized to world time rather than a budget, a pursuer's
   to its last-seen spot.
 - Save: version 5 (8.5) — the mode, the walking clock, each enemy's last-seen
@@ -263,7 +293,10 @@ Each step lands with its tests and keeps the golden tests green.
    restore without XP, the ways it ends. Tests: a rest stops on `R` and on the
    button alike; it stops on a sighting; it ends when all are full and clear;
    poisoned, it takes the poison's damage and runs on past full HP until the
-   poison has worn off; no XP is credited.
+   poison has worn off; no XP is credited. Space plays exactly one rest turn, and
+   one world turn at full; during a full rest it stops after the turn in
+   progress; a heal cast or a potion while exploring spends no movement and
+   credits no XP or wear.
 5. **8.5 — Save version 5.** The mode and the clock saved; the migration from
    `MarchingThisTurn`; older saves load.
 6. **8.6 — HUD and docs.**

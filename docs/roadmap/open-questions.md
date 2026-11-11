@@ -1393,7 +1393,7 @@ the movement/reach overlay (PR #17) are integrated** — not before.
 resting and combat — with turns kept as the world's clock (PHASE 8 DECISIONS 1–7,
 settled.md). The plan answers "does movement mode lose turns?" (no: the clock runs
 while the party walks) and "what keeps counting them?" (the ground walked, and a
-rest); its own open questions were ruled on 2026-11-11 (PHASE 8 DECISIONS 8–19,
+rest); its own open questions were ruled on 2026-11-11 (PHASE 8 DECISIONS 8–21,
 a button to stop a rest among them). The record below is kept as it was raised.
 
 Raised by the user on 2026-11-08, after play: the reach overlay turned off at a
