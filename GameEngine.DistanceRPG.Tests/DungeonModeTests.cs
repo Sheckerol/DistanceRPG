@@ -35,7 +35,7 @@ public sealed class DungeonModeTests : IDisposable
         var grid = new int[30, 30];
         var party = new[] { Member("A", 3 * Tile, 3 * Tile), Member("B", 4 * Tile, 3 * Tile) };
         var enemy = new EnemyState { X = 25 * Tile, Y = 25 * Tile };
-        var turns = new TurnSystem(grid, party, new[] { enemy }, () => 10);
+        var turns = new TurnSystem(grid, party, new[] { enemy }, () => 10, mode: DungeonMode.Exploring);
         var log = new List<string>();
         turns.ModeChanged += (was, now) => log.Add($"{was}->{now}");
         turns.CombatEnded += () => log.Add("ended");
@@ -94,16 +94,40 @@ public sealed class DungeonModeTests : IDisposable
     }
 
     [Fact]
-    public void CombatOutlastsSight_UntilTheNextTurnStart()
+    public void CombatOutlastsSight_ForAWholeTurn()
     {
+        // PHASE 8 DECISION 22: the fight ends only once no living enemy has been in
+        // view for a whole turn — breaking sight round a corner is not the end of it.
         var (turns, _, enemy, log) = Fixture();
         turns.NotifyEnemyVisible(enemy, true);
         turns.NotifyEnemyVisible(enemy, false);   // out of view mid-turn: still a fight
         Assert.Equal(DungeonMode.Combat, turns.Mode);
 
         NextTurn(turns);
-        Assert.Equal(DungeonMode.Exploring, turns.Mode);
+        Assert.Equal(DungeonMode.Combat, turns.Mode);   // it was in view this turn: a turn's grace
+
+        NextTurn(turns);
+        Assert.Equal(DungeonMode.Exploring, turns.Mode);   // a whole turn unseen
         Assert.Equal(["Exploring->Combat", "Combat->Exploring", "ended"], log);   // exploring before the end is raised
+    }
+
+    [Fact]
+    public void AnEnemySeenInTheEnemysPhase_KeepsTheFightOnToo()
+    {
+        // In view at any moment of the turn counts, either side's phase: one that
+        // walks into sight and out again while the enemies move is a fight's.
+        var (turns, _, enemy, _) = Fixture();
+        turns.NotifyEnemyVisible(enemy, true);
+        turns.NotifyEnemyVisible(enemy, false);
+        NextTurn(turns);   // the grace turn
+
+        turns.EndTurn();
+        turns.NotifyEnemyVisible(enemy, true);    // round the corner on its own turn...
+        turns.NotifyEnemyVisible(enemy, false);   // ...and back out of it
+        for (float t = 0f; t < 6f && turns.Phase != TurnPhase.Player; t += 1f / 30f)
+            turns.Update(1f / 30f);
+
+        Assert.Equal(DungeonMode.Combat, turns.Mode);
     }
 
     [Fact]
@@ -182,21 +206,37 @@ public sealed class DungeonModeTests : IDisposable
     }
 
     [Fact]
-    public void ASameTurnCarry_WithALiveEnemySighted_OpensInCombat()
+    public void ABareSystemOpensInCombat_AVisitsFloorExploring_NeverResting()
+    {
+        var grid = new int[30, 30];
+        var party = new[] { Member("A", 3 * Tile, 3 * Tile) };
+        Assert.Equal(DungeonMode.Combat, new TurnSystem(grid, party, Array.Empty<EnemyState>()).Mode);
+        Assert.Equal(DungeonMode.Exploring, new TurnSystem(grid, party, Array.Empty<EnemyState>(), mode: DungeonMode.Exploring).Mode);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TurnSystem(grid, party, Array.Empty<EnemyState>(), mode: DungeonMode.Resting));
+    }
+
+    [Fact]
+    public void ASameTurnCarry_OfAFight_OpensInCombat()
     {
         var grid = new int[30, 30];
         var party = new[] { Member("A", 3 * Tile, 3 * Tile) };
         var enemy = new EnemyState { X = 25 * Tile, Y = 25 * Tile };
-        var first = new TurnSystem(grid, party, new[] { enemy }, () => 10);
-        first.NotifyEnemyVisible(enemy, true);
+        var first = new TurnSystem(grid, party, new[] { enemy }, () => 10, mode: DungeonMode.Exploring);
+        first.NotifyEnemyVisible(enemy, true);   // the fight opens a new turn (PHASE 8 DECISION 15)
         var carry = first.ExportCarry();
+        Assert.Equal((1, true), (carry.Turn, carry.InCombat));
 
-        Assert.Equal(DungeonMode.Combat, new TurnSystem(grid, party, new[] { enemy }, () => 10, carry: carry).Mode);
-        // A carry from an earlier turn is dropped, and its sighting with it.
-        Assert.Equal(DungeonMode.Exploring, new TurnSystem(grid, party, new[] { enemy }, () => 10, firstTurn: 1, carry: carry).Mode);
-        // Its only sighting fallen since: no fight to come back to.
+        TurnSystem Open(int turn, TurnCarry c) => new(grid, party, new[] { enemy }, () => 10, firstTurn: turn, carry: c, mode: DungeonMode.Exploring);
+
+        // The party left in combat: the floor arrived on opens in it.
+        Assert.Equal(DungeonMode.Combat, Open(1, carry).Mode);
+        // A carry from an earlier turn is dropped, and the fight with it.
+        Assert.Equal(DungeonMode.Exploring, Open(2, carry).Mode);
+        // A live enemy of this roster sighted this turn is a fight too; its only sighting fallen since, none.
+        var sightedOnly = carry with { InCombat = false };
+        Assert.Equal(DungeonMode.Combat, Open(1, sightedOnly).Mode);
         enemy.Alive = false;
-        Assert.Equal(DungeonMode.Exploring, new TurnSystem(grid, party, new[] { enemy }, () => 10, carry: carry).Mode);
+        Assert.Equal(DungeonMode.Exploring, Open(1, sightedOnly).Mode);
     }
 
     [Fact]

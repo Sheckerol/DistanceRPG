@@ -23,6 +23,15 @@ namespace GameEngine.DistanceRPG.Tests;
 /// land in one swing is helped by setting the target's HP to 1 first — a save
 /// names content by id, so the party holds catalogue weapons only.
 /// </para>
+/// <para>
+/// <strong>A script plays a fight</strong> (<see cref="DungeonMode.Combat"/>), turn
+/// by turn, as every visit played before Phase 8: it walks by putting members
+/// where a walk would end, never on the walking clock, so exploring is not what it
+/// models. Opening a floor, looking about and swinging each put the floor's system
+/// in combat first (<see cref="Fight"/>), so a sighting opens no turn of its own and
+/// a blow is a fight's; a turn's start that finds nobody in view still drops it to
+/// exploring, as it ends any fight, until the script next looks or swings.
+/// </para>
 /// </summary>
 internal sealed class VisitScript
 {
@@ -99,6 +108,13 @@ internal sealed class VisitScript
         return turns;
     }
 
+    /// <summary>The floor's system in combat, if it was not: what a script plays (see the class's remarks).</summary>
+    public void Fight()
+    {
+        if (Turns.Mode != DungeonMode.Combat)
+            Turns.ResumeMode(DungeonMode.Combat);
+    }
+
     /// <summary>
     /// Open the floor a load brought back — its system imports the saved
     /// counters and catches the floor up, as an arrival's does — keeping the
@@ -113,6 +129,7 @@ internal sealed class VisitScript
     public TurnSystem Resume()
     {
         var turns = Visit.OpenTurns(Party, Die);
+        Fight();
         var floor = Floor;
         foreach (var row in floor.Enemies)
         {
@@ -172,6 +189,7 @@ internal sealed class VisitScript
     /// </summary>
     public void Look()
     {
+        Fight();
         var floor = Floor;
         foreach (var member in Party)
         {
@@ -196,7 +214,11 @@ internal sealed class VisitScript
     // ── Fighting ─────────────────────────────────────────────────────────────
 
     /// <summary>Member <paramref name="id"/> swings at <paramref name="target"/> from where it stands, and the swing is allowed.</summary>
-    public void Swing(string id, EnemyState target) => Assert.True(Turns.TryAttack(Member(id), target), $"{id} could not swing at spawn {target.SpawnIndex}");
+    public void Swing(string id, EnemyState target)
+    {
+        Fight();
+        Assert.True(Turns.TryAttack(Member(id), target), $"{id} could not swing at spawn {target.SpawnIndex}");
+    }
 
     /// <summary>
     /// Member <paramref name="id"/> walks up beside <paramref name="target"/> and

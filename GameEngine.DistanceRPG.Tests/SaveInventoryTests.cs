@@ -200,6 +200,7 @@ public class SaveInventoryTests
             new("ZoneUses", Kept.Saved, "carry.zoneUses[], sorted the same way"),
             new("ReactionUses", Kept.Saved, "carry.reactionUses[], by actor, then modifier in enum order"),
             new("Seen", Kept.Saved, "carry.seen[], sorted by floor and spawn"),
+            new("InCombat", Kept.NotSaved, "the stairs are taken and the next floor opened in one frame, which no save falls between; a resume takes the mode from the view (DungeonScene.ResumedMode)"),
         ],
         [typeof(EnemyState)] =
         [
@@ -228,6 +229,9 @@ public class SaveInventoryTests
             new("_seenThisTurn", Kept.Saved, "carry.seen[], sorted"),
             new("_inView", Kept.Derived, "the saved sight (the current floor's visible tiles), told the system on resume by NotifyEnemyInView"),
             new("Mode", Kept.Derived, "replayed on a resume from view.marchingThisTurn and the turn's sightings (DungeonScene.ResumedMode, ResumeMode), then the saved sight; kept in the document itself from save version 5 (Phase 8.5)"),
+            new("_inViewSinceCheck", Kept.Derived, "the turn's sightings (carry.seen[]) taken up on a resume by Import, and the saved sight told by NotifyEnemyInView; only an enemy in view unsighted earlier in the turn and out of view by the save is lost, which shortens a fight's grace by nothing a save point holds"),
+            new("WalkedThisTurn", Kept.NotSaved, "the walking turn in progress: a resume opens the turn fresh until save version 5 keeps it (Phase 8.5); an autosave comes at each walking turn's start, where it is next to nothing"),
+            new("_atBoundary", Kept.NotSaved, "true only inside a turn's boundary, which no save falls in"),
             new("_attacksThisTurn", Kept.Saved, "carry.attacks[], sorted"),
             new("_partyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived by SnapshotZones from where everyone stands, kept true continuously"),
             new("_enemyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived as the party's are"),

@@ -327,13 +327,13 @@ public sealed class SaveMenuTests : IDisposable
 
         // And the three keys that act at once, in the lambda WireInput hands them —
         // TAB picks the next member (with no floor built there is no party here to
-        // pick from), SPACE ends the turn, G picks up — ask whether a menu is open
-        // before they act.
+        // pick from), SPACE passes the turn (ends it in combat, waits one out
+        // exploring), G picks up — ask whether a menu is open before they act.
         var menuOpen = typeof(DungeonScene).GetProperty(nameof(DungeonScene.AnyMenuOpen))!.GetMethod!;
         foreach (var act in new MethodBase[]
                  {
                      typeof(DungeonScene).GetMethod("CycleActiveCharacter", Declared)!,
-                     typeof(TurnSystem).GetMethod(nameof(TurnSystem.EndTurn))!,
+                     typeof(DungeonScene).GetMethod("PassTurn", Declared)!,
                      typeof(DungeonScene).GetMethod("PickUp", Declared)!,
                  })
         {

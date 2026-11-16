@@ -41,7 +41,9 @@ public sealed class EncounterEndTests : IDisposable
         var grid = new int[30, 30];
         var party = new[] { Member("A", 3 * Tile, 3 * Tile), Member("B", 4 * Tile, 3 * Tile) };
         var enemy = new EnemyState { X = 25 * Tile, Y = 25 * Tile };
-        var turns = new TurnSystem(grid, party, new[] { enemy }, () => 10);
+        // Exploring, as a visit's floor opens: a sighting starts the fight, on a turn
+        // of its own (PHASE 8 DECISION 15), which the log hears as a turn's start.
+        var turns = new TurnSystem(grid, party, new[] { enemy }, () => 10, mode: DungeonMode.Exploring);
         var log = new List<string>();
         turns.CombatEnded += () => log.Add("ended");
         turns.PlayerTurnStarted += () => log.Add("turn");
@@ -58,7 +60,7 @@ public sealed class EncounterEndTests : IDisposable
         NextTurn(turns);
 
         Assert.True(turns.AnyLiveEnemyInView);   // nobody said it left view
-        Assert.Equal(["turn"], log);
+        Assert.Equal(["turn", "turn"], log);     // the fight's own turn, then the next
     }
 
     [Fact]
@@ -68,13 +70,16 @@ public sealed class EncounterEndTests : IDisposable
         turns.NotifyEnemyVisible(enemy, true);
         turns.NotifyEnemyVisible(enemy, false);   // out of view mid-turn: nothing yet (PHASE 7 DECISION 5)
         Assert.False(turns.AnyLiveEnemyInView);
-        Assert.Empty(log);
+        Assert.Equal(["turn"], log);              // the fight's own turn, and no end
 
         NextTurn(turns);
-        Assert.Equal(["ended", "turn"], log);   // before the turn's own start, so a revive gets a full budget
+        Assert.Equal(["turn", "turn"], log);      // in view this turn: a turn's grace (PHASE 8 DECISION 22)
 
         NextTurn(turns);
-        Assert.Equal(["ended", "turn", "turn"], log);   // the encounter is closed: no second end
+        Assert.Equal(["turn", "turn", "ended", "turn"], log);   // a whole turn unseen; before the turn's own start, so a revive gets a full budget
+
+        NextTurn(turns);
+        Assert.Equal(["turn", "turn", "ended", "turn", "turn"], log);   // the encounter is closed: no second end
     }
 
     [Fact]
@@ -87,7 +92,7 @@ public sealed class EncounterEndTests : IDisposable
 
         Assert.False(turns.AnyLiveEnemyInView);
         NextTurn(turns);
-        Assert.Equal(["ended", "turn"], log);
+        Assert.Equal(["turn", "ended", "turn"], log);
     }
 
     [Fact]
@@ -122,7 +127,7 @@ public sealed class EncounterEndTests : IDisposable
         Assert.True(turns.AnyLiveEnemyInView);
         Assert.False(turns.AnyLiveEnemySeenThisTurn);
         Assert.False(turns.CheckEncounterEnd());
-        Assert.Empty(log);
+        Assert.Equal(["turn"], log);   // the fight's own turn, and no end
     }
 
     [Fact]
@@ -132,9 +137,10 @@ public sealed class EncounterEndTests : IDisposable
         turns.NotifyEnemyVisible(enemy, true);
         turns.NotifyEnemyVisible(enemy, false);
 
-        Assert.True(turns.CheckEncounterEnd());
+        Assert.False(turns.CheckEncounterEnd());   // in view since the last check: its grace
+        Assert.True(turns.CheckEncounterEnd());    // none since
         Assert.False(turns.CheckEncounterEnd());
-        Assert.Equal(["ended"], log);
+        Assert.Equal(["turn", "ended"], log);
     }
 
     // ── The revive and its cut (§7.1, step 2) ────────────────────────────────
@@ -167,12 +173,14 @@ public sealed class EncounterEndTests : IDisposable
 
         turns.NotifyEnemyVisible(enemy, false);
         NextTurn(turns);
+        Assert.False(party[1].Alive);   // it was in view this turn: still the fight's (PHASE 8 DECISION 22)
 
+        NextTurn(turns);
         Assert.True(party[1].Alive);
         Assert.Equal(1, party[1].Hp);   // PHASE 7 DECISION 6
         Assert.Equal(mana, party[1].Mana);
         Assert.Equal(party[1].EffectiveMax, party[1].DistLeft);   // up before the budgets refilled
-        Assert.Equal(["turn", "revived B hp=1", "ended", "turn"], log);
+        Assert.Equal(["turn", "turn", "turn", "revived B hp=1", "ended", "turn"], log);   // the fight's own turn first
     }
 
     [Fact]
@@ -411,9 +419,9 @@ public sealed class EncounterEndTests : IDisposable
         var (turns, _, enemy, log) = Fixture();
         turns.NotifyEnemyVisible(enemy, true);
         turns.NotifyEnemyVisible(enemy, false);
-        turns.NotifyEnemyVisible(enemy, true);
+        turns.NotifyEnemyVisible(enemy, true);   // back in view while the fight is on: no second opening
 
         NextTurn(turns);
-        Assert.Equal(["turn"], log);
+        Assert.Equal(["turn", "turn"], log);
     }
 }

@@ -32,12 +32,22 @@ namespace GameEngine.DistanceRPG.Logic;
 /// <param name="ZoneUses">Threat-zone uses per reactor this turn, either side's: a reactor fights on one side only, so one map holds both zones.</param>
 /// <param name="ReactionUses">Uses of the reactions that answer being hit (Riposte) per actor and modifier this turn.</param>
 /// <param name="Seen">The enemies a party member has laid eyes on this turn.</param>
+/// <param name="InCombat">
+/// Whether the party left in combat (<see cref="TurnSystem.Mode"/>, PHASE 8
+/// DECISION 1): a fight is not left behind on the stairs, so the floor arrived on
+/// opens in it, and the arrival's check ends it there if no live enemy is in view.
+/// Without it, a party fleeing down the stairs mid-fight into sight of another
+/// enemy would start a new fight, and a fresh turn with it (PHASE 8 DECISION 7).
+/// Not saved: the stairs are taken and the floor opened in one frame, and a resume
+/// takes the mode from the view.
+/// </param>
 public sealed record TurnCarry(
     int Turn,
     IReadOnlyDictionary<ActorState, int> Attacks,
     IReadOnlyDictionary<ActorState, int> ZoneUses,
     IReadOnlyDictionary<(ActorState Actor, ModifierType Type), int> ReactionUses,
-    IReadOnlySet<EnemyState> Seen)
+    IReadOnlySet<EnemyState> Seen,
+    bool InCombat = false)
 {
     /// <summary>
     /// This carry with <paramref name="later"/> laid over it, per actor: the
@@ -60,7 +70,8 @@ public sealed record TurnCarry(
             Merge(Attacks, later.Attacks, ReferenceEqualityComparer.Instance),
             Merge(ZoneUses, later.ZoneUses, ReferenceEqualityComparer.Instance),
             Merge(ReactionUses, later.ReactionUses, EqualityComparer<(ActorState Actor, ModifierType Type)>.Default),
-            new HashSet<EnemyState>(Seen.Concat(later.Seen), ReferenceEqualityComparer.Instance));
+            new HashSet<EnemyState>(Seen.Concat(later.Seen), ReferenceEqualityComparer.Instance),
+            later.InCombat);
     }
 
     private static Dictionary<TKey, int> Merge<TKey>(IReadOnlyDictionary<TKey, int> earlier, IReadOnlyDictionary<TKey, int> later,

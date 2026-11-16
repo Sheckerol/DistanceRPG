@@ -407,17 +407,17 @@ public sealed class SaveConsistencyTests : IDisposable
         potions.Party[0].TakePotion(3);
         Loads(potions, "potions carried into a dungeon, one poured out");
 
-        // Drunk (Phase 6b.2): A, hurt, drinks the other, its HP and HP XP the drink's
-        // and its movement spent; C's is still carried. Saved at the party's turn, it
-        // loads. The drink's numbers are this case's own input — a share of 20 a unit
-        // and a drink at 40, as PotionDrinkTests states them — so a retune of the
-        // shipped file fails none of it (ShippedDataTests' R5).
+        // Drunk (Phase 6b.2): A, hurt, drinks the other while exploring, its HP the
+        // drink's and no movement spent (PHASE 8 DECISION 21); C's is still carried.
+        // Saved at the party's turn, it loads. The drink's numbers are this case's own
+        // input — a share of 20 a unit and a drink at 40, as PotionDrinkTests states
+        // them — so a retune of the shipped file fails none of it (ShippedDataTests' R5).
         using (TestContent.UsePremise(tuning: t => t with { HealthPotionPercent = 20, ManaPotionPercent = 20, PotionUseCost = 40 }))
         {
             potions.Party[0].Hp -= 5;
             float before = potions.Party[0].DistLeft;
             var drunk = potionTurns.TryDrink(potions.Party[0], 2);
-            Assert.Equal((5, before - 40), (drunk!.Restored, potions.Party[0].DistLeft));
+            Assert.Equal((5, before), (drunk!.Restored, potions.Party[0].DistLeft));
         }
         Assert.Empty(potions.Party[0].Potions);
         Assert.Equal(TestPotions.Health(3), potions.Party[2].PotionIn(5));

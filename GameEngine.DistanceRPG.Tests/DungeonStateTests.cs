@@ -587,11 +587,35 @@ public sealed class DungeonStateTests : IDisposable
     // ── Using the stairs ─────────────────────────────────────────────────────
 
     [Fact]
+    public void ExploringTheLeaderTakesTheLine_GatheredOrNot()
+    {
+        // PHASE 8 DECISION 19: while exploring, the leader on the stair takes the
+        // whole marching line, wherever the others stand.
+        var party = Party();
+        var visit = DungeonState.Enter(Tutorial, GoldenSeed, party);
+        var floor = visit.Current;
+        var down = new StairUse(Stair.Down, floor.DownStairs!.Value);
+        Gather(visit, party, down.Tile);
+        var turns = visit.OpenTurns(party, Ten);
+        Assert.Equal(DungeonMode.Exploring, turns.Mode);   // a visit's floor opens exploring
+
+        Put(party[0], down.Tile);          // the leader, on the stair
+        Put(party[3], floor.UpStairs);     // a straggler, a room away
+        Assert.Equal(3, visit.Gathered(party, down.Tile));
+        Assert.Null(visit.CanUse(down, party, party[0]));
+        // Asked without a leader, the party's half of the rule stands: gathered.
+        Assert.Equal(StairRefusal.PartyNotGathered, visit.CanUse(down, party));
+        visit.Descend(party, party[0]);
+        Assert.Equal(1, visit.FloorIndex);
+    }
+
+    [Fact]
     public void TheWholeLivingPartyMustGatherAtTheStairs()
     {
-        // The party moves as one, so nobody is ever on another floor: every living
-        // member within three tiles of the stair, in the player phase of an open
-        // floor. The count is the living; the fallen are carried, not gathered.
+        // In combat the party moves as one, so nobody is ever on another floor:
+        // every living member within three tiles of the stair, in the player phase
+        // of an open floor. The count is the living; the fallen are carried, not
+        // gathered.
         var party = Party();
         var visit = DungeonState.Enter(Tutorial, GoldenSeed, party);
         var floor = visit.Current;
@@ -602,6 +626,7 @@ public sealed class DungeonStateTests : IDisposable
         Assert.Equal(StairRefusal.NotThePlayersTurn, visit.CanUse(down, party));
 
         var turns = visit.OpenTurns(party, Ten);
+        turns.ResumeMode(DungeonMode.Combat);   // a fight on: the gathering rule holds
         Assert.Null(visit.CanUse(down, party));
         Assert.Equal(4, visit.Gathered(party, down.Tile));
 
@@ -1005,6 +1030,7 @@ public sealed class DungeonStateTests : IDisposable
         Put(sword, (39, 30));
 
         var turns = visit.OpenTurns(party, Ten);
+        turns.ResumeMode(DungeonMode.Combat);   // the fight already on: the sightings below open no turn of their own
         int braces = 0, ripostes = 0;
         turns.EnemyBraceTriggered += _ => braces++;
         turns.RiposteTriggered += _ => ripostes++;
@@ -1034,6 +1060,8 @@ public sealed class DungeonStateTests : IDisposable
         Gather(visit, party, first.DownStairs!.Value);
         var carried = party.Select(m => (m.DistLeft, m.Hp, m.StatusLevel(StatusEffectType.Poison))).ToArray();
         var below = Down(visit, party);
+        Assert.Equal(DungeonMode.Combat, below.Mode);   // a fight is not left behind on the stairs
+        Assert.True(below.CheckEncounterEnd());          // the arrival's check, as the scene makes it: nothing here in view
 
         Assert.Equal((TurnPhase.Player, 0), (below.Phase, below.TurnCount));
         Assert.Equal(carried, party.Select(m => (m.DistLeft, m.Hp, m.StatusLevel(StatusEffectType.Poison))));
@@ -1081,9 +1109,9 @@ public sealed class DungeonStateTests : IDisposable
 
         // A system takes a carry up only on the turn it was spent in: opened on
         // turn 0 it inherits every counter, opened on turn 1 none of them.
-        var sameTurn = new TurnSystem(first.Map.Grid, party, first.Enemies, Ten, first.Seed, firstTurn: 0, carry: carry);
+        var sameTurn = new TurnSystem(first.Map.Grid, party, first.Enemies, Ten, first.Seed, firstTurn: 0, carry: carry, mode: DungeonMode.Exploring);
         Assert.Equal((2, true, swapCost), (sameTurn.AttacksThisTurn(thrower), sameTurn.AnyLiveEnemySeenThisTurn, sameTurn.SwapCost));
-        var laterTurn = new TurnSystem(first.Map.Grid, party, first.Enemies, Ten, first.Seed, firstTurn: 1, carry: carry);
+        var laterTurn = new TurnSystem(first.Map.Grid, party, first.Enemies, Ten, first.Seed, firstTurn: 1, carry: carry, mode: DungeonMode.Exploring);
         Assert.Equal((0, false, 0), (laterTurn.AttacksThisTurn(thrower), laterTurn.AnyLiveEnemySeenThisTurn, laterTurn.SwapCost));
         Assert.Empty(laterTurn.ExportCarry().ZoneUses);
 

@@ -6,8 +6,9 @@ namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
 /// Drinking a potion (Phase 6b.2; §3.4): a member drinks from its own bag for
-/// <see cref="TurnSystem.PotionUseCost"/> movement, in combat and out (PHASE 6b
-/// DECISION 2), paid whole or refused, and the potion restores a share of a pool,
+/// <see cref="TurnSystem.PotionUseCost"/> movement in combat (PHASE 6b DECISION 2)
+/// and nothing outside it (PHASE 8 DECISION 21), paid whole or refused, and the
+/// potion restores a share of a pool,
 /// rounded down (PHASE 6b DECISION 3) — health through the heal applier, which
 /// credits HP XP with exactly what it restored and hands the overshoot to whatever
 /// banks it, mana through the mana applier's refund, which teaches nothing. No
@@ -62,28 +63,29 @@ public sealed class PotionDrinkTests : IDisposable
     }
 
     [Fact]
-    public void ADrinkCostsPotionUseCost_InCombatAndOut()
+    public void ADrinkCostsPotionUseCost_InCombat_NothingOutOfIt()
     {
-        // §3.4: "on the same principle as swapping" — and a drink costs its 40 out
-        // of combat as in it (PHASE 6b DECISION 2), where a swap is free until a
-        // live enemy has been seen. Raised through MovementSpent for every drink,
-        // as a swap is: the one record of every cost.
+        // §3.4: "on the same principle as swapping" — a drink costs its 40 in combat
+        // (PHASE 6b DECISION 2) and, like a swap, nothing while exploring, where
+        // there is no budget (PHASE 8 DECISION 21). Raised through MovementSpent for
+        // every drink, as a swap is: the one record of every cost.
         var a = Member();
         a.Inventory[1] = Health(1);
         a.Inventory[2] = Mana(1);
-        var (turns, enemy, _) = Turns(a);
+        var enemy = new EnemyState { X = 25 * Tile + Tile / 2f, Y = 15 * Tile + Tile / 2f };
+        var turns = new TurnSystem(new int[20, 30], [a], [enemy], () => 10, mode: DungeonMode.Exploring);
         var spent = MovementProbe(turns);
 
-        Assert.Equal((0, Cost), (turns.SwapCost, turns.PotionUseCost));
+        Assert.Equal((0, 0), (turns.SwapCost, turns.PotionUseCost));
         var drink = turns.TryDrink(a, 1);
-        Assert.Equal(Cost, drink!.Cost);
-        Assert.Equal(Premise.Budget - Cost, a.DistLeft);
+        Assert.Equal(0, drink!.Cost);
+        Assert.Equal(Premise.Budget, a.DistLeft);
 
         turns.NotifyEnemyVisible(enemy, true);
         Assert.Equal((Premise.Tuning.WeaponSwapCost, Cost), (turns.SwapCost, turns.PotionUseCost));
         Assert.NotNull(turns.TryDrink(a, 2));
-        Assert.Equal(Premise.Budget - 2 * Cost, a.DistLeft);
-        Assert.Equal([("potion", Cost), ("potion", Cost)], spent);
+        Assert.Equal(Premise.Budget - Cost, a.DistLeft);
+        Assert.Equal([("potion", 0), ("potion", Cost)], spent);
         Assert.Empty(a.Potions);
 
         // At a cost of 0 a drink is free, and still raised: it settles at zero, as

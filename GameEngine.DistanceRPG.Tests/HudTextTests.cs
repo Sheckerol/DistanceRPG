@@ -1394,10 +1394,12 @@ public sealed class HudTextTests : IDisposable
         Assert.Equal(new[] { "WAY OUT", "STAIRS DOWN" },
             DungeonState.StairsOf(first).Select(s => DungeonHud.StairLabel(s.Kind)));
 
-        // ...and two of the four gathered at the down-stairs are two short, the
-        // count the cue prints being the visit's own: the living within reach, of
-        // the living. The fallen are carried, so they are counted in neither.
+        // ...and in a fight two of the four gathered at the down-stairs are two
+        // short, the count the cue prints being the visit's own: the living within
+        // reach, of the living. The fallen are carried, so they are counted in
+        // neither. (Exploring, the leader takes the line: PHASE 8 DECISION 19.)
         var down = DungeonState.StairsOf(first).Single(s => s.Kind == Stair.Down);
+        visit.Turns!.ResumeMode(DungeonMode.Combat);
         Gather(visit, party, down.Tile, 2);
         var refusal = visit.CanUse(down, party);
         Assert.Equal(StairRefusal.PartyNotGathered, refusal);

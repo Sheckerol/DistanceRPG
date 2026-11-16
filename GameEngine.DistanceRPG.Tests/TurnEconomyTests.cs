@@ -29,7 +29,7 @@ public sealed class TurnEconomyTests : IDisposable
         var a = Char("A", 5 * Tile + 16, 5 * Tile + 16, "longbow");
         a.Inventory[1] = TestWeapons.Get("weakspot_stiletto");
         var enemy = new EnemyState { X = a.X + 60f, Y = a.Y };   // at knife range, not yet seen
-        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10);
+        var turns = new TurnSystem(grid, new[] { a }, new[] { enemy }, () => 10, mode: DungeonMode.Exploring);
         var spent = new List<(int Wanted, int Spent, string Source)>();
         turns.Events.On<MovementPayload>(GameEvent.MovementSpent, new HandlerPriority(9, 9), "probe", (p, s, _) =>
         {

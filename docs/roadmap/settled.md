@@ -4548,7 +4548,8 @@ the turn's sightings, each enemy's reactions) and the pause every couple of spac
 while exploring. Planned as its own phase: see [phase-8-modes](phase-8-modes.md).
 Its open questions were ruled on 2026-11-11 (DECISIONS 9–19), and the user added a
 button to stop a rest (DECISION 8), Space's one-turn rest (DECISION 20) and free
-actions without XP outside combat (DECISION 21).
+actions without XP outside combat (DECISION 21). After playing 8.2 the user ruled
+that a fight ends only after a whole turn unseen (DECISION 22).
 
 - **PHASE 8 DECISION 1 — three modes, held in `Logic/`, ruled 2026-11-09.**
   Exploring, resting and combat, exactly one at a time; everything that today
@@ -4621,3 +4622,13 @@ actions without XP outside combat (DECISION 21).
   may act during a full rest without stopping it. *To revisit after play:* if healing a
   member through a status outside combat feels unrewarding, narrow it to no mana
   or weapon XP, keeping HP XP, which only HP really lost can feed.
+- **PHASE 8 DECISION 22 — a fight ends only after a whole turn unseen, ruled
+  2026-11-16 (after play).** The user hid the leader behind a corner, with three
+  members down. At the next turn's start no enemy was in view, so the encounter
+  ended and the fallen revived. One of them got up with a view round the corner,
+  and a new fight began on the spot. Now the encounter ends at a party turn's start
+  only once no living enemy has been in view for a whole turn, both sides' phases.
+  A fight that only broke sight this turn goes on into the next, the fallen still
+  down. An enemy killed in view keeps nothing open, since it is not living. This
+  replaces PHASE 7 DECISION 5's "no live enemy in view at the turn's start" as the
+  end, and is still checked only at a turn's start (or a floor arrival).

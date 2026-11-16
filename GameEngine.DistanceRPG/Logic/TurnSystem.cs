@@ -110,6 +110,16 @@ public sealed class TurnSystem
     /// </summary>
     private readonly HashSet<EnemyState> _inView = new(ReferenceEqualityComparer.Instance);
 
+    /// <summary>
+    /// Every enemy in view alive at any moment since the last encounter check
+    /// (<see cref="CheckEncounterEnd"/>), in either side's phase, and the turn's
+    /// own sightings a carry brought. The check reads it to give a fight its turn of
+    /// grace (PHASE 8 DECISION 22): combat ends only once no living enemy has been in
+    /// view for a whole turn, so breaking sight round a corner for the rest of a turn
+    /// is not the end of the fight. Then it starts again from who is in view.
+    /// </summary>
+    private readonly HashSet<EnemyState> _inViewSinceCheck = new(ReferenceEqualityComparer.Instance);
+
     /// <summary>A live enemy is in view now: the party is in combat mode (§7.2).</summary>
     public bool AnyLiveEnemyInView => _inView.Any(e => e.Alive);
 
@@ -120,15 +130,29 @@ public sealed class TurnSystem
     /// <see cref="DungeonMode.Exploring"/> only at a player turn's start, or on a
     /// floor arrival, with no live enemy in view (<see cref="CheckEncounterEnd"/>):
     /// combat outlasts the sight that started it, so killing the last enemy in view
-    /// mid-turn changes nothing until then. A system opens exploring, unless the
-    /// turn it takes up had already sighted a live enemy of its roster
-    /// (<see cref="Import"/>); a resumed turn is told the mode it was saved in
+    /// mid-turn changes nothing until then. A system opens in the mode it was built
+    /// with — a floor the visit opens, exploring — unless the turn it takes up was a
+    /// fight (<see cref="Import"/>); a resumed turn is told the mode it was saved in
     /// (<see cref="ResumeMode"/>).
     /// </summary>
-    public DungeonMode Mode { get; private set; } = DungeonMode.Exploring;
+    public DungeonMode Mode { get; private set; }
 
     /// <summary>The mode changed (<see cref="Mode"/>): what it was, then what it is now.</summary>
     public event Action<DungeonMode, DungeonMode>? ModeChanged;
+
+    /// <summary>
+    /// How far the leader has walked into the world turn in progress while
+    /// exploring (PHASE 8 DECISION 4): a turn passes at every
+    /// <see cref="Tuning.MovementBudget"/> of it (<see cref="AdvanceExploring"/>).
+    /// Dropped when a fight starts (PHASE 8 DECISION 15) and when the party waits a
+    /// turn out (<see cref="WaitTurn"/>).
+    /// </summary>
+    public float WalkedThisTurn { get; private set; }
+
+    // True while a turn's boundary runs (a player turn's start, a walking turn, a
+    // fight's opening), so a fight that starts inside one (a dummy getting up in
+    // view) opens on the turn being opened rather than a second one after it.
+    private bool _atBoundary;
 
     /// <summary>
     /// The encounter is over (§7.2): raised by <see cref="CheckEncounterEnd"/> at
@@ -373,12 +397,26 @@ public sealed class TurnSystem
     /// merely carries a promise (<see cref="EnemyState.PromisedStacks"/>) but is
     /// not named here drops as any dummy does.
     /// </param>
+    /// <param name="mode">
+    /// The mode the system opens in (PHASE 8 DECISION 1), before any carry is taken
+    /// up: <see cref="DungeonMode.Combat"/> for a bare system, the fight the turn
+    /// machine plays, and <see cref="DungeonMode.Exploring"/> for a floor the visit
+    /// opens (<see cref="DungeonState.OpenTurns"/>), whose arrival lighting then
+    /// decides. A carry of a party that left in combat, or one that sighted a live
+    /// enemy of this roster, opens it in combat either way. Never
+    /// <see cref="DungeonMode.Resting"/>: a rest is chosen, never opened in.
+    /// </param>
     /// <exception cref="ArgumentException"><paramref name="boss"/> is not one of <paramref name="enemies"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> is <see cref="DungeonMode.Resting"/>, or <paramref name="firstTurn"/> is negative.</exception>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
         IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null, long mapSeed = 0,
-        int firstTurn = 0, TurnCarry? carry = null, EnemyState? boss = null)
+        int firstTurn = 0, TurnCarry? carry = null, EnemyState? boss = null,
+        DungeonMode mode = DungeonMode.Combat)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(firstTurn);
+        if (mode is not (DungeonMode.Exploring or DungeonMode.Combat))
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "A system opens exploring or in combat, never resting.");
+        Mode = mode;
         if (boss is not null && !enemies.Contains(boss))
             throw new ArgumentException("The boss is one of the floor's enemies: pass it on the roster it is the boss of.", nameof(boss));
 
@@ -502,10 +540,15 @@ public sealed class TurnSystem
                 _ripostes.RestoreUses(actor, type, uses);
         foreach (var enemy in carry.Seen)
             if (_sides.ContainsKey(enemy))
+            {
                 _seenThisTurn.Add(enemy);
-        // A turn that sighted a live enemy here was a fight before the party left:
-        // a same-turn return finds it still on. Nothing is subscribed yet.
-        if (AnyLiveEnemySeenThisTurn)
+                if (enemy.Alive)
+                    _inViewSinceCheck.Add(enemy);   // seen this turn: in view since the turn's check
+            }
+        // A party that left in combat arrives in it, and a turn that sighted a live
+        // enemy here was a fight before the party left: a same-turn return finds it
+        // still on. Nothing is subscribed yet.
+        if (carry.InCombat || AnyLiveEnemySeenThisTurn)
             Mode = DungeonMode.Combat;
     }
 
@@ -528,7 +571,43 @@ public sealed class TurnSystem
         if (Mode == mode) return;
         var was = Mode;
         Mode = mode;
+        if (was == DungeonMode.Exploring)
+            WalkedThisTurn = 0f;   // the walking turn in progress is dropped (PHASE 8 DECISION 15)
         ModeChanged?.Invoke(was, mode);
+    }
+
+    /// <summary>
+    /// A fight starts in the party's phase, outside any turn's boundary (PHASE 8
+    /// DECISIONS 7 and 15): a new world turn opens on the spot, the walking turn in
+    /// progress dropped and <see cref="TurnCount"/> on by one, with every reaction's
+    /// uses restored, held shots lapsed, the chosen attacks counted afresh, both
+    /// sides' zones re-armed from where everyone stands, and every living member's
+    /// whole movement: spotting the enemy is the party's advantage. Nothing of the
+    /// dropped turn's end runs (no status ticks, no revivals), and no mana comes
+    /// from movement, since nothing was left unspent (PHASE 8 DECISION 16). Raises
+    /// <see cref="PlayerTurnStarted"/>, as any party turn's start does.
+    /// </summary>
+    private void OpenFight()
+    {
+        _atBoundary = true;
+        try
+        {
+            _seenThisTurn.Clear();   // the enemy that started it is counted seen as soon as this returns (NotifyEnemyVisible)
+            TurnCount++;
+            ResetTurnCounters();
+            SnapshotZones();
+            foreach (var c in _party)
+            {
+                if (c.Alive)
+                    c.StartTurn();
+                RaiseBoundary(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Party), c);
+            }
+        }
+        finally
+        {
+            _atBoundary = false;
+        }
+        PlayerTurnStarted?.Invoke();
     }
 
     /// <summary>
@@ -551,7 +630,8 @@ public sealed class TurnSystem
             new Dictionary<ActorState, int>(_attacksThisTurn, ReferenceEqualityComparer.Instance),
             zoneUses,
             new Dictionary<(ActorState Actor, ModifierType Type), int>(_ripostes.SpentUses),
-            new HashSet<EnemyState>(_seenThisTurn, ReferenceEqualityComparer.Instance));
+            new HashSet<EnemyState>(_seenThisTurn, ReferenceEqualityComparer.Instance),
+            InCombat: Mode == DungeonMode.Combat);
     }
 
     /// <summary>
@@ -653,32 +733,48 @@ public sealed class TurnSystem
             return;
         }
         _inView.Add(enemy);
+        if (enemy.Alive)
+            _inViewSinceCheck.Add(enemy);
         // A live enemy in view is a fight (PHASE 8 DECISION 1), in whatever phase
         // it walks into sight. Not after the wipe: there is nobody left to fight.
-        if (enemy.Alive && Phase != TurnPhase.GameOver)
-            SetMode(DungeonMode.Combat);
+        if (!enemy.Alive || Phase == TurnPhase.GameOver || Mode == DungeonMode.Combat) return;
+        bool opens = Phase == TurnPhase.Player && !_atBoundary;
+        SetMode(DungeonMode.Combat);
+        if (opens)
+            OpenFight();
     }
 
     /// <summary>
-    /// The encounter's end (§7.2): no live enemy in view, and the party in combat
-    /// or a member down — then the mode goes back to exploring, every fallen member
-    /// revives (<see cref="Revive"/>), the zones are re-read with them standing,
-    /// and <see cref="CombatEnded"/> is raised. Runs at every player turn's start
-    /// (<see cref="StartPlayerTurn"/>) and is called by the scene on a floor arrival
-    /// once the arrival's lighting has told this system who is in view; a resumed
-    /// turn is not an arrival, so a member saved down revives at the next turn's
-    /// start (PHASE 7 DECISION 3). The one way out of combat (PHASE 8 DECISION 1).
+    /// The encounter's end (§7.2): no living enemy in view since the last check —
+    /// a whole turn, both sides' phases, with none in view (PHASE 8 DECISION 22) —
+    /// and the party in combat or a member down; then the mode goes back to
+    /// exploring, every fallen member revives (<see cref="Revive"/>), the zones are
+    /// re-read with them standing, and <see cref="CombatEnded"/> is raised. A fight
+    /// that only broke sight this turn goes on into the next, the fallen still down.
+    /// Runs at every player turn's start (<see cref="StartPlayerTurn"/>) and is
+    /// called by the scene on a floor arrival once the arrival's lighting has told
+    /// this system who is in view; a resumed turn is not an arrival, so a member
+    /// saved down revives at a later turn's start (PHASE 7 DECISION 3). The one way
+    /// out of combat (PHASE 8 DECISION 1).
     /// </summary>
     /// <returns>True if the encounter ended here.</returns>
     public bool CheckEncounterEnd()
     {
         if (Phase == TurnPhase.GameOver) return false;
+        bool sighted = _inViewSinceCheck.Any(enemy => enemy.Alive);
+        // The next check watches from here: whoever is in view now.
+        _inViewSinceCheck.Clear();
+        foreach (var enemy in _inView)
+            if (enemy.Alive)
+                _inViewSinceCheck.Add(enemy);
+
         if (AnyLiveEnemyInView)
         {
             SetMode(DungeonMode.Combat);   // a corpse in view that got up this turn's start is a fight too
             return false;
         }
         bool anyDown = _party.Any(member => !member.Alive);
+        if (Mode == DungeonMode.Combat && sighted) return false;   // a living enemy was in view this turn: a turn's grace
         if (Mode != DungeonMode.Combat && !anyDown) return false;
 
         SetMode(DungeonMode.Exploring);
@@ -868,11 +964,12 @@ public sealed class TurnSystem
     // ── Potions (§3.4) ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// What a drink costs: <see cref="Tuning.PotionUseCost"/> movement, in combat
-    /// and out (PHASE 6b DECISION 2) — §3.4 prices it "on the same principle as
-    /// swapping" and states no exception out of combat, where a swap's is free.
+    /// What a drink costs: <see cref="Tuning.PotionUseCost"/> movement in combat
+    /// (PHASE 6b DECISION 2: §3.4 prices it "on the same principle as swapping"),
+    /// and nothing while exploring or resting, where there is no budget (PHASE 8
+    /// DECISION 21). The potion is used up either way.
     /// </summary>
-    public int PotionUseCost => GameContent.Current.Tuning.PotionUseCost;
+    public int PotionUseCost => Mode == DungeonMode.Combat ? GameContent.Current.Tuning.PotionUseCost : 0;
 
     /// <summary>
     /// Can the member drink the potion in <paramref name="slot"/> of its own bag
@@ -962,6 +1059,15 @@ public sealed class TurnSystem
     internal const string ManaPotionSource = "ManaPotion";
 
     /// <summary>
+    /// The movement a cast of <paramref name="w"/> costs <paramref name="caster"/>
+    /// now: the weapon's resolved cost less the caster's proficiency discount in
+    /// combat, and nothing while exploring or resting, where there is no budget
+    /// (PHASE 8 DECISION 21). The cast still pays its mana.
+    /// </summary>
+    private float CastMovement(PartyMemberState caster, Weapon w)
+        => Mode == DungeonMode.Combat ? caster.MovementCost(w) : 0f;
+
+    /// <summary>
     /// Can the caster cast their equipped staff on <paramref name="target"/>?
     /// Needs a staff whose innate effect lands on the target's side (a buff on
     /// an ally or on the caster itself, a debuff on an enemy), enough movement
@@ -975,7 +1081,7 @@ public sealed class TurnSystem
         ArgumentNullException.ThrowIfNull(target);
         if (Phase != TurnPhase.Player || !CanCastOn(caster, target)) return false;
         var w = caster.EquippedWeapon!;   // CanCastOn gated on it
-        return caster.DistLeft >= caster.MovementCost(w) && caster.Mana >= w.ResolvedManaCost;
+        return caster.DistLeft >= CastMovement(caster, w) && caster.Mana >= w.ResolvedManaCost;
     }
 
     /// <summary>
@@ -990,7 +1096,7 @@ public sealed class TurnSystem
         if (!CanCast(caster, target)) return false;
         var w = caster.EquippedWeapon!;
 
-        if (!caster.Movement.TrySpend(caster.MovementCost(w), MoveReason.Cast)) return false;
+        if (!caster.Movement.TrySpend(CastMovement(caster, w), MoveReason.Cast)) return false;
         CastWith(caster, target);
         return true;
     }
@@ -1015,7 +1121,7 @@ public sealed class TurnSystem
         var w = caster.EquippedWeapon;
         if (w == null || !IsAreaCaster(w)) return false;
         if (w.Innate?.Def.DamageType is null or DamageType.None) return false;
-        if (caster.DistLeft < caster.MovementCost(w) || caster.Mana < w.ResolvedManaCost) return false;
+        if (caster.DistLeft < CastMovement(caster, w) || caster.Mana < w.ResolvedManaCost) return false;
         return AreaTargets(caster, aim).Count > 0;
     }
 
@@ -1063,7 +1169,7 @@ public sealed class TurnSystem
         if (!CanCastArea(caster, aim)) return false;
         var w = caster.EquippedWeapon!;
 
-        if (!caster.Movement.TrySpend(caster.MovementCost(w), MoveReason.Cast)) return false;
+        if (!caster.Movement.TrySpend(CastMovement(caster, w), MoveReason.Cast)) return false;
         CastAreaWith(caster, aim);
         return true;
     }
@@ -1178,14 +1284,7 @@ public sealed class TurnSystem
         // with a member down, say — never crosses a tile to sight it, and an
         // enemy in plain view left to count as unseen would go passive after two
         // turns and freeze where it stood, the encounter never able to end.
-        foreach (var enemy in _enemies)
-        {
-            if (!enemy.Alive) continue;
-            if (_seenThisTurn.Contains(enemy) || _inView.Contains(enemy))
-                enemy.TurnsSinceSeen = 0;
-            else
-                enemy.TurnsSinceSeen++;
-        }
+        TallySightings();
 
         // The enemy phase opens for the whole roster — acting, passive or dead —
         // so every actor sees TurnStart, TurnEnd and RoundEnd once per round,
@@ -1202,6 +1301,19 @@ public sealed class TurnSystem
 
         _enemyIdx = -1;
         AdvanceToNextEnemy();
+    }
+
+    /// <summary>Each living enemy's wake (<see cref="EnemyState.TurnsSinceSeen"/>): back to 0 when seen this turn or in view now, one more turn unseen otherwise.</summary>
+    private void TallySightings()
+    {
+        foreach (var enemy in _enemies)
+        {
+            if (!enemy.Alive) continue;
+            if (_seenThisTurn.Contains(enemy) || _inView.Contains(enemy))
+                enemy.TurnsSinceSeen = 0;
+            else
+                enemy.TurnsSinceSeen++;
+        }
     }
 
     /// <summary>
@@ -1677,11 +1789,33 @@ public sealed class TurnSystem
         // restore full HP) are considered.
         foreach (var enemy in _enemies)
             RaiseBoundary(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Enemy), enemy);
+        _atBoundary = true;
+        try
+        {
+            EndRound();
+            OpenTurn();
+        }
+        finally
+        {
+            _atBoundary = false;
+        }
+
+        Phase = TurnPhase.Player;
+        PlayerTurnStarted?.Invoke();
+    }
+
+    /// <summary>The round closes for every actor, the party's side first: every status not ticked at a turn's end loses its level.</summary>
+    private void EndRound()
+    {
         foreach (var member in _party)
             RaiseBoundary(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Party), member);
         foreach (var enemy in _enemies)
             RaiseBoundary(GameEvent.RoundEnd, new TurnPayload(TurnCount, Side.Enemy), enemy);
+    }
 
+    /// <summary>A new turn of the world's clock opens, the party's to play: what a player turn's start and a walking turn's (<see cref="WorldTurn"/>) share.</summary>
+    private void OpenTurn()
+    {
         _seenThisTurn.Clear();
         TurnCount++;
 
@@ -1698,13 +1832,7 @@ public sealed class TurnSystem
         // the party's chosen attacks are counted afresh, and both sides' zones
         // re-arm from where everyone now stands (after resurrections placed
         // everyone): pairs already inside never fire this turn.
-        _partyZone.ResetUses();
-        _enemyZone.ResetUses();
-        _ripostes.Reset();
-        _attacksThisTurn.Clear();
-        foreach (var roster in _rosters)
-            foreach (var actor in roster)
-                actor.HeldShots = 0;
+        ResetTurnCounters();
 
         // The encounter's end (§7.2), after resurrections — a dummy getting up in
         // sight keeps the fight on — and before the zones arm and the budgets
@@ -1720,8 +1848,101 @@ public sealed class TurnSystem
                 c.StartTurn();
             RaiseBoundary(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Party), c);
         }
+    }
 
-        Phase = TurnPhase.Player;
+    /// <summary>Every reaction's uses restored, the chosen attacks counted afresh, every held shot lapsed: what opens any turn.</summary>
+    private void ResetTurnCounters()
+    {
+        _partyZone.ResetUses();
+        _enemyZone.ResetUses();
+        _ripostes.Reset();
+        _attacksThisTurn.Clear();
+        foreach (var roster in _rosters)
+            foreach (var actor in roster)
+                actor.HeldShots = 0;
+    }
+
+    // ── Exploring: the walking clock (Phase 8.2) ─────────────────────────────
+
+    /// <summary>
+    /// The leader walked <paramref name="walked"/> logic units while exploring
+    /// (PHASE 8 DECISION 4): the world's clock runs only while the party walks, one
+    /// turn for every <see cref="Tuning.MovementBudget"/> of ground (a second of
+    /// walking at <see cref="GameConstants.Speed"/>), each played by
+    /// <see cref="WorldTurn"/>. Exploring has no budget: nothing is spent, and the
+    /// turn never needs ending. Nothing outside the party's phase of exploring, and
+    /// the walk stops counting the moment a fight starts, inside a turn it passed
+    /// included.
+    /// </summary>
+    /// <returns>How many world turns the walk passed.</returns>
+    public int AdvanceExploring(float walked)
+    {
+        if (!Exploring || !(walked > 0f)) return 0;
+        float turnLength = Math.Max(1, GameContent.Current.Tuning.MovementBudget);
+        WalkedThisTurn += walked;
+        int passed = 0;
+        while (Exploring && WalkedThisTurn >= turnLength)
+        {
+            WalkedThisTurn -= turnLength;
+            WorldTurn();
+            passed++;
+        }
+        return passed;
+    }
+
+    /// <summary>
+    /// Wait one world turn out where the party stands (Space while exploring; PHASE 8
+    /// DECISION 20 makes it a rest turn in 8.4): the walking turn in progress is
+    /// dropped and one whole turn passes (<see cref="WorldTurn"/>).
+    /// </summary>
+    /// <returns>False, with nothing passed, outside the party's phase of exploring.</returns>
+    public bool WaitTurn()
+    {
+        if (!Exploring) return false;
+        WalkedThisTurn = 0f;
+        WorldTurn();
+        return true;
+    }
+
+    /// <summary>The party's phase of exploring: where the walking clock runs.</summary>
+    private bool Exploring => Mode == DungeonMode.Exploring && Phase == TurnPhase.Player;
+
+    /// <summary>
+    /// One turn of the world while exploring (PHASE 8 DECISIONS 2 and 4): every
+    /// boundary a played round raises, with nobody acting. The party's turn ends
+    /// (its statuses tick), the enemies' begins and ends (theirs tick, and
+    /// <see cref="EnemyState.TurnsSinceSeen"/> counts as at an enemy turn's start),
+    /// the round closes, and a new turn opens as a player turn's start opens one:
+    /// <see cref="TurnCount"/> on, every dummy whose wait has run out up, uses
+    /// restored, held shots lapsed, zones re-armed, budgets refilled. No attack
+    /// beats (an enemy in view would be a fight) and no mana from movement, for
+    /// anyone: nothing was left unspent (PHASE 8 DECISION 16). Raises
+    /// <see cref="PlayerTurnStarted"/> for the turn it opens; never
+    /// <see cref="TurnEnded"/>, which is a played turn's.
+    /// </summary>
+    private void WorldTurn()
+    {
+        _atBoundary = true;
+        try
+        {
+            foreach (var c in _party)
+                RaiseBoundary(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Party), c);
+            if (Phase == TurnPhase.GameOver) return;   // a tick took the last member
+
+            _attacksThisTurn.Clear();
+            TallySightings();
+            foreach (var enemy in _enemies)
+                RaiseBoundary(GameEvent.TurnStart, new TurnPayload(TurnCount, Side.Enemy), enemy);
+            foreach (var enemy in _enemies)
+                RaiseBoundary(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Enemy), enemy);
+            EndRound();
+            OpenTurn();
+        }
+        finally
+        {
+            _atBoundary = false;
+        }
+        if (Phase == TurnPhase.GameOver) return;
         PlayerTurnStarted?.Invoke();
     }
 
@@ -2265,6 +2486,7 @@ public sealed class TurnSystem
     private void CreditEnchantments(ActorState payer, ImmutableArray<EnchantmentPayment> payments, int wanted, int spent)
     {
         if (payments.IsDefaultOrEmpty || wanted <= 0 || spent <= 0) return;
+        if (Mode != DungeonMode.Combat) return;   // an entry's mana teaches it nothing outside combat (PHASE 8 DECISION 21)
         var weapon = payer.EquippedWeapon;
         if (weapon == null) return;
 
@@ -2325,6 +2547,11 @@ public sealed class TurnSystem
     /// anything at all, including nothing, rather than at whatever later credit
     /// happens to be positive.
     /// </para>
+    /// <para>
+    /// <strong>Combat's alone</strong> (PHASE 8 DECISION 21): while exploring or
+    /// resting nothing credits XP of any kind (mana, HP or a weapon's), so free
+    /// casts and a rest's mana never make a farm.
+    /// </para>
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The credit is negative: XP is credited, never taken back.</exception>
     /// <exception cref="InvalidOperationException"><paramref name="earner"/> is not on this system's roster.</exception>
@@ -2335,7 +2562,7 @@ public sealed class TurnSystem
                 "XP is credited, never taken back: a refund is not a negative credit.");
         if (!_xpFeeds.TryGetValue(earner, out var feed))
             throw new InvalidOperationException("Credited XP to an actor that is not on this turn system's roster.");
-        if (credit.Amount == 0) return;
+        if (credit.Amount == 0 || Mode != DungeonMode.Combat) return;   // nothing outside combat teaches (PHASE 8 DECISION 21)
         feed(credit);
     }
 
@@ -2345,13 +2572,15 @@ public sealed class TurnSystem
     /// <see cref="Tuning.WearPerHit"/> and says when that filled the weapon, an
     /// enemy's does nothing. The two hit appliers are its only callers, so wear
     /// accrues where a hit is written and nowhere else (§6.7: "the unified attack
-    /// resolver is the single place it accrues").
+    /// resolver is the single place it accrues"). Combat's alone: a cast while
+    /// exploring or resting banks none (PHASE 8 DECISION 21).
     /// </summary>
     /// <exception cref="InvalidOperationException"><paramref name="wielder"/> is not on this system's roster.</exception>
     private void WearHit(ActorState wielder, Weapon weapon)
     {
         if (!_wearFeeds.TryGetValue(wielder, out var feed))
             throw new InvalidOperationException("Wore a weapon for an actor that is not on this turn system's roster.");
+        if (Mode != DungeonMode.Combat) return;   // no cast outside combat banks wear (PHASE 8 DECISION 21)
         feed(weapon);
     }
 

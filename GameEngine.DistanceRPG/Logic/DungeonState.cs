@@ -1064,7 +1064,7 @@ public sealed class DungeonState
 
         var floor = Current;
         var turns = new TurnSystem(floor.Map.Grid, party, floor.Enemies, rollD20 ?? RollD20, floor.Seed,
-            firstTurn: _turn, carry: _carry, boss: floor.Boss)
+            firstTurn: _turn, carry: _carry, boss: floor.Boss, mode: DungeonMode.Exploring)
         {
             ResurrectionActive = !BossDefeated,
             // A death costs the share of the member's run gain (§7.1): against the
@@ -1144,9 +1144,12 @@ public sealed class DungeonState
 
     /// <summary>
     /// Whether the party may use <paramref name="stair"/> now, or why not: only
-    /// in the player phase of an open floor, and only with every living member
-    /// gathered at it (<see cref="Gathered"/>) — the party moves as one, so
-    /// nobody is ever on another floor, the fallen included. Nothing else is
+    /// in the player phase of an open floor, and in combat only with every living
+    /// member gathered at it (<see cref="Gathered"/>) — the party moves as one, so
+    /// nobody is ever on another floor, the fallen included. While exploring the
+    /// leader on the stair takes the whole marching line, wherever the others stand
+    /// (PHASE 8 DECISION 19) — that leader being <paramref name="active"/>, standing
+    /// on it; asked without one, the gathering is asked as in combat. Nothing else is
     /// asked: a floor may be left with every enemy on it standing (§4.4: no gate).
     /// <para>
     /// <strong>Taken from the stair tile.</strong> The stairs are used by the
@@ -1178,8 +1181,12 @@ public sealed class DungeonState
         if (active is not null)
             RequireStandingOn(stair, party, active);
 
-        if (Turns is not { Phase: TurnPhase.Player })
+        if (Turns is not { Phase: TurnPhase.Player } turns)
             return StairRefusal.NotThePlayersTurn;
+        // Exploring, the leader on the stair takes the marching line, gathered or not
+        // (PHASE 8 DECISION 19). Asked without a leader, the party's half stands.
+        if (turns.Mode == DungeonMode.Exploring && active is not null)
+            return null;
         return Gathered(party, stair.Tile) < party.Count(m => m.Alive) ? StairRefusal.PartyNotGathered : null;
     }
 

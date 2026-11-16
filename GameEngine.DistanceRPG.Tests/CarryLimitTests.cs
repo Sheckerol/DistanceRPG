@@ -27,7 +27,7 @@ public sealed class CarryLimitTests : IDisposable
 
     /// <summary>A turn system for <paramref name="member"/> alone on an open floor, its one dummy far off and unseen: out of combat, so a swap is free.</summary>
     private static TurnSystem Quiet(PartyMemberState member)
-        => new(new int[20, 30], new[] { member }, new[] { new EnemyState { X = 25 * Tile, Y = 15 * Tile } }, () => 10);
+        => new(new int[20, 30], new[] { member }, new[] { new EnemyState { X = 25 * Tile, Y = 15 * Tile } }, () => 10, mode: DungeonMode.Exploring);
 
     [Fact]
     public void AMemberCarriesSix_ThePartyTwentyFour()

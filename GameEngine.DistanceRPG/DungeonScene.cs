@@ -692,7 +692,6 @@ public class DungeonScene : Scene
         UpdateFogParticles(deltaTime);
         UpdateActiveCharacterMovement(deltaTime);
         UpdateMarchingFollowers(deltaTime);
-        AutoEndTurnWhenDry();
         UpdateHover();
         RefreshReachOverlay();
     }
@@ -1478,7 +1477,11 @@ public class DungeonScene : Scene
         // RunEnded put the summary up. What is left here is the log line.
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER - the party is defeated");
         _turns.CombatEnded += () => Log.Info("[Turns] The encounter is over - no live enemy in view");
-        _turns.ModeChanged += (was, now) => Log.Info($"[Turns] {was} -> {now} on turn {_turns.TurnCount}");
+        _turns.ModeChanged += (was, now) =>
+        {
+            Log.Info($"[Turns] {was} -> {now} on turn {_turns.TurnCount}");
+            ReleaseMovementKeys();
+        };
         _turns.Leader = () => ActiveCharacter.State;   // a revived member gets up beside whoever the player is moving (§7.3)
         _turns.CharacterRevived += (member, clawbacks) =>
         {
@@ -1514,6 +1517,16 @@ public class DungeonScene : Scene
             _hud.AddFloatingText(obj.Position, label, new Vector4(0.53f, 1f, 1f, 1f), -52f);
     }
 
+    /// <summary>
+    /// Let go of every walking key the scene thinks is held, whatever the keyboard
+    /// says: a key held through a change of mode walks no further until it is
+    /// released and pressed again (after play, 2026-11-16). Walking into view of an
+    /// enemy starts a fight on a fresh turn, and a key still held would spend that
+    /// turn's movement before the player had seen the fight begin. A press is heard
+    /// once per physical press, so the key stays let go until it is pressed anew.
+    /// </summary>
+    private void ReleaseMovementKeys() => _up = _down = _left = _right = false;
+
     private void WireInput()
     {
         var input = Input!;
@@ -1543,9 +1556,10 @@ public class DungeonScene : Scene
         input.SubscribeToKeyPressed(e => AnyKey(e.Key));
         input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) CycleActiveCharacter(); }, Keys.Tab);
 
-        // Space ends the turn and nothing else; ENTER is routed by the menu open
-        // — it ends the turn with none, and says yes to leaving the dungeon.
-        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) _turns.EndTurn(); }, Keys.Space);
+        // Space ends the turn and nothing else (exploring, it waits one out); ENTER
+        // is routed by the menu open — it does the same with none, and says yes to
+        // leaving the dungeon.
+        input.SubscribeToKeyPressed(_ => { if (!AnyMenuOpen && !Transiting) PassTurn(); }, Keys.Space);
         input.SubscribeToKeyPressed(_ => EnterKey(), Keys.Enter, Keys.KeyPadEnter);
         // E takes the stairs the active member is standing on (§4.2), and says
         // yes to leaving when the way out has asked.
@@ -1904,8 +1918,11 @@ public class DungeonScene : Scene
     {
         if (Transiting || _turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
 
+        // Exploring has no budget (PHASE 8 DECISION 4): the party walks as far as
+        // the player likes, and the walk is the world's clock instead.
+        bool exploring = Marching;
         var state = ActiveCharacter.State;
-        if (!state.Alive || state.DistLeft <= 0f) return;
+        if (!state.Alive || (!exploring && state.DistLeft <= 0f)) return;
 
         float vx = _left ? -GameConstants.Speed : _right ? GameConstants.Speed : 0f;
         float vy = _up ? -GameConstants.Speed : _down ? GameConstants.Speed : 0f;
@@ -1917,25 +1934,13 @@ public class DungeonScene : Scene
             vy *= 0.707f;
         }
 
-        // Cap this frame's intended travel to the remaining budget. While
-        // marching, the slowest member sets the group's pace: the leader can
-        // spend no more than the smallest budget left in the party, so nobody
-        // gets left behind.
-        float budget = state.DistLeft;
-        if (Marching)
-        {
-            foreach (var member in _party)
-                if (member.State.Alive)
-                    budget = MathF.Min(budget, member.State.DistLeft);
-            if (budget <= 0f) return;
-        }
-
+        // In combat, cap this frame's intended travel to the remaining budget.
         float dx = vx * deltaTime;
         float dy = vy * deltaTime;
         float frameDist = MathF.Sqrt(dx * dx + dy * dy);
-        if (frameDist > budget)
+        if (!exploring && frameDist > state.DistLeft)
         {
-            float scale = budget / frameDist;
+            float scale = state.DistLeft / frameDist;
             dx *= scale;
             dy *= scale;
         }
@@ -1946,18 +1951,24 @@ public class DungeonScene : Scene
         // other in combat as they always did marching).
         var (nx, ny) = GridCollision.Move(_map.Grid, state.X, state.Y, state.Radius, dx, dy, LiveEnemyBlockers());
 
-        // Budget depletes by distance actually travelled, so pushing into a
-        // wall costs nothing while sliding along it costs the slide.
+        // Budget — or, exploring, the world's clock — runs by distance actually
+        // travelled, so pushing into a wall costs nothing while sliding along it
+        // costs the slide.
         float movedX = nx - state.X;
         float movedY = ny - state.Y;
         float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
-        state.Movement.SpendUpTo(moved, MoveReason.Walk);
+        if (!exploring)
+            state.Movement.SpendUpTo(moved, MoveReason.Walk);
 
         state.X = nx;
         state.Y = ny;
         ActiveCharacter.SyncTransform();
         UpdateFogFor(ActiveCharacter);
         _turns.NotifyCharacterMoved(state); // spear enemies brace against walk-ins
+        // After the sight the step brought: a fight it started drops the walking
+        // turn, and this step counts for nothing (PHASE 8 DECISION 15).
+        if (exploring)
+            _turns.AdvanceExploring(moved);
     }
 
     // ── The stairs ───────────────────────────────────────────────────────────
@@ -2043,6 +2054,20 @@ public class DungeonScene : Scene
         else if (ActiveMenu == GameMenu.ConfirmLeave)
             Leave();
         else if (!AnyMenuOpen)
+            PassTurn();
+    }
+
+    /// <summary>
+    /// Space, or ENTER with no menu: in combat the turn ends, as it always has;
+    /// exploring there is no turn to end, and one world turn is waited out where the
+    /// party stands (<see cref="TurnSystem.WaitTurn"/>; PHASE 8 DECISION 20 makes it
+    /// a rest turn).
+    /// </summary>
+    private void PassTurn()
+    {
+        if (_turns.Mode == DungeonMode.Exploring)
+            _turns.WaitTurn();
+        else
             _turns.EndTurn();
     }
 
@@ -2207,8 +2232,8 @@ public class DungeonScene : Scene
     /// <summary>
     /// Outside combat the rest of the party follows the active character in a
     /// single-file line (party order), each targeting a point a fixed
-    /// arc-length back along the leader's walked path. Followers spend their
-    /// own movement budgets as they walk and stop when dry.
+    /// arc-length back along the leader's walked path. Exploring has no budget,
+    /// so nobody runs dry (PHASE 8 DECISION 4).
     /// </summary>
     private void UpdateMarchingFollowers(float deltaTime)
     {
@@ -2256,34 +2281,13 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// Outside combat, cycle the turn automatically once the slowest living
-    /// member is out of movement — the group is halted at that point anyway,
-    /// since the leader paces itself to the smallest budget. Exploring never
-    /// needs Space; combat turns always end by hand, where held-back movement
-    /// is a choice.
+    /// One follower's step towards its place in the line, while exploring: no
+    /// budget to spend (PHASE 8 DECISION 4), and nothing counted on the clock,
+    /// which is the leader's walk alone.
     /// </summary>
-    private void AutoEndTurnWhenDry()
-    {
-        // Marching implies the player phase. Never mid-fade: the stairs are
-        // taken in the player phase, and a turn ended under the fade would leave
-        // them nobody's to take.
-        if (Transiting || !Marching || AnyMenuOpen) return;
-
-        // Budgets deplete through float math and may stop just shy of zero;
-        // treat anything below a hair's width as dry (a full budget is 160).
-        const float dry = 0.05f;
-        foreach (var member in _party)
-            if (member.State.Alive && member.State.DistLeft <= dry)
-            {
-                _turns.EndTurn();
-                return;
-            }
-    }
-
     private void MoveFollowerToward(CharacterObject member, (float X, float Y) target, float stopAt, float deltaTime)
     {
         var state = member.State;
-        if (state.DistLeft <= 0f) return;
 
         float tx = target.X - state.X;
         float ty = target.Y - state.Y;
@@ -2303,7 +2307,7 @@ public class DungeonScene : Scene
         // A touch faster than the leader when far behind, so gaps close
         // instead of merely holding steady.
         float speed = dist > 2f * MarchingLine.Spacing ? GameConstants.Speed * 1.25f : GameConstants.Speed;
-        float step = MathF.Min(MathF.Min(speed * deltaTime, room), state.DistLeft);
+        float step = MathF.Min(speed * deltaTime, room);
 
         var (nx, ny) = GridCollision.Move(
             _map.Grid, state.X, state.Y, state.Radius, dx / toWaypoint * step, dy / toWaypoint * step, LiveEnemyBlockers());
@@ -2313,7 +2317,6 @@ public class DungeonScene : Scene
         float moved = MathF.Sqrt(movedX * movedX + movedY * movedY);
         if (moved <= 0f) return;
 
-        state.Movement.SpendUpTo(moved, MoveReason.Walk);
         state.X = nx;
         state.Y = ny;
         member.SyncTransform();
@@ -3104,6 +3107,12 @@ public class DungeonScene : Scene
         if (_lastFogTile.TryGetValue(member, out var last) && last == tile) return;
         _lastFogTile[member] = tile;
 
+        if (Marching)
+        {
+            RelightFromParty(tile, animate);
+            return;
+        }
+
         var newly = _fog.RevealAt(tile.R, tile.C, _fogBoxes.FogBoxes);
         if (newly.Count > 0)
         {
@@ -3114,6 +3123,53 @@ public class DungeonScene : Scene
                 _fogOverlay.AnimateReveal(newly, tile);
                 QueueRevealMist(newly, tile);
             }
+        }
+        UpdateEnemyVisibility();
+    }
+
+    /// <summary>
+    /// Exploring, the fog is live (after play, 2026-11-16): there is no turn's end
+    /// to reset the sight at, so every tile a member crosses relights it from where
+    /// the living party stands now. What came into view ripples in from the mover's
+    /// tile; what left it shrouds back over, as a turn's reset does
+    /// (<see cref="ResetFogVisibility"/>). In combat the sight still builds up over
+    /// a turn and resets at its end.
+    /// </summary>
+    /// <param name="moverTile">The tile the member who just moved stepped onto.</param>
+    /// <param name="animate">False for a silent relight (an arrival's): nothing ripples or shrouds.</param>
+    private void RelightFromParty((int R, int C) moverTile, bool animate)
+    {
+        var oldVisible = (bool[,])_fog.Visible.Clone();
+        _fog.ResetVisibility();
+
+        var cameIntoView = new List<(int R, int C, bool WasSeen)>();
+        foreach (var member in _party)
+        {
+            if (!member.State.Alive) continue;
+            var tile = LogicTile(member.State.X, member.State.Y);
+            _lastFogTile[member] = tile;
+            foreach (var lit in _fog.RevealAt(tile.R, tile.C, _fogBoxes.FogBoxes))
+                if (!oldVisible[lit.R, lit.C])
+                    cameIntoView.Add(lit);
+        }
+
+        var leftView = new List<(int R, int C)>();
+        for (int r = 0; r < _fog.Rows; r++)
+            for (int c = 0; c < _fog.Cols; c++)
+                if (oldVisible[r, c] && !_fog.Visible[r, c] && _fog.Seen[r, c])
+                    leftView.Add((r, c));
+
+        if (animate && cameIntoView.Count > 0)
+        {
+            _fogOverlay.AnimateReveal(cameIntoView, moverTile);
+            QueueRevealMist(cameIntoView, moverTile);
+        }
+        if (animate && leftView.Count > 0)
+            _fogOverlay.AnimateRefog(leftView, moverTile);
+        if (cameIntoView.Count > 0 || leftView.Count > 0)
+        {
+            _fogOverlay.MarkDirty();
+            _reachOverlay.MarkDirty();
         }
         UpdateEnemyVisibility();
     }

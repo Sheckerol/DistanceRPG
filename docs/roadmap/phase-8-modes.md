@@ -6,8 +6,9 @@ dungeon the mode Phase 7 (§7.2) already speaks of and no code holds: three mode
 in all three. The decisions and their reasons are recorded in
 [settled](settled.md) under *Exploring, resting and combat*, with the user's
 rulings (PHASE 8 DECISIONS 1–7; 8–19, which answered the plan's open questions
-on 2026-11-11 and added the stop-resting button; and 20–21, Space's one-turn rest
-and free actions without XP outside combat). It replaces the open question *One
+on 2026-11-11 and added the stop-resting button; 20–21, Space's one-turn rest
+and free actions without XP outside combat; and 22, after play, a fight's end after
+a whole turn unseen). It replaces the open question *One
 combat/movement mode, and exploring without the pause* in
 [open-questions](open-questions.md).
 
@@ -25,7 +26,7 @@ moving *while* the party moves, so turns cannot simply be removed.
 | --- | --- | --- | --- | --- | --- |
 | **Exploring** | Arriving on a floor with no live enemy in view; combat ending; a rest ending without a sighting | A live enemy comes into view; the player rests | One turn per `MovementBudget` the leader walks; still while nobody walks | Walks freely as a marching line, no budget, no pause; acts without spending movement, earning no XP; Space rests one turn | Awake ones move at the same time, at their budget's share of the party's speed |
 | **Resting** | Chosen by the player while exploring (`R`, or the REST button) | Every living member at full HP and mana with no negative status, or a live enemy comes into view, or the player stops it (`R`, or the STOP RESTING button), or the pause menu opens | Runs on its own, fast-forwarded | Stands still, regains HP and mana, earns no XP; may act as while exploring, free and teaching nothing | Move as in exploring |
-| **Combat** | A live enemy comes into view in either mode above | The start of a party turn with no live enemy in view (PHASE 7 DECISION 5) | One turn per side's phase, as today | Turn-based, as today; opens on a fresh party turn | Turn-based, as today |
+| **Combat** | A live enemy comes into view in either mode above | The start of a party turn once no living enemy has been in view for a whole turn (DECISION 22) | One turn per side's phase, as today | Turn-based, as today; opens on a fresh party turn | Turn-based, as today |
 
 ## Decisions
 
@@ -149,7 +150,15 @@ moving *while* the party moves, so turns cannot simply be removed.
   start of the party's turn only** — any live enemy in view keeps the party in
   combat; none drops it to exploring. Killing the last enemy in view mid-turn
   changes nothing until then. It is the moment Phase 7 ends an encounter and
-  revives the fallen (PHASE 7 DECISION 5).
+  revives the fallen (PHASE 7 DECISION 5). *Narrowed by DECISION 22.*
+- **PHASE 8 DECISION 22 — a fight ends only after a whole turn unseen
+  (2026-11-16, after play).** The encounter ends at a party turn's start only once
+  no living enemy has been in view for a whole turn, both sides' phases (in
+  `TurnSystem`, the live enemies in view since the last check). Breaking sight round
+  a corner is not the end of a fight, and the fallen stay down until it ends. In
+  play, the leader hid round a corner with three members down. The check found
+  nothing in view, the fallen revived, and one of them saw the enemy at once, so a
+  new fight began. An enemy killed in view keeps nothing open.
 
 ## 8.1 The mode, in Logic
 
@@ -323,6 +332,53 @@ Each step lands with its tests and keeps the golden tests green.
    turn per `MovementBudget` walked, with its boundaries. Tests: a turn passes at
    exactly 160 walked; standing still passes none; a dummy's timer runs on walking
    turns; poison ticks on the walk.
+   *As built (step 2):*
+   - **The clock.** The scene feeds the leader's walked distance to
+     `TurnSystem.AdvanceExploring`. Each `MovementBudget` of it plays
+     `WorldTurn`: the party's turn end, the enemies' turn start and end with
+     their wake tallied, the round's end, then the same turn opening a player
+     turn's start uses (`OpenTurn`). A walking turn raises `PlayerTurnStarted`,
+     so it autosaves as an exploring turn always did, but never `TurnEnded` and
+     its banner.
+   - **No budget.** Walking spends nothing while exploring, and neither do the
+     followers. `AutoEndTurnWhenDry` is gone. Space or Enter while exploring
+     calls `WaitTurn`, which passes one world turn; 8.4 turns it into a rest
+     turn.
+   - **A fight's new turn.** A live enemy coming into view in the party's phase
+     of exploring opens the fight's own turn on the spot (`OpenFight`, DECISIONS
+     7 and 15). The walk is dropped, `TurnCount` moves on, counters reset, zones
+     re-arm, and every member's budget refills. A fight that starts inside a
+     boundary already running, such as a dummy getting up in view on a walking
+     turn, opens on that turn rather than a second one.
+   - **The mode crosses the stairs.** `TurnCarry.InCombat` carries it, so a
+     party fleeing down mid-fight arrives in combat, with no fresh turn to
+     exploit. The arrival check then ends the fight if nothing is in view.
+   - **Free actions teach nothing (DECISION 21).** Casts and drinks spend no
+     movement outside combat. `CreditXp`, `WearHit` and `CreditEnchantments`
+     credit nothing outside combat.
+     **Assumed, not ruled:** enchantment tiers stop too. They climb on mana
+     spent, and a rest's free mana would farm them just as it would farm mana
+     XP.
+   - **Stairs (DECISION 19).** `DungeonState.CanUse` waives the gathering while
+     exploring when the leader standing on the stair is named. Asked without
+     one, as `EndRun` asks of the way out, the gathering still holds.
+   - **Opening modes.** A bare `TurnSystem` opens in combat, the fight the unit
+     fixtures exercise. `DungeonState.OpenTurns` opens a visit's floors
+     exploring. `VisitScript` plays a fight throughout, as visits did before
+     Phase 8, because it moves members by placing them and never walks the
+     clock.
+   - **Live fog (after play, 2026-11-16).** The sight used to reset only at a
+     turn's end, which exploring no longer has, so everything walked past stayed
+     lit. Now, while exploring, every tile a member crosses relights the fog from
+     where the living party stands (`DungeonScene.RelightFromParty`). What leaves
+     view shrouds back over as it walks away. Combat keeps the turn-based reset.
+   - **A held key stops at a change of mode (after play, 2026-11-16).** Every
+     mode change lets go of the walking keys (`DungeonScene.ReleaseMovementKeys`).
+     A key held as a fight starts walks no further until it is released and
+     pressed again, so an inattentive player never spends the fight's fresh
+     turn.
+   - **Not yet.** Until 8.3, pursuers stand still while the party explores; the
+     enemies' phase only plays in combat.
 3. **8.3 — Enemies move with the party.** Awake enemies at their budget's share of
    the party's speed, a pursuer to its last-seen spot; walking into view starts
    combat with the party first, on a new turn.

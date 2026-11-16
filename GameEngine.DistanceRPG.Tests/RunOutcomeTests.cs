@@ -147,6 +147,8 @@ public sealed class RunOutcomeTests : IDisposable
     private static void Kill(TurnSystem turns, Floor floor, PartyMemberState killer, EnemyState target)
     {
         StandBeside(floor, killer, target);
+        if (turns.Mode != DungeonMode.Combat)
+            turns.ResumeMode(DungeonMode.Combat);   // a fight: only a fight's blows teach (PHASE 8 DECISION 21)
         for (int swing = 0; target.Alive; swing++)
         {
             Assert.True(swing < 5, "the fixture's weapon never finished the enemy");
