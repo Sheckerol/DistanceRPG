@@ -4540,3 +4540,84 @@ record (`RunResult.Deaths`), and the summary tells a line a member who died
 renames a version-3 `Death` outcome and saves the death record on the visit and the
 last result (checks 36 and 37). A revive floats `REVIVED` with the levels the cut
 took (`REVIVED  -1 SWORD  -2 HP`), or `REVIVED` alone when it crossed none.
+
+## Exploring, resting and combat — Phase 8 (2026-11-09, planned)
+
+Replaces the three checks that stand in for a mode (marching's turn-start grant,
+the turn's sightings, each enemy's reactions) and the pause every couple of spaces
+while exploring. Planned as its own phase: see [phase-8-modes](phase-8-modes.md).
+Its open questions were ruled on 2026-11-11 (DECISIONS 9–19), and the user added a
+button to stop a rest (DECISION 8), Space's one-turn rest (DECISION 20) and free
+actions without XP outside combat (DECISION 21).
+
+- **PHASE 8 DECISION 1 — three modes, held in `Logic/`, ruled 2026-11-09.**
+  Exploring, resting and combat, exactly one at a time; everything that today
+  asks its own question — the swap cost, the reach overlay, marching, the turn's
+  pace — reads the mode.
+- **PHASE 8 DECISION 2 — turns stay the world's clock, ruled 2026-11-09.**
+  Resurrection timers, status ticks and `TurnsSinceSeen` keep counting turns in
+  every mode: patrol routes, a later addition, need enemies moving while the party
+  moves.
+- **PHASE 8 DECISION 3 — exploring is simultaneous, ruled 2026-11-09.** Everyone
+  moves at once, an enemy at the party's speed times its movement budget over the
+  party's: more movement, faster; the slow ones at a relaxed pace.
+- **PHASE 8 DECISION 4 — the clock runs only while the party walks, ruled
+  2026-11-09.** A turn per `MovementBudget` the leader walks; standing still stops
+  the world, so nothing happens while the player thinks; resting is time passing
+  on purpose.
+- **PHASE 8 DECISION 5 — resting, ruled 2026-11-09.** Chosen while exploring: the
+  party regains HP and mana while the enemies move, until every living member is
+  at full HP and mana or an enemy is spotted, whichever is first.
+- **PHASE 8 DECISION 6 — resting teaches nothing, ruled 2026-11-09.** No HP or
+  mana XP from a rest, so damage and a rest are never an XP farm.
+- **PHASE 8 DECISION 7 — the party opens every fight, ruled 2026-11-09.** Combat
+  begins on a fresh party turn with full movement, wherever the party stands when
+  the enemy comes into view.
+- **PHASE 8 DECISION 8 — a button stops a rest, ruled 2026-11-11.** Added by the
+  user: a clickable STOP RESTING button while resting, and REST while exploring;
+  `R` toggles the rest and a click does what the key does. Only the key, the
+  button and the pause menu stop a rest. The buttons move onto the action bar
+  when it lands.
+- **PHASE 8 DECISION 9 — a rest waits out negative statuses, ruled 2026-11-11.**
+  A rest ends on its own only when every living member is at full HP and mana and
+  has no negative status (Poison, Bleeding, Searing, Mire, Sundered, Weakened,
+  Softened). They tick on every rest turn, harm and all, and decay as in combat,
+  so the rest always ends.
+- **PHASE 8 DECISION 10 — a rest turn restores `RestHealthPercent` of max HP,
+  ruled 2026-11-11.** Rounded down, at least 1, a potion's shape (provisionally
+  10).
+- **PHASE 8 DECISION 11 — a rest turn banks a whole idle turn's mana, ruled
+  2026-11-11.** The unspent-movement conversion over a whole budget, 16 a turn at
+  today's tuning; no new key.
+- **PHASE 8 DECISION 12 — a rest plays at `RestTurnsPerSecond`, enemies drawn
+  moving, ruled 2026-11-11.** Wall time only, so `Played = false` for good
+  (provisionally 4).
+- **PHASE 8 DECISION 13 — followers walk into formation, ruled 2026-11-11.** The
+  march's spacing test goes.
+- **PHASE 8 DECISION 14 — only awake enemies move outside combat, a pursuer to
+  where it last saw the party, ruled 2026-11-11.** No tracking through the fog;
+  the spot is saved.
+- **PHASE 8 DECISION 15 — a fight starts a new world turn, ruled 2026-11-11.** The
+  walking turn in progress is dropped.
+- **PHASE 8 DECISION 16 — mana from unspent movement is combat's alone, ruled
+  2026-11-11.** For the party and the enemies; outside combat, rests and potions.
+- **PHASE 8 DECISION 17 — resting near a farm is accepted, ruled 2026-11-11.** A
+  dummy that gets up in view ends the rest.
+- **PHASE 8 DECISION 18 — a save ends a rest, ruled 2026-11-11.** The pause menu
+  stops it; save version 5 holds no rest state.
+- **PHASE 8 DECISION 19 — the leader takes the line down the stairs, ruled
+  2026-11-11.** While exploring; combat keeps today's rule.
+- **PHASE 8 DECISION 20 — Space rests one turn outside combat, ruled 2026-11-11.**
+  Added by the user: while exploring, Space plays one rest turn and stops, so the
+  party can heal or drink between turns when a status out-damages the rest. At
+  full it passes one world turn anyway; during a full rest it stops after the turn
+  in progress. In combat Space stays End Turn.
+- **PHASE 8 DECISION 21 — actions outside combat are free and teach nothing,
+  ruled 2026-11-11.** Casts and potions spend no movement while exploring or
+  resting (mana and the potion are still paid), and nothing done in either credits
+  XP of any kind or banks wear, so free casts and a rest's mana are never a farm.
+  Enchantments included: one that fires outside combat still pays its trigger mana,
+  but teaches no mana XP, nor weapon XP for a staff's forged entries. The party
+  may act during a full rest without stopping it. *To revisit after play:* if healing a
+  member through a status outside combat feels unrewarding, narrow it to no mana
+  or weapon XP, keeping HP XP, which only HP really lost can feed.
