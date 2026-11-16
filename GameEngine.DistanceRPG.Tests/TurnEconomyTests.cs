@@ -4,7 +4,7 @@ namespace GameEngine.DistanceRPG.Tests;
 
 /// <summary>
 /// §1.2's turn economy: a weapon swap costs movement once combat has begun
-/// and nothing out of it, gated on the same signal that grants marching, so
+/// and nothing out of it, gated on the mode that also grants marching, so
 /// no weapon's downside is optional once the fight is on. The swap is priced in
 /// the numbers it was written against — the swap's cost, the budget, the weapons'
 /// statlines (<see cref="Premise"/>) — made current for each test, so the content
@@ -38,7 +38,7 @@ public sealed class TurnEconomyTests : IDisposable
             return p;
         });
 
-        // Out of combat — no live enemy seen this turn — a swap is free, both ways.
+        // Out of combat — exploring, no live enemy in view yet — a swap is free, both ways.
         Assert.False(turns.AnyLiveEnemySeenThisTurn);
         Assert.Equal(0, turns.SwapCost);
         Assert.True(turns.CanSwap(a, 1));
@@ -93,17 +93,27 @@ public sealed class TurnEconomyTests : IDisposable
         Assert.False(turns.TrySwap(a, 2));
         Assert.Equal(Premise.Budget, a.DistLeft);
 
-        // The signal is a *live* enemy seen: once the only one seen has fallen, swapping is free again this turn.
+        // The signal is combat, which outlasts its enemy until a player turn's start (PHASE 8
+        // DECISION 1): the only enemy seen has fallen, and a swap still costs this turn.
         enemy.Hp = 1;
         Assert.True(turns.TryAttack(a, enemy));   // the bow at a tile's range: 5 into Block 3 is enough
         Assert.False(enemy.Alive);
-        Assert.False(turns.AnyLiveEnemySeenThisTurn);
+        Assert.Equal(DungeonMode.Combat, turns.Mode);
+        Assert.Equal(20, turns.SwapCost);
+        Assert.True(turns.TrySwap(a, 1));
+        Assert.Equal((20, 20, "swap"), spent[^1]);
+        Assert.Equal(5, spent.Count);
+
+        // The next turn's start finds no live enemy in view: exploring, and the swap is free again.
+        turns.EndTurn();
+        for (float t = 0f; t < 3f && turns.Phase != TurnPhase.Player; t += 1f / 30f) turns.Update(1f / 30f);
+        Assert.Equal((TurnPhase.Player, DungeonMode.Exploring), (turns.Phase, turns.Mode));
         Assert.Equal(0, turns.SwapCost);
         float before = a.DistLeft;
         Assert.True(turns.TrySwap(a, 1));
         Assert.Equal(before, a.DistLeft);
         Assert.Equal((0, 0, "swap"), spent[^1]);   // free again, and still on the record
-        Assert.Equal(5, spent.Count);
+        Assert.Equal(6, spent.Count);
 
         // Not on the enemy's turn, and never for the fallen.
         var b = Char("B", 5 * Tile + 16, 5 * Tile + 16, "longbow");

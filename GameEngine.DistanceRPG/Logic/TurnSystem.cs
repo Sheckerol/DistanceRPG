@@ -22,6 +22,24 @@ public enum TurnPhase
 }
 
 /// <summary>
+/// What the party is doing in the dungeon (PHASE 8 DECISION 1): exactly one
+/// holds at any moment, and <see cref="TurnSystem.Mode"/> is the one place it is
+/// kept and changed. The swap cost, the reach overlay, marching and the turn's
+/// pace read it, rather than each asking its own question of what has been seen.
+/// </summary>
+public enum DungeonMode
+{
+    /// <summary>No fight on: the party marches, a swap is free.</summary>
+    Exploring,
+
+    /// <summary>Chosen while exploring: the party stands and recovers (Phase 8.4).</summary>
+    Resting,
+
+    /// <summary>A live enemy came into view: turn-based, as the game has always played.</summary>
+    Combat,
+}
+
+/// <summary>
 /// The turn state machine ported from the prototype, engine-free and driven by
 /// <see cref="Update"/>, extended to any number of enemies: on the enemy turn
 /// they act one at a time (plan → walk → attack beats), and passive enemies
@@ -96,19 +114,28 @@ public sealed class TurnSystem
     public bool AnyLiveEnemyInView => _inView.Any(e => e.Alive);
 
     /// <summary>
-    /// A live enemy has been sighted since the last encounter check
-    /// (<see cref="CheckEncounterEnd"/>): an encounter is open. Not saved — a
-    /// reload only loses the end of an encounter nobody fell in, which nothing
-    /// acts on; a member saved down still has the check find them.
+    /// The mode the party is in (PHASE 8 DECISION 1), changed only here: into
+    /// <see cref="DungeonMode.Combat"/> the moment a live enemy comes into view
+    /// (<see cref="NotifyEnemyInView"/>), and back to
+    /// <see cref="DungeonMode.Exploring"/> only at a player turn's start, or on a
+    /// floor arrival, with no live enemy in view (<see cref="CheckEncounterEnd"/>):
+    /// combat outlasts the sight that started it, so killing the last enemy in view
+    /// mid-turn changes nothing until then. A system opens exploring, unless the
+    /// turn it takes up had already sighted a live enemy of its roster
+    /// (<see cref="Import"/>); a resumed turn is told the mode it was saved in
+    /// (<see cref="ResumeMode"/>).
     /// </summary>
-    private bool _encounterOpen;
+    public DungeonMode Mode { get; private set; } = DungeonMode.Exploring;
+
+    /// <summary>The mode changed (<see cref="Mode"/>): what it was, then what it is now.</summary>
+    public event Action<DungeonMode, DungeonMode>? ModeChanged;
 
     /// <summary>
     /// The encounter is over (§7.2): raised by <see cref="CheckEncounterEnd"/> at
     /// a player turn's start, or on a floor arrival, when no live enemy is in
-    /// view and either an enemy was sighted since the last check or a member is
-    /// down. Raised before the members' budgets refill and before
-    /// <see cref="PlayerTurnStarted"/>.
+    /// view and either the party was in combat or a member is down. Raised once
+    /// the mode is back to exploring, before the members' budgets refill and
+    /// before <see cref="PlayerTurnStarted"/>.
     /// </summary>
     public event Action? CombatEnded;
 
@@ -418,7 +445,7 @@ public sealed class TurnSystem
             // its row and this floor's seed, the dungeon's theme in its roll pool.
             _dropFeeds[enemy] = () => LootTable.Roll(enemy, _mapSeed);
             _sides[enemy] = Side.Enemy;
-            _mayReact[enemy] = () => _seenThisTurn.Contains(enemy);      // no ambushes from the fog
+            _mayReact[enemy] = () => _seenThisTurn.Contains(enemy) || _inView.Contains(enemy);   // no ambushes from the fog; one in plain view is seen
         }
         // The boss is an enemy whose death means more (§4.3): the feeds the roster
         // fixes for it stop resurrection around its defeat, and count that defeat
@@ -476,6 +503,32 @@ public sealed class TurnSystem
         foreach (var enemy in carry.Seen)
             if (_sides.ContainsKey(enemy))
                 _seenThisTurn.Add(enemy);
+        // A turn that sighted a live enemy here was a fight before the party left:
+        // a same-turn return finds it still on. Nothing is subscribed yet.
+        if (AnyLiveEnemySeenThisTurn)
+            Mode = DungeonMode.Combat;
+    }
+
+    /// <summary>
+    /// A resumed turn takes up the mode it was saved in (PHASE 8 DECISION 1), before
+    /// the scene's lighting tells this system who is in view — which can only add
+    /// a fight, never end one. Raises <see cref="ModeChanged"/> when it changes the
+    /// mode. Not <see cref="DungeonMode.Resting"/>: a save never holds a rest
+    /// (PHASE 8 DECISION 18).
+    /// </summary>
+    public void ResumeMode(DungeonMode mode)
+    {
+        if (mode is not (DungeonMode.Exploring or DungeonMode.Combat))
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "A turn is saved exploring or in combat, never resting.");
+        SetMode(mode);
+    }
+
+    private void SetMode(DungeonMode mode)
+    {
+        if (Mode == mode) return;
+        var was = Mode;
+        Mode = mode;
+        ModeChanged?.Invoke(was, mode);
     }
 
     /// <summary>
@@ -600,29 +653,35 @@ public sealed class TurnSystem
             return;
         }
         _inView.Add(enemy);
-        if (enemy.Alive)
-            _encounterOpen = true;
+        // A live enemy in view is a fight (PHASE 8 DECISION 1), in whatever phase
+        // it walks into sight. Not after the wipe: there is nobody left to fight.
+        if (enemy.Alive && Phase != TurnPhase.GameOver)
+            SetMode(DungeonMode.Combat);
     }
 
     /// <summary>
-    /// The encounter's end (§7.2): no live enemy in view, and an encounter open
-    /// or a member down — then every fallen member revives (<see cref="Revive"/>),
-    /// the zones are re-read with them standing, <see cref="CombatEnded"/> is
-    /// raised, and the encounter is closed. Runs at every player turn's start (<see cref="StartPlayerTurn"/>)
-    /// and is called by the scene on a floor arrival once the arrival's lighting
-    /// has told this system who is in view; a resumed turn is not an arrival, so
-    /// a member saved down revives at the next turn's start (PHASE 7 DECISION 3).
-    /// Ignores marching's spacing test, which decides whether the line forms,
-    /// not whether the fight is over.
+    /// The encounter's end (§7.2): no live enemy in view, and the party in combat
+    /// or a member down — then the mode goes back to exploring, every fallen member
+    /// revives (<see cref="Revive"/>), the zones are re-read with them standing,
+    /// and <see cref="CombatEnded"/> is raised. Runs at every player turn's start
+    /// (<see cref="StartPlayerTurn"/>) and is called by the scene on a floor arrival
+    /// once the arrival's lighting has told this system who is in view; a resumed
+    /// turn is not an arrival, so a member saved down revives at the next turn's
+    /// start (PHASE 7 DECISION 3). The one way out of combat (PHASE 8 DECISION 1).
     /// </summary>
     /// <returns>True if the encounter ended here.</returns>
     public bool CheckEncounterEnd()
     {
-        if (Phase == TurnPhase.GameOver || AnyLiveEnemyInView) return false;
+        if (Phase == TurnPhase.GameOver) return false;
+        if (AnyLiveEnemyInView)
+        {
+            SetMode(DungeonMode.Combat);   // a corpse in view that got up this turn's start is a fight too
+            return false;
+        }
         bool anyDown = _party.Any(member => !member.Alive);
-        if (!_encounterOpen && !anyDown) return false;
+        if (Mode != DungeonMode.Combat && !anyDown) return false;
 
-        _encounterOpen = false;
+        SetMode(DungeonMode.Exploring);
         if (anyDown)
         {
             foreach (var member in _party)
@@ -765,13 +824,13 @@ public sealed class TurnSystem
 
     /// <summary>
     /// What a weapon swap costs right now: <see cref="Tuning.WeaponSwapCost"/>
-    /// movement once a live enemy has been seen this turn — the combat-footing
-    /// signal that also grants marching — and nothing out of combat, so
-    /// loadout management between fights stays free while a mid-fight swap is
-    /// a real decision: a bow user caught at knife range pays the swap and
-    /// then the swing (§1.2).
+    /// movement in combat (<see cref="Mode"/>) and nothing out of it, so loadout
+    /// management between fights stays free while a mid-fight swap is a real
+    /// decision: a bow user caught at knife range pays the swap and then the
+    /// swing (§1.2). Combat lasts until a player turn's start, so a swap after the
+    /// last enemy in view fell still costs this turn.
     /// </summary>
-    public int SwapCost => AnyLiveEnemySeenThisTurn ? GameContent.Current.Tuning.WeaponSwapCost : 0;
+    public int SwapCost => Mode == DungeonMode.Combat ? GameContent.Current.Tuning.WeaponSwapCost : 0;
 
     /// <summary>
     /// Can the member swap the weapon in <paramref name="slot"/> for the

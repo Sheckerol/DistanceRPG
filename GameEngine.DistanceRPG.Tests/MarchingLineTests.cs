@@ -85,4 +85,62 @@ public class MarchingLineTests
 
         Assert.Null(line.PointBehind(30f));
     }
+    // ── Walking into formation (PHASE 8 DECISION 13) ─────────────────────────
+
+    /// <summary>A 10×12 room split by a wall down column 5, open only at the bottom row (row 8).</summary>
+    private static int[,] SplitRoom()
+    {
+        var grid = new int[10, 12];
+        for (int r = 0; r < 10; r++)
+        for (int c = 0; c < 12; c++)
+            if (r == 0 || c == 0 || r == 9 || c == 11 || (c == 5 && r < 8)) grid[r, c] = 1;
+        return grid;
+    }
+
+    private static (float X, float Y) At(int r, int c) => ((c + 0.5f) * GameConstants.Tile, (r + 0.5f) * GameConstants.Tile);
+
+    [Fact]
+    public void Waypoint_InTheClear_IsThePlaceItself()
+    {
+        var grid = SplitRoom();
+        var target = (X: At(2, 3).X + 5f, Y: At(2, 3).Y);
+        Assert.Equal(target, MarchingLine.Waypoint(grid, At(6, 2), target));
+    }
+
+    [Fact]
+    public void Waypoint_BehindAWall_WalksRoundIt()
+    {
+        // Follower top-left, its place top-right: the wall between, the way round at the bottom.
+        var grid = SplitRoom();
+        var from = At(2, 2);
+        var target = At(2, 8);
+        var waypoint = MarchingLine.Waypoint(grid, from, target);
+
+        Assert.NotEqual(target, waypoint);
+        Assert.True(LineOfSight.HasLineOfSight(grid, from.X, from.Y, waypoint.X, waypoint.Y));   // walkable straight to
+        int row = (int)(waypoint.Y / GameConstants.Tile), col = (int)(waypoint.X / GameConstants.Tile);
+        Assert.Equal(0, grid[row, col]);
+        Assert.True(col < 5, "still on the follower's side: the wall is passed at the bottom, not through");
+        Assert.True(row > 2, "headed down, towards the gap");
+    }
+
+    [Fact]
+    public void Waypoint_FollowedStepByStep_ReachesThePlace()
+    {
+        var grid = SplitRoom();
+        var at = At(2, 2);
+        var target = At(2, 8);
+        for (int step = 0; step < 50 && at != target; step++)
+            at = MarchingLine.Waypoint(grid, at, target);
+        Assert.Equal(target, at);
+    }
+
+    [Fact]
+    public void Waypoint_WithNoWayRound_IsThePlace_AndTheWallsStopIt()
+    {
+        var grid = SplitRoom();
+        grid[8, 5] = 1;   // the gap closed
+        var target = At(2, 8);
+        Assert.Equal(target, MarchingLine.Waypoint(grid, At(2, 2), target));
+    }
 }

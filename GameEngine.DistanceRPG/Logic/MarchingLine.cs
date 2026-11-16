@@ -78,6 +78,43 @@ public sealed class MarchingLine
         return null;
     }
 
+    /// <summary>
+    /// Where a follower heads next to reach its place in the line (PHASE 8
+    /// DECISION 13): the place itself while the straight line to it is clear of
+    /// walls; otherwise the furthest tile centre of the shortest path to it
+    /// (<see cref="Pathfinder.FindPath"/>) that it can walk straight to — so a member
+    /// the fight left in another room walks round to the line rather than into the
+    /// wall between. With no path at all, the place itself: the walls stop it as
+    /// they always did.
+    /// </summary>
+    /// <param name="grid">The floor's tiles.</param>
+    /// <param name="from">The follower, in logic units.</param>
+    /// <param name="target">Its place in the line, in logic units.</param>
+    public static (float X, float Y) Waypoint(int[,] grid, (float X, float Y) from, (float X, float Y) target)
+    {
+        ArgumentNullException.ThrowIfNull(grid);
+        if (LineOfSight.HasLineOfSight(grid, from.X, from.Y, target.X, target.Y)) return target;
+
+        var start = TileOf(from);
+        var goal = TileOf(target);
+        var path = Pathfinder.FindPath(grid, start.R, start.C, goal.R, goal.C);
+        if (path is null || path.Count == 0) return target;
+
+        var next = Centre(path[0]);   // the first step is a neighbour: walkable whatever the sight says
+        for (int i = 1; i < path.Count; i++)
+        {
+            var centre = Centre(path[i]);
+            if (!LineOfSight.HasLineOfSight(grid, from.X, from.Y, centre.X, centre.Y)) break;
+            next = centre;
+        }
+        return next;
+
+        static (int R, int C) TileOf((float X, float Y) p)
+            => ((int)MathF.Floor(p.Y / GameConstants.Tile), (int)MathF.Floor(p.X / GameConstants.Tile));
+        static (float X, float Y) Centre((int R, int C) t)
+            => ((t.C + 0.5f) * GameConstants.Tile, (t.R + 0.5f) * GameConstants.Tile);
+    }
+
     private void Prune()
     {
         // Walk back from the head; once the kept length is exceeded, drop

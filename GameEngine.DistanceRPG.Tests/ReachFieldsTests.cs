@@ -21,18 +21,18 @@ public class ReachFieldsTests
     }
 
     [Fact]
-    public void TheOverlayComesBackAtTheTurnsStart_WithAnEnemyInViewNotYetSighted()
+    public void TheOverlayShowsInCombatOnly()
     {
-        // The turn's start: sightings wiped, nobody has crossed a tile, an enemy in plain view.
-        Assert.True(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, enemySeenThisTurn: false, liveEnemyInView: true));
-        // A fight that has just lost sight of its enemy keeps it.
-        Assert.True(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, enemySeenThisTurn: true, liveEnemyInView: false));
-        // No fight, the enemies' phase, a menu, a stair's fade, a fallen member: off.
-        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, enemySeenThisTurn: false, liveEnemyInView: false));
-        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.EnemyMoving, false, true, true, true));
-        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, true, true, true, true));
-        Assert.False(DungeonScene.ReachOverlayOn(true, TurnPhase.Player, false, true, true, true));
-        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, false, true, true));
+        // Combat in the party's phase: on, whether the enemy that started it is still in view or not —
+        // the mode outlasts the sight (PHASE 8 DECISION 1).
+        Assert.True(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, DungeonMode.Combat));
+        // Exploring or resting, the enemies' phase, a menu, a stair's fade, a fallen member: off.
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, DungeonMode.Exploring));
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, true, DungeonMode.Resting));
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.EnemyMoving, false, true, DungeonMode.Combat));
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, true, true, DungeonMode.Combat));
+        Assert.False(DungeonScene.ReachOverlayOn(true, TurnPhase.Player, false, true, DungeonMode.Combat));
+        Assert.False(DungeonScene.ReachOverlayOn(false, TurnPhase.Player, false, false, DungeonMode.Combat));
     }
 
     [Fact]

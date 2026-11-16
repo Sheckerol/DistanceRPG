@@ -227,7 +227,7 @@ public class SaveInventoryTests
             new("ResurrectionActive", Kept.Derived, "!visit.bossDefeated, set by OpenTurns"),
             new("_seenThisTurn", Kept.Saved, "carry.seen[], sorted"),
             new("_inView", Kept.Derived, "the saved sight (the current floor's visible tiles), told the system on resume by NotifyEnemyInView"),
-            new("_encounterOpen", Kept.NotSaved, "a reload loses only the end of an encounter nobody fell in; a member saved down still ends it (PHASE 7 DECISION 3)"),
+            new("Mode", Kept.Derived, "replayed on a resume from view.marchingThisTurn and the turn's sightings (DungeonScene.ResumedMode, ResumeMode), then the saved sight; kept in the document itself from save version 5 (Phase 8.5)"),
             new("_attacksThisTurn", Kept.Saved, "carry.attacks[], sorted"),
             new("_partyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived by SnapshotZones from where everyone stands, kept true continuously"),
             new("_enemyZone", Kept.Saved, "its uses in carry.zoneUses[], sorted; its pairs re-derived as the party's are"),
@@ -288,6 +288,7 @@ public class SaveInventoryTests
             new("PotionDrunk", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh for the drink's beat and log line"),
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),
             new("CombatEnded", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
+            new("ModeChanged", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
             new("CharacterRevived", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh"),
             new("Leader", Kept.NotSaved, "wiring: the scene hands in its active member; the active member is saved in the view"),
             new("DeathCost", Kept.Derived, "set by OpenTurns: the cut against the visit's saved entry snapshot at the tuning's DeathXpLossPercent"),
@@ -307,9 +308,10 @@ public class SaveInventoryTests
     {
         [typeof(DungeonScene)] =
         [
-            // Saved in the view: the two decisions a turn has made that a resume must not make again.
+            // Saved in the view: the decision a turn has made that a resume must not make again. The
+            // view's other member, marchingThisTurn, is the turn system's mode (TurnSystem.Mode), which
+            // the scene writes there until save version 5 keeps it (Phase 8.5).
             new("_activeIdx", Kept.View, "view.activeMemberId: the member by roster id, read back on a resume (the first living member if it has fallen)"),
-            new("_marchingThisTurn", Kept.View, "view.marchingThisTurn: decided at a turn's start or a stairs arrival and read back on a resume, never decided afresh — it gates the march and the turn's automatic end"),
 
             // Wiring: what the scene was built with.
             new("_camera", Kept.NotSaved, "wiring: the game's camera"),
@@ -490,9 +492,10 @@ public class SaveInventoryTests
         }
 
         // The view is the two decisions 1b names, and ViewDto holds exactly them: the
-        // document's view has a member for each scene field kept in it, and the
-        // gameplay types keep nothing in it.
-        Assert.Equal(["_activeIdx", "_marchingThisTurn"],
+        // active member, the scene's one field kept in it, and whether the turn
+        // marches — the turn system's mode, written there by the scene until save
+        // version 5 (Phase 8.5). The gameplay types keep nothing in it.
+        Assert.Equal(["_activeIdx"],
             SceneInventory.Values.SelectMany(rows => rows).Where(row => row.Kept == Kept.View).Select(row => row.Member).Order(StringComparer.Ordinal));
         Assert.Equal(["ActiveMemberId", "MarchingThisTurn"], typeof(ViewDto).GetConstructors().Single().GetParameters().Select(p => p.Name));
         Assert.DoesNotContain(Inventory.Values.SelectMany(rows => rows), row => row.Kept == Kept.View);

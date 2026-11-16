@@ -299,6 +299,26 @@ Each step lands with its tests and keeps the golden tests green.
 
 1. **8.1 — The mode in Logic.** `Mode` and its transitions; the swap cost,
    overlay, marching and reactions read it. Exploring still plays in turns.
+   *As built (step 1):* `TurnSystem.Mode` (`DungeonMode`) replaces Phase 7's
+   `_encounterOpen` and raises `ModeChanged`. A live enemy put in the in-view set
+   starts combat in any phase, and so does a turn's-start check that finds one in
+   view: a dummy that gets up on a tile already lit as its corpse is a fight, and
+   nothing new was reported. `CheckEncounterEnd` is the only way back to
+   exploring. A system opened from a same-turn carry with a live enemy sighted
+   opens in combat, so a hop back mid-fight finds the fight still on. Until
+   save version 5, the mode travels in the view's `MarchingThisTurn`, written as
+   `Mode == Exploring`. A resume reads it back through
+   `DungeonScene.ResumedMode`: exploring if the turn marched and saw nothing live,
+   otherwise combat. That is the rule 8.5's migration will apply to version-4
+   saves. The march's spacing test went with `EvaluateMarchingForTurn`, so
+   DECISION 13 landed here instead of in 8.2: a follower that cannot walk straight
+   to its place heads for the furthest tile of the A* path it can
+   (`MarchingLine.Waypoint`). DECISION 7's fresh party turn on entering combat
+   waits for 8.2. While exploring still plays in turns, starting a new turn
+   mid-walk would mean skipping the enemies' phase, and it belongs with
+   DECISION 15's new world turn. One behaviour change shows already: a swap after
+   the last enemy in view falls now costs until the next turn's start, since
+   combat lasts until then.
 2. **8.2 — The walking clock.** No budget and no pause while exploring; a world
    turn per `MovementBudget` walked, with its boundaries. Tests: a turn passes at
    exactly 160 walked; standing still passes none; a dummy's timer runs on walking

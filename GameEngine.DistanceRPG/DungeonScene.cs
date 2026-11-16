@@ -312,7 +312,6 @@ public class DungeonScene : Scene
     private readonly MarchingLine _march = new();
     private CharacterObject? _marchLeader;
     private bool _wasMarching;
-    private bool _marchingThisTurn; // decided at each turn's start and on a stairs arrival; a resume reads it back from the save's view
     private const float MarchArriveTolerance = 2f;
     private readonly List<EnemyObject> _enemies = new();
     private readonly Dictionary<EnemyObject, (int R, int C)> _lastEnemyTile = new();
@@ -450,11 +449,12 @@ public class DungeonScene : Scene
 
     /// <summary>
     /// What a save carries for this scene (1b): the active member, and whether
-    /// the turn in progress was granted the march. <c>Logic/</c> never reads it;
-    /// a scene resuming the save does (<see cref="ResumeView"/>). Read by the host
+    /// the turn in progress is exploring — written as the march it has always been
+    /// saved as, until save version 5 keeps the mode itself (Phase 8.5). A scene
+    /// resuming the save reads it back (<see cref="ResumeView"/>). Read by the host
     /// when it saves, once the frame — or a quit's settle — is over.
     /// </summary>
-    internal ViewDto View => new(ActiveCharacter.State.Id, _marchingThisTurn);
+    internal ViewDto View => new(ActiveCharacter.State.Id, _turns.Mode == DungeonMode.Exploring);
 
     public CharacterObject ActiveCharacter => _party[_activeIdx];
 
@@ -638,43 +638,15 @@ public class DungeonScene : Scene
     private readonly Dictionary<(ActorState Actor, StatusEffectType Type), int> _riderLevels = new();
 
     /// <summary>
-    /// True while the party marches freely. Marching is granted only at the
-    /// start of a turn, or on arriving on a floor — no live enemy visible and
-    /// the party regrouped within each member's max movement of the leader —
-    /// and once revoked (a live enemy sighted) stays off for the rest of the
-    /// turn. This keeps a split party from charging back into formation the
-    /// moment line of sight to the enemy breaks mid-fight; a party that has
-    /// just taken the stairs is together by construction, having gathered to
-    /// take them. A resumed turn is neither: the grant comes back from the save's
-    /// view and the sighting from the turn's own counters, so a march revoked
-    /// before the quit stays revoked, and one granted stays granted.
+    /// True while the party marches freely: the party's phase, exploring
+    /// (PHASE 8 DECISION 1). Combat starts the moment a live enemy comes into view
+    /// and lasts until a player turn's start finds none, so a split party never
+    /// charges back into formation the moment sight of the enemy breaks mid-fight.
+    /// The followers walk into line however far apart the fight left them
+    /// (PHASE 8 DECISION 13, <see cref="UpdateMarchingFollowers"/>).
     /// </summary>
-    public bool Marching => _turns.Phase == TurnPhase.Player
-        && _marchingThisTurn
-        && !_turns.AnyLiveEnemySeenThisTurn;
+    public bool Marching => _turns.Phase == TurnPhase.Player && _turns.Mode == DungeonMode.Exploring;
 
-    /// <summary>
-    /// The turn-start (and floor-arrival) marching decision: needs the enemy
-    /// dead or out of view and every living member within their own max
-    /// movement of the leader.
-    /// </summary>
-    private void EvaluateMarchingForTurn()
-    {
-        _marchingThisTurn = false;
-        if (LiveEnemyInView) return;
-
-        var leader = ActiveCharacter.State;
-        foreach (var member in _party)
-        {
-            var state = member.State;
-            if (!state.Alive) continue;
-            float dx = state.X - leader.X;
-            float dy = state.Y - leader.Y;
-            if (dx * dx + dy * dy > state.EffectiveMax * state.EffectiveMax) return;
-        }
-
-        _marchingThisTurn = true;
-    }
     public Vector4 PartyColor(int idx) => PartyColors[idx];
 
     /// <summary>
@@ -872,22 +844,38 @@ public class DungeonScene : Scene
 
         if (resume?.View is { } kept)
         {
-            // The saved turn goes on: its leader, its sight and its march.
+            // The saved turn goes on: its leader, its mode and its sight — the mode
+            // first, since the lighting can only add a fight to it.
             _activeIdx = ActiveIndexFor(_campaign.Party, kept.ActiveMemberId);
+            turns.ResumeMode(ResumedMode(kept, turns.AnyLiveEnemySeenThisTurn));
             RevealArrival(keepSight: true);
-            _marchingThisTurn = kept.MarchingThisTurn;
             Log.Info($"[Save] Resumed on floor {_floor.Index + 1} at turn {turns.TurnCount}: {ActiveCharacter.State.Id} active, "
-                + (_marchingThisTurn ? "the turn marching" : "the turn not marching"));
+                + $"the turn {turns.Mode.ToString().ToLowerInvariant()}");
         }
         else
         {
             RevealArrival(keepSight: false);
             turns.CheckEncounterEnd();   // the arrival's check (§7.5), after the lighting told the system who is in view
-            EvaluateMarchingForTurn();   // after visibility, which it reads; the party gathered to take the stairs
         }
         _cameraTarget = ActiveCharacter.Position;
         if (resume is null)
             _hud.ShowArrival(_visit);   // a resume's banner, RESUMED over it, is up already (ShowResume)
+    }
+
+    /// <summary>
+    /// The mode a resumed turn takes up (PHASE 8 DECISION 1), from the view a save
+    /// carries until save version 5 keeps the mode itself (Phase 8.5): exploring
+    /// when the turn marched — granted the march, and no live enemy sighted in it,
+    /// which revoked a Phase 7 build's march for the rest of the turn — and combat
+    /// otherwise. A save is taken in the party's phase, where a turn not marching
+    /// was a fight's.
+    /// </summary>
+    /// <param name="view">The save's view.</param>
+    /// <param name="liveEnemySeenThisTurn">Whether the resumed turn's own counters hold a live enemy sighted (<see cref="TurnSystem.AnyLiveEnemySeenThisTurn"/>).</param>
+    internal static DungeonMode ResumedMode(ViewDto view, bool liveEnemySeenThisTurn)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        return view.MarchingThisTurn && !liveEnemySeenThisTurn ? DungeonMode.Exploring : DungeonMode.Combat;
     }
 
     /// <summary>
@@ -1490,6 +1478,7 @@ public class DungeonScene : Scene
         // RunEnded put the summary up. What is left here is the log line.
         _turns.GameOver += () => Log.Info("[Turns] GAME OVER - the party is defeated");
         _turns.CombatEnded += () => Log.Info("[Turns] The encounter is over - no live enemy in view");
+        _turns.ModeChanged += (was, now) => Log.Info($"[Turns] {was} -> {now} on turn {_turns.TurnCount}");
         _turns.Leader = () => ActiveCharacter.State;   // a revived member gets up beside whoever the player is moving (§7.3)
         _turns.CharacterRevived += (member, clawbacks) =>
         {
@@ -1504,8 +1493,8 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// A player turn has begun: a fallen leader hands the lead on, the turn's
-    /// march is decided, and the turn is saved once the frame is over (1f: an
+    /// A player turn has begun: a fallen leader hands the lead on, and the turn
+    /// is saved once the frame is over (1f: an
     /// autosave at every player turn's start) — asked for here and written by the
     /// host after the raise that began the turn has returned.
     /// </summary>
@@ -1514,7 +1503,6 @@ public class DungeonScene : Scene
         Log.Info($"[Turns] Player turn {_turns.TurnCount} begins");
         if (!ActiveCharacter.State.Alive)
             SetActiveCharacter(_party.FindIndex(p => p.State.Alive), force: true);
-        EvaluateMarchingForTurn(); // after the leader fixup: distances measure from a live leader
         _host.RequestSave();
     }
 
@@ -2297,18 +2285,28 @@ public class DungeonScene : Scene
         var state = member.State;
         if (state.DistLeft <= 0f) return;
 
-        float dx = target.X - state.X;
-        float dy = target.Y - state.Y;
-        float dist = MathF.Sqrt(dx * dx + dy * dy);
+        float tx = target.X - state.X;
+        float ty = target.Y - state.Y;
+        float dist = MathF.Sqrt(tx * tx + ty * ty);
         if (dist <= stopAt + 0.5f) return;
+
+        // Round the walls to its place, however far apart the fight left the
+        // party (PHASE 8 DECISION 13): headed for the next waypoint, stopping
+        // short of the place itself.
+        var waypoint = MarchingLine.Waypoint(_map.Grid, (state.X, state.Y), target);
+        float dx = waypoint.X - state.X;
+        float dy = waypoint.Y - state.Y;
+        float toWaypoint = MathF.Sqrt(dx * dx + dy * dy);
+        if (toWaypoint <= 0f) return;
+        float room = waypoint == target ? dist - stopAt : toWaypoint;
 
         // A touch faster than the leader when far behind, so gaps close
         // instead of merely holding steady.
         float speed = dist > 2f * MarchingLine.Spacing ? GameConstants.Speed * 1.25f : GameConstants.Speed;
-        float step = MathF.Min(MathF.Min(speed * deltaTime, dist - stopAt), state.DistLeft);
+        float step = MathF.Min(MathF.Min(speed * deltaTime, room), state.DistLeft);
 
         var (nx, ny) = GridCollision.Move(
-            _map.Grid, state.X, state.Y, state.Radius, dx / dist * step, dy / dist * step, LiveEnemyBlockers());
+            _map.Grid, state.X, state.Y, state.Radius, dx / toWaypoint * step, dy / toWaypoint * step, LiveEnemyBlockers());
 
         float movedX = nx - state.X;
         float movedY = ny - state.Y;
@@ -2630,7 +2628,7 @@ public class DungeonScene : Scene
     private void RefreshReachOverlay()
     {
         var active = ActiveCharacter.State;
-        bool show = ReachOverlayOn(Transiting, _turns.Phase, AnyMenuOpen, active.Alive, _turns.AnyLiveEnemySeenThisTurn, LiveEnemyInView);
+        bool show = ReachOverlayOn(Transiting, _turns.Phase, AnyMenuOpen, active.Alive, _turns.Mode);
         if (!show)
         {
             Watch(ref _watchedMember, null);
@@ -2690,18 +2688,13 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// Whether the reach overlay shows: the party's phase, nothing in the way, and
-    /// a fight on — a live enemy seen this turn, or one in view now. Both, because
-    /// the turn's sightings start empty and fill only when sight is next asked, as
-    /// someone crosses a tile: with the second alone a fight that has just lost
-    /// sight of its enemy would drop the overlay, and with the first alone an enemy
-    /// standing in plain view at the turn's start would not bring it back.
+    /// Whether the reach overlay — and the attack-cost ruler drawn with it — shows:
+    /// the party's phase, nothing in the way, and combat (PHASE 8 DECISION 1). The
+    /// mode outlasts the sight that started the fight, so a fight that has just
+    /// lost sight of its enemy keeps the overlay until a turn's start ends it.
     /// </summary>
-    internal static bool ReachOverlayOn(bool transiting, TurnPhase phase, bool menuOpen, bool memberAlive, bool enemySeenThisTurn, bool liveEnemyInView)
-        => !transiting && phase == TurnPhase.Player && !menuOpen && memberAlive && (enemySeenThisTurn || liveEnemyInView);
-
-    /// <summary>Is a live enemy on a tile the party can see right now?</summary>
-    private bool LiveEnemyInView => _turns.AnyLiveEnemyInView;   // what the fog last told the system (UpdateEnemyVisibility)
+    internal static bool ReachOverlayOn(bool transiting, TurnPhase phase, bool menuOpen, bool memberAlive, DungeonMode mode)
+        => !transiting && phase == TurnPhase.Player && !menuOpen && memberAlive && mode == DungeonMode.Combat;
 
     /// <summary>
     /// Listen to <paramref name="next"/> in place of what <paramref name="slot"/>

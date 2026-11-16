@@ -87,12 +87,13 @@ public sealed record SaveFile(int Version, string TuningHash, int TuningHashVers
 /// </summary>
 /// <param name="ActiveMemberId">The active member's roster id, or null for the scene's own default.</param>
 /// <param name="MarchingThisTurn">
-/// Whether the turn in progress was granted the march at its start or on its
-/// arrival (Phase 5.8). The scene decides it only there, and it changes nothing
-/// after, so a resume reads it back: decided afresh, a turn the party marched
-/// could come back halted, or one a fight had split back marching. A live
-/// enemy seen this turn still halts the march, from the turn's own counters
-/// (<see cref="CarryDto.Seen"/>). Appended by Phase 5.8, with its default.
+/// Whether the turn in progress marches (Phase 5.8): since Phase 8.1, whether it
+/// is exploring (<see cref="TurnSystem.Mode"/>), which the scene writes here and
+/// reads back on a resume (<c>DungeonScene.ResumedMode</c>) — exploring when it
+/// marched and its own counters (<see cref="CarryDto.Seen"/>) hold no live enemy
+/// sighted, which revoked a Phase 7 build's march for the rest of the turn, and
+/// combat otherwise. Save version 5 keeps the mode itself (Phase 8.5). Appended
+/// by Phase 5.8, with its default.
 /// </param>
 public sealed record ViewDto(string? ActiveMemberId = null, bool MarchingThisTurn = false);
 
