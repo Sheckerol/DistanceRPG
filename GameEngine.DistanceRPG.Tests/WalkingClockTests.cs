@@ -8,7 +8,9 @@ namespace GameEngine.DistanceRPG.Tests;
 /// every <see cref="Tuning.MovementBudget"/> walked (PHASE 8 DECISION 4), each with
 /// every boundary a played round raises and nobody acting. A fight that starts
 /// opens a new turn on the spot (PHASE 8 DECISIONS 7 and 15). What the party does
-/// while exploring spends no movement and teaches nothing (PHASE 8 DECISION 21).
+/// while exploring spends no movement (PHASE 8 DECISION 21) and teaches as in
+/// combat (PHASE 8 DECISION 24); waiting a turn out banks an idle turn's mana
+/// (PHASE 8 DECISION 23).
 /// </summary>
 [Collection(TestContent.Collection)]
 public sealed class WalkingClockTests : IDisposable
@@ -190,34 +192,29 @@ public sealed class WalkingClockTests : IDisposable
     }
 
     [Fact]
-    public void ACastWhileExploring_SpendsNoMovement_PaysItsMana_AndTeachesNothing()
+    public void ACastWhileExploring_SpendsNoMovement_PaysItsMana_AndTeachesAsInCombat()
     {
         var a = Member("A", 5, 5, "staff_of_renewal");
         var b = Member("B", 5, 6);
         var turns = Exploring([a, b], Far());
-        var staff = a.EquippedWeapon!;
-        int mana = a.Mana, manaXp = a.ManaXp, hpXpB = b.HpXp;
+        int mana = a.Mana, hpXpB = b.HpXp;
         float movement = a.DistLeft;
-        var credited = new List<XpCredit>();
-        turns.XpCredited += (_, credit, _) => credited.Add(credit);
 
         Assert.True(turns.TryCast(a, b));
 
         Assert.Equal(movement, a.DistLeft);                         // no budget to spend
         Assert.True(a.Mana < mana);                                 // the cast still pays its mana
         Assert.Equal(2, b.StatusLevel(StatusEffectType.Regeneration));   // and lands
-        Assert.Equal((0, manaXp), (a.WeaponXp[WeaponClass.Staff], a.ManaXp));
-        Assert.Equal(0, staff.Wear);                                 // no cast outside combat banks wear
-        Assert.All(staff.Enchantments, entry => Assert.Equal(0, entry.Xp));   // nor teaches its entries
+        Assert.Equal(2, a.WeaponXp[WeaponClass.Staff]);              // and teaches, as in combat
+        Assert.Equal(1, a.EquippedWeapon!.Wear);                     // and wears
 
         b.Hp -= 20;
         turns.AdvanceExploring(TurnLength);                          // the regeneration heals on the walk...
-        Assert.Equal(hpXpB, b.HpXp);                                 // ...and teaches nothing
-        Assert.Empty(credited);
+        Assert.True(b.HpXp > hpXpB);                                 // ...and teaches HP
     }
 
     [Fact]
-    public void ADrinkWhileExploring_IsFree_AndTeachesNothing()
+    public void ADrinkWhileExploring_IsFree_AndTeaches()
     {
         var a = Member("A", 5, 5);
         a.Inventory[1] = TestPotions.Health(2);
@@ -231,7 +228,33 @@ public sealed class WalkingClockTests : IDisposable
         Assert.Equal(0, drink!.Cost);
         Assert.Equal(a.EffectiveMax, a.DistLeft);
         Assert.True(drink.Restored > 0);
-        Assert.Equal(hpXp, a.HpXp);
+        Assert.Equal(hpXp + drink.Restored, a.HpXp);
+    }
+
+    [Fact]
+    public void AWaitedTurn_BanksAWholeIdleTurnsMana_TeachingNothing_AndRestoringNoHp()
+    {
+        // PHASE 8 DECISION 23: Space while exploring is an idle turn, the way mana
+        // comes back outside combat; a walking turn banks none (above).
+        var a = Member("A", 3, 3);
+        var down = Member("B", 3, 4);
+        down.Alive = false;
+        down.Hp = 0;
+        down.Mana = 0;
+        a.Mana = 0;
+        a.Hp -= 10;
+        int hp = a.Hp, manaXp = a.ManaXp;
+        var turns = Exploring([a, down], Far());
+        int perTurn = (int)(a.EffectiveMax / Math.Max(1, GameContent.Current.Tuning.MovementUnitsPerMana));
+
+        turns.WaitTurn();
+
+        Assert.Equal(Math.Min(perTurn, a.UsableMaxMana), a.Mana);
+        Assert.Equal((hp, manaXp), (a.Hp, a.ManaXp));
+        Assert.Equal(0, down.Mana);                                  // nothing for the dead
+
+        for (int i = 0; i < 50; i++) turns.WaitTurn();
+        Assert.Equal(a.UsableMaxMana, a.Mana);                       // capped at the spendable pool
     }
 
     [Fact]

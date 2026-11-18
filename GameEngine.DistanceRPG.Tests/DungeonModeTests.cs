@@ -206,13 +206,13 @@ public sealed class DungeonModeTests : IDisposable
     }
 
     [Fact]
-    public void ABareSystemOpensInCombat_AVisitsFloorExploring_NeverResting()
+    public void ABareSystemOpensInCombat_AVisitsFloorExploring_NothingElse()
     {
         var grid = new int[30, 30];
         var party = new[] { Member("A", 3 * Tile, 3 * Tile) };
         Assert.Equal(DungeonMode.Combat, new TurnSystem(grid, party, Array.Empty<EnemyState>()).Mode);
         Assert.Equal(DungeonMode.Exploring, new TurnSystem(grid, party, Array.Empty<EnemyState>(), mode: DungeonMode.Exploring).Mode);
-        Assert.Throws<ArgumentOutOfRangeException>(() => new TurnSystem(grid, party, Array.Empty<EnemyState>(), mode: DungeonMode.Resting));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TurnSystem(grid, party, Array.Empty<EnemyState>(), mode: (DungeonMode)99));
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public sealed class DungeonModeTests : IDisposable
     }
 
     [Fact]
-    public void ResumeMode_TakesUpTheSavedMode_NeverARest()
+    public void ResumeMode_TakesUpTheSavedMode_NothingElse()
     {
         var (turns, _, _, log) = Fixture();
         turns.ResumeMode(DungeonMode.Exploring);
@@ -248,7 +248,7 @@ public sealed class DungeonModeTests : IDisposable
         turns.ResumeMode(DungeonMode.Combat);
         Assert.Equal(DungeonMode.Combat, turns.Mode);
         Assert.Equal(["Exploring->Combat"], log);
-        Assert.Throws<ArgumentOutOfRangeException>(() => turns.ResumeMode(DungeonMode.Resting));   // a save never holds a rest (PHASE 8 DECISION 18)
+        Assert.Throws<ArgumentOutOfRangeException>(() => turns.ResumeMode((DungeonMode)99));
         Assert.Equal(DungeonMode.Combat, turns.Mode);
     }
 

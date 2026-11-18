@@ -80,7 +80,7 @@ GameEngine.DistanceRPG/         # Game executable
     MovementLedger.cs           # Every actor's movement left and its only door: TrySpend (an action, all
                                 # or nothing, bool), SpendUpTo (a walk), Reset; Changed says before/after/why
     TurnSystem.cs               # Turn state machine, drives combat via events; the one home of the
-                                # mode (DungeonMode: exploring, resting, combat — Phase 8)
+                                # mode (DungeonMode: exploring, combat — Phase 8)
     Wear.cs                     # Wear (§6.1): what a hit banks, and a weapon's capacity replayed
                                 # from the wear it has ever cashed (R4); where its slots open, what
                                 # an enchantment costs, a service's runs, and its improvement odds

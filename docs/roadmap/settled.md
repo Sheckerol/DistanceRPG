@@ -4549,7 +4549,8 @@ while exploring. Planned as its own phase: see [phase-8-modes](phase-8-modes.md)
 Its open questions were ruled on 2026-11-11 (DECISIONS 9–19), and the user added a
 button to stop a rest (DECISION 8), Space's one-turn rest (DECISION 20) and free
 actions without XP outside combat (DECISION 21). After playing 8.2 the user ruled
-that a fight ends only after a whole turn unseen (DECISION 22).
+that a fight ends only after a whole turn unseen (DECISION 22), then dropped
+resting and let XP count in every mode (DECISIONS 23 and 24).
 
 - **PHASE 8 DECISION 1 — three modes, held in `Logic/`, ruled 2026-11-09.**
   Exploring, resting and combat, exactly one at a time; everything that today
@@ -4632,3 +4633,17 @@ that a fight ends only after a whole turn unseen (DECISION 22).
   down. An enemy killed in view keeps nothing open, since it is not living. This
   replaces PHASE 7 DECISION 5's "no live enemy in view at the turn's start" as the
   end, and is still checked only at a turn's start (or a floor arrival).
+- **PHASE 8 DECISION 23 — no resting; a waited turn banks mana, ruled 2026-11-17
+  (after play).** No free HP outside combat: resting and its keys, buttons and
+  tuning go, leaving exploring and combat. Space while exploring waits a world
+  turn out, every living member banking a whole idle turn's mana (DECISION 11's
+  conversion, capped at `UsableMaxMana`), with no HP and no XP from it. Heals and
+  potions are the only HP outside combat, and the patrols make waiting the risk
+  that pays for the mana: on a waited turn every awake enemy moves a whole turn's
+  worth, its full budget, and one that moves into sight starts combat. Withdraws DECISIONS 5, 6, 8, 9, 10, 12 and 18; keeps 11
+  for the waited turn; narrows 20.
+- **PHASE 8 DECISION 24 — XP counts in every mode, ruled 2026-11-17 (after
+  play).** Exploring teaches as combat does: mana, HP and weapon XP, wear and
+  enchantment tiers. Casts and drinks stay free of movement. The mana spent came
+  from waiting turns out with enemies moving, a risk the user judges enough.
+  Withdraws DECISION 21's "teach nothing" half.

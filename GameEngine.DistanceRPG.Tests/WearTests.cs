@@ -436,7 +436,7 @@ public sealed class WearTests : IDisposable
         var campaign = CampaignRuns.Campaign();
         var visit = campaign.Enter("tutorial", CampaignRuns.GoldenSeed, EnemyPlacer.Unprotected);
         var turns = visit.OpenTurns(campaign.Party, CampaignRuns.Ten);
-        turns.ResumeMode(DungeonMode.Combat);   // a fight: only a fight's hits wear (PHASE 8 DECISION 21)
+        turns.ResumeMode(DungeonMode.Combat);   // a fight
         var a = campaign.Party[0];
         var knife = a.EquippedWeapon!;
         var dummy = visit.Current.Enemies[0];

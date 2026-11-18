@@ -2060,8 +2060,8 @@ public class DungeonScene : Scene
     /// <summary>
     /// Space, or ENTER with no menu: in combat the turn ends, as it always has;
     /// exploring there is no turn to end, and one world turn is waited out where the
-    /// party stands (<see cref="TurnSystem.WaitTurn"/>; PHASE 8 DECISION 20 makes it
-    /// a rest turn).
+    /// party stands (<see cref="TurnSystem.WaitTurn"/>), banking a whole idle turn's
+    /// mana (PHASE 8 DECISION 23).
     /// </summary>
     private void PassTurn()
     {

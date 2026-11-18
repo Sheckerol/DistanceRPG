@@ -32,9 +32,6 @@ public enum DungeonMode
     /// <summary>No fight on: the party marches, a swap is free.</summary>
     Exploring,
 
-    /// <summary>Chosen while exploring: the party stands and recovers (Phase 8.4).</summary>
-    Resting,
-
     /// <summary>A live enemy came into view: turn-based, as the game has always played.</summary>
     Combat,
 }
@@ -403,11 +400,10 @@ public sealed class TurnSystem
     /// machine plays, and <see cref="DungeonMode.Exploring"/> for a floor the visit
     /// opens (<see cref="DungeonState.OpenTurns"/>), whose arrival lighting then
     /// decides. A carry of a party that left in combat, or one that sighted a live
-    /// enemy of this roster, opens it in combat either way. Never
-    /// <see cref="DungeonMode.Resting"/>: a rest is chosen, never opened in.
+    /// enemy of this roster, opens it in combat either way.
     /// </param>
     /// <exception cref="ArgumentException"><paramref name="boss"/> is not one of <paramref name="enemies"/>.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> is <see cref="DungeonMode.Resting"/>, or <paramref name="firstTurn"/> is negative.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> is not a <see cref="DungeonMode"/>, or <paramref name="firstTurn"/> is negative.</exception>
     public TurnSystem(int[,] grid, IReadOnlyList<PartyMemberState> party,
         IReadOnlyList<EnemyState> enemies, Func<int>? rollD20 = null, long mapSeed = 0,
         int firstTurn = 0, TurnCarry? carry = null, EnemyState? boss = null,
@@ -415,7 +411,7 @@ public sealed class TurnSystem
     {
         ArgumentOutOfRangeException.ThrowIfNegative(firstTurn);
         if (mode is not (DungeonMode.Exploring or DungeonMode.Combat))
-            throw new ArgumentOutOfRangeException(nameof(mode), mode, "A system opens exploring or in combat, never resting.");
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "A system opens exploring or in combat.");
         Mode = mode;
         if (boss is not null && !enemies.Contains(boss))
             throw new ArgumentException("The boss is one of the floor's enemies: pass it on the roster it is the boss of.", nameof(boss));
@@ -556,13 +552,13 @@ public sealed class TurnSystem
     /// A resumed turn takes up the mode it was saved in (PHASE 8 DECISION 1), before
     /// the scene's lighting tells this system who is in view — which can only add
     /// a fight, never end one. Raises <see cref="ModeChanged"/> when it changes the
-    /// mode. Not <see cref="DungeonMode.Resting"/>: a save never holds a rest
-    /// (PHASE 8 DECISION 18).
+    /// mode.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="mode"/> is not a <see cref="DungeonMode"/>.</exception>
     public void ResumeMode(DungeonMode mode)
     {
         if (mode is not (DungeonMode.Exploring or DungeonMode.Combat))
-            throw new ArgumentOutOfRangeException(nameof(mode), mode, "A turn is saved exploring or in combat, never resting.");
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "A turn is saved exploring or in combat.");
         SetMode(mode);
     }
 
@@ -966,8 +962,8 @@ public sealed class TurnSystem
     /// <summary>
     /// What a drink costs: <see cref="Tuning.PotionUseCost"/> movement in combat
     /// (PHASE 6b DECISION 2: §3.4 prices it "on the same principle as swapping"),
-    /// and nothing while exploring or resting, where there is no budget (PHASE 8
-    /// DECISION 21). The potion is used up either way.
+    /// and nothing while exploring, where there is no budget (PHASE 8 DECISION 21).
+    /// The potion is used up either way.
     /// </summary>
     public int PotionUseCost => Mode == DungeonMode.Combat ? GameContent.Current.Tuning.PotionUseCost : 0;
 
@@ -1061,8 +1057,9 @@ public sealed class TurnSystem
     /// <summary>
     /// The movement a cast of <paramref name="w"/> costs <paramref name="caster"/>
     /// now: the weapon's resolved cost less the caster's proficiency discount in
-    /// combat, and nothing while exploring or resting, where there is no budget
-    /// (PHASE 8 DECISION 21). The cast still pays its mana.
+    /// combat, and nothing while exploring, where there is no budget (PHASE 8
+    /// DECISION 21). The cast still pays its mana, and teaches as in combat
+    /// (DECISION 24).
     /// </summary>
     private float CastMovement(PartyMemberState caster, Weapon w)
         => Mode == DungeonMode.Combat ? caster.MovementCost(w) : 0f;
@@ -1892,15 +1889,20 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Wait one world turn out where the party stands (Space while exploring; PHASE 8
-    /// DECISION 20 makes it a rest turn in 8.4): the walking turn in progress is
-    /// dropped and one whole turn passes (<see cref="WorldTurn"/>).
+    /// DECISION 23): the walking turn in progress is dropped and one whole turn
+    /// passes (<see cref="WorldTurn"/>) as an idle turn. Every living member banks
+    /// its whole unspent budget as mana, as an idle combat turn's end would
+    /// (<see cref="ActorState.RegenManaFromUnusedMovement"/>, Mire's cut included),
+    /// before its statuses tick. It restores no HP, and the conversion credits no
+    /// XP. Waiting is how mana comes back outside combat, and the enemies that
+    /// move meanwhile are its risk.
     /// </summary>
     /// <returns>False, with nothing passed, outside the party's phase of exploring.</returns>
     public bool WaitTurn()
     {
         if (!Exploring) return false;
         WalkedThisTurn = 0f;
-        WorldTurn();
+        WorldTurn(idle: true);
         return true;
     }
 
@@ -1915,18 +1917,22 @@ public sealed class TurnSystem
     /// the round closes, and a new turn opens as a player turn's start opens one:
     /// <see cref="TurnCount"/> on, every dummy whose wait has run out up, uses
     /// restored, held shots lapsed, zones re-armed, budgets refilled. No attack
-    /// beats (an enemy in view would be a fight) and no mana from movement, for
-    /// anyone: nothing was left unspent (PHASE 8 DECISION 16). Raises
-    /// <see cref="PlayerTurnStarted"/> for the turn it opens; never
-    /// <see cref="TurnEnded"/>, which is a played turn's.
+    /// beats (an enemy in view would be a fight). A walking turn banks no mana from
+    /// movement, for anyone: nothing was left unspent (PHASE 8 DECISION 16). An
+    /// <paramref name="idle"/> turn (<see cref="WaitTurn"/>) banks the party's whole
+    /// budget first. Raises <see cref="PlayerTurnStarted"/> for the turn it opens;
+    /// never <see cref="TurnEnded"/>, which is a played turn's.
     /// </summary>
-    private void WorldTurn()
+    private void WorldTurn(bool idle = false)
     {
         _atBoundary = true;
         try
         {
             foreach (var c in _party)
+            {
+                if (idle) c.RegenManaFromUnusedMovement(c.DistLeft);
                 RaiseBoundary(GameEvent.TurnEnd, new TurnPayload(TurnCount, Side.Party), c);
+            }
             if (Phase == TurnPhase.GameOver) return;   // a tick took the last member
 
             _attacksThisTurn.Clear();
@@ -2486,7 +2492,6 @@ public sealed class TurnSystem
     private void CreditEnchantments(ActorState payer, ImmutableArray<EnchantmentPayment> payments, int wanted, int spent)
     {
         if (payments.IsDefaultOrEmpty || wanted <= 0 || spent <= 0) return;
-        if (Mode != DungeonMode.Combat) return;   // an entry's mana teaches it nothing outside combat (PHASE 8 DECISION 21)
         var weapon = payer.EquippedWeapon;
         if (weapon == null) return;
 
@@ -2548,9 +2553,9 @@ public sealed class TurnSystem
     /// happens to be positive.
     /// </para>
     /// <para>
-    /// <strong>Combat's alone</strong> (PHASE 8 DECISION 21): while exploring or
-    /// resting nothing credits XP of any kind (mana, HP or a weapon's), so free
-    /// casts and a rest's mana never make a farm.
+    /// <strong>In every mode</strong> (PHASE 8 DECISION 24): a free cast while
+    /// exploring teaches as one in combat does. Its mana came from waiting turns
+    /// out with enemies moving, and that risk is what keeps it from being a farm.
     /// </para>
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The credit is negative: XP is credited, never taken back.</exception>
@@ -2562,7 +2567,7 @@ public sealed class TurnSystem
                 "XP is credited, never taken back: a refund is not a negative credit.");
         if (!_xpFeeds.TryGetValue(earner, out var feed))
             throw new InvalidOperationException("Credited XP to an actor that is not on this turn system's roster.");
-        if (credit.Amount == 0 || Mode != DungeonMode.Combat) return;   // nothing outside combat teaches (PHASE 8 DECISION 21)
+        if (credit.Amount == 0) return;
         feed(credit);
     }
 
@@ -2572,15 +2577,14 @@ public sealed class TurnSystem
     /// <see cref="Tuning.WearPerHit"/> and says when that filled the weapon, an
     /// enemy's does nothing. The two hit appliers are its only callers, so wear
     /// accrues where a hit is written and nowhere else (§6.7: "the unified attack
-    /// resolver is the single place it accrues"). Combat's alone: a cast while
-    /// exploring or resting banks none (PHASE 8 DECISION 21).
+    /// resolver is the single place it accrues"). In every mode, a cast while
+    /// exploring included (PHASE 8 DECISION 24).
     /// </summary>
     /// <exception cref="InvalidOperationException"><paramref name="wielder"/> is not on this system's roster.</exception>
     private void WearHit(ActorState wielder, Weapon weapon)
     {
         if (!_wearFeeds.TryGetValue(wielder, out var feed))
             throw new InvalidOperationException("Wore a weapon for an actor that is not on this turn system's roster.");
-        if (Mode != DungeonMode.Combat) return;   // no cast outside combat banks wear (PHASE 8 DECISION 21)
         feed(weapon);
     }
 

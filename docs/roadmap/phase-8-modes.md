@@ -1,14 +1,17 @@
-# Phase 8 — Exploring, resting and combat
+# Phase 8 — Exploring and combat
 
 **Planned 2026-11-09.** A new plan on top of the shipped Phases 0–7. It gives the
-dungeon the mode Phase 7 (§7.2) already speaks of and no code holds: three modes
-— **exploring**, **resting** and **combat** — with turns kept as the world's clock
-in all three. The decisions and their reasons are recorded in
+dungeon the mode Phase 7 (§7.2) already speaks of and no code holds: planned as
+three modes — **exploring**, **resting** and **combat** — with turns kept as the
+world's clock in all three. After playing 8.2 the user dropped resting (DECISION
+23, 2026-11-17): two modes remain, and waiting turns out while exploring is how
+mana comes back, with the moving enemies as its risk. The decisions and their reasons are recorded in
 [settled](settled.md) under *Exploring, resting and combat*, with the user's
 rulings (PHASE 8 DECISIONS 1–7; 8–19, which answered the plan's open questions
 on 2026-11-11 and added the stop-resting button; 20–21, Space's one-turn rest
-and free actions without XP outside combat; and 22, after play, a fight's end after
-a whole turn unseen). It replaces the open question *One
+and free actions without XP outside combat; 22, after play, a fight's end after
+a whole turn unseen; and 23–24, after play, no resting and XP in every mode).
+It replaces the open question *One
 combat/movement mode, and exploring without the pause* in
 [open-questions](open-questions.md).
 
@@ -24,8 +27,7 @@ moving *while* the party moves, so turns cannot simply be removed.
 
 | Mode | Entered | Ends | The clock | The party | The enemies |
 | --- | --- | --- | --- | --- | --- |
-| **Exploring** | Arriving on a floor with no live enemy in view; combat ending; a rest ending without a sighting | A live enemy comes into view; the player rests | One turn per `MovementBudget` the leader walks; still while nobody walks | Walks freely as a marching line, no budget, no pause; acts without spending movement, earning no XP; Space rests one turn | Awake ones move at the same time, at their budget's share of the party's speed |
-| **Resting** | Chosen by the player while exploring (`R`, or the REST button) | Every living member at full HP and mana with no negative status, or a live enemy comes into view, or the player stops it (`R`, or the STOP RESTING button), or the pause menu opens | Runs on its own, fast-forwarded | Stands still, regains HP and mana, earns no XP; may act as while exploring, free and teaching nothing | Move as in exploring |
+| **Exploring** | Arriving on a floor with no live enemy in view; combat ending | A live enemy comes into view | One turn per `MovementBudget` the leader walks; one per Space; still otherwise | Walks freely as a marching line, no budget, no pause; acts without spending movement, earning XP as in combat; Space waits a turn out, banking an idle turn's mana | Awake ones move at the same time, at their budget's share of the party's speed |
 | **Combat** | A live enemy comes into view in either mode above | The start of a party turn once no living enemy has been in view for a whole turn (DECISION 22) | One turn per side's phase, as today | Turn-based, as today; opens on a fresh party turn | Turn-based, as today |
 
 ## Decisions
@@ -49,11 +51,12 @@ moving *while* the party moves, so turns cannot simply be removed.
   Standing still stops the world, so nothing happens while the player thinks.
   Resting is how time passes on purpose. Deterministic, as every clock in the game
   is (the logic step, 1c).
-- **PHASE 8 DECISION 5 — resting (2026-11-09).** Chosen while exploring. The
+- **PHASE 8 DECISION 5 — resting (2026-11-09).** *Withdrawn by DECISION 23.* Chosen while exploring. The
   party regains HP and mana while the enemies move. It ends when every living
   member is at full HP and full mana (`UsableMaxMana`), or a live enemy comes into
   view — whichever is first — and the party is exploring or fighting again.
-- **PHASE 8 DECISION 6 — resting teaches nothing (2026-11-09).** HP and mana
+- **PHASE 8 DECISION 6 — resting teaches nothing (2026-11-09).** *Withdrawn
+  with resting (DECISION 23).* HP and mana
   regained by resting earn no XP, so taking damage and resting is never an HP-XP
   farm. Healing by a cast or a potion still earns HP XP (§2.2) — in combat only,
   since DECISION 21.
@@ -61,7 +64,8 @@ moving *while* the party moves, so turns cannot simply be removed.
   on a fresh party turn with every member's full movement, wherever the party
   stands when the enemy comes into view. Spotting the enemy is the party's
   advantage.
-- **PHASE 8 DECISION 8 — a button stops a rest (2026-11-11).** Added by the
+- **PHASE 8 DECISION 8 — a button stops a rest (2026-11-11).** *Withdrawn by
+  DECISION 23.* Added by the
   user: while resting the HUD shows a clickable **STOP RESTING  R** button, and
   while exploring a **REST  R** button. `R` toggles the rest, and clicking a
   button does exactly what its key does (`ClickZones.Press`, as the inventory's
@@ -69,7 +73,8 @@ moving *while* the party moves, so turns cannot simply be removed.
   progress first, DECISION 20) and the pause menu (DECISION 18) stop a rest: the
   walking keys do nothing while resting. The buttons are the HUD's own for now
   and move onto the action bar when that phase lands (open question 11).
-- **PHASE 8 DECISION 9 — a rest waits out negative statuses (2026-11-11).** A
+- **PHASE 8 DECISION 9 — a rest waits out negative statuses (2026-11-11).**
+  *Withdrawn by DECISION 23.* A
   rest is how the party gets rid of them: it ends on its own only when every
   living member is at full HP, full mana and has no negative status — Poison,
   Bleeding, Searing, Mire, Sundered, Weakened or Softened. (`StatusEffectType`
@@ -79,18 +84,19 @@ moving *while* the party moves, so turns cannot simply be removed.
   ends. Regeneration, Ward and the Overheal pool don't hold a rest open. This
   narrows DECISION 5's end.
 - **PHASE 8 DECISION 10 — a rest turn restores a share of max HP (2026-11-11).**
+  *Withdrawn by DECISION 23: no free HP outside combat.*
   `RestHealthPercent` (new `tuning.json` key, provisionally 10): each rest turn
   every living member regains that percentage of its max HP, rounded down and
   never less than 1, as a potion's share is (§3.4). It grows with the pool, so a
   rest from 1 HP takes about the same number of turns at any level.
 - **PHASE 8 DECISION 11 — a rest turn banks a whole idle turn's mana
-  (2026-11-11).** No new key: each rest turn converts a whole turn's movement
+  (2026-11-11).** *Kept for Space's waited turn (DECISION 23).* No new key: each rest turn converts a whole turn's movement
   (`MovementBudget`, Mire's cut included, as an idle combat turn would bank) into
   mana through `RegenManaFromUnusedMovement` — 160 / `MovementUnitsPerMana` 10 =
   16 a turn at today's tuning, capped at `UsableMaxMana`. That conversion credits
   no XP already (DECISION 6).
 - **PHASE 8 DECISION 12 — a rest plays at a tuned pace, enemies drawn moving
-  (2026-11-11).** `RestTurnsPerSecond` (new `tuning.json` key, provisionally 4)
+  (2026-11-11).** *Withdrawn by DECISION 23.* `RestTurnsPerSecond` (new `tuning.json` key, provisionally 4)
   sets how fast rest turns play; awake enemies are drawn walking at that sped-up
   pace, so one coming into view is seen arriving. It changes wall time only, never
   what a rest does, so it is `Played = false` for good, like `SaveSlots`.
@@ -108,11 +114,15 @@ moving *while* the party moves, so turns cannot simply be removed.
 - **PHASE 8 DECISION 16 — mana from unspent movement is combat's alone
   (2026-11-11).** Only a combat turn's end converts unspent movement into mana,
   for the party and the enemies alike; a walking turn converts none. Outside
-  combat, a rest (DECISION 11) and potions are how mana comes back.
-- **PHASE 8 DECISION 17 — resting near a farm is accepted (2026-11-11).** Rest
+  combat, a rest (DECISION 11) and potions are how mana comes back. *Since
+  DECISION 23, Space's waited turn and potions; the waited turn is the party's
+  idle turn, and the enemies bank nothing from it.*
+- **PHASE 8 DECISION 17 — resting near a farm is accepted (2026-11-11).**
+  *Holds for waited turns, which run the timers too.* Rest
   turns are world turns and run the dummies' resurrection timers. A dummy that
   gets up in view ends the rest and starts a fight, which is the limit.
-- **PHASE 8 DECISION 18 — a save ends a rest (2026-11-11).** Opening the pause
+- **PHASE 8 DECISION 18 — a save ends a rest (2026-11-11).** *Moot: there is
+  no rest (DECISION 23).* Opening the pause
   menu stops the rest, so a save is always taken while exploring or in combat;
   save version 5 holds no rest state.
 - **PHASE 8 DECISION 19 — the leader takes the line down the stairs
@@ -120,6 +130,7 @@ moving *while* the party moves, so turns cannot simply be removed.
   whole marching line; the members need not be gathered on them. In combat the
   rule stays as today.
 - **PHASE 8 DECISION 20 — Space rests one turn outside combat (2026-11-11).**
+  *Narrowed by DECISION 23: the turn restores mana only.*
   Added by the user: while exploring, Space — End Turn in combat, as today — plays
   exactly one rest turn (the restore, the status ticks, the enemies moving, as in
   8.4) and stops, so the party can act between turns. When a status deals more
@@ -128,7 +139,8 @@ moving *while* the party moves, so turns cannot simply be removed.
   world turn, restoring nothing: a way to wait a turn. Pressed during a full rest,
   it finishes the rest turn in progress and stops there.
 - **PHASE 8 DECISION 21 — actions outside combat are free and teach nothing
-  (2026-11-11).** While exploring or resting a cast or a potion spends no
+  (2026-11-11).** *Its free half holds; its "teach nothing" half is withdrawn by
+  DECISION 24.* While exploring or resting a cast or a potion spends no
   movement (there is no budget, 8.2); a cast still pays its mana and a potion is
   still used up. So that free casts and the rest's mana never make an XP farm
   (DECISION 6), nothing done while exploring or resting credits XP of any kind —
@@ -159,10 +171,32 @@ moving *while* the party moves, so turns cannot simply be removed.
   play, the leader hid round a corner with three members down. The check found
   nothing in view, the fallen revived, and one of them saw the enemy at once, so a
   new fight began. An enemy killed in view keeps nothing open.
+- **PHASE 8 DECISION 23 — no resting; a waited turn banks mana (2026-11-17,
+  after play).** The user dropped resting: no free HP outside combat. Two modes
+  remain, exploring and combat. Space while exploring waits one world turn out
+  where the party stands, and every living member banks a whole idle turn's
+  movement as mana, as an idle combat turn's end would (DECISION 11's rule, Mire's
+  cut included, capped at `UsableMaxMana`; 16 a turn at today's tuning). It
+  restores no HP, and the conversion teaches nothing, as it never has. HP comes
+  back outside combat only by heals and potions. The patrols are meant to make
+  waiting turns out a real risk, which is the price of the mana: on a waited turn
+  every awake enemy moves a whole turn's worth, its full budget, as it would in
+  its own phase (8.3), and one that moves into sight starts combat as any sighting
+  does (DECISIONS 7 and 15). The enemies bank no mana from it. No tuning keys:
+  `RestHealthPercent` and `RestTurnsPerSecond` never arrive. This withdraws
+  DECISIONS 5, 6, 8, 9, 10, 12 and 18, keeps 11 for the waited turn, and narrows
+  20.
+- **PHASE 8 DECISION 24 — XP counts in every mode (2026-11-17, after play).**
+  What the party does while exploring teaches exactly as it would in combat: mana,
+  HP and weapon XP, a cast's wear, and an enchantment's tier. Casts and drinks
+  stay free of movement (DECISION 21's first half). The user's reasoning: the mana
+  a free cast spends came from waiting turns out with enemies moving, and with the
+  patrols managed well that risk is enough. This withdraws DECISION 21's "teach
+  nothing" half and the assumption that enchantment tiers stop outside combat.
 
 ## 8.1 The mode, in Logic
 
-`TurnSystem` gains `Mode` (`Exploring`, `Resting`, `Combat`) and a `ModeChanged`
+`TurnSystem` gains `Mode` (`Exploring`, `Combat`; `Resting` until DECISION 23) and a `ModeChanged`
 event, and becomes the one place the mode changes:
 
 - **Into combat:** a live enemy enters the in-view set (`NotifyEnemyInView`, Phase
@@ -195,7 +229,8 @@ ground the leader walks, and each `MovementBudget` of it is one turn of the worl
 
 What a walking turn does **not** do: no attack beats (no enemy is in view, or it
 would be combat), and no mana from unspent movement, for anyone (DECISION 16) —
-nothing is left unspent. Resting is where mana comes back outside combat.
+nothing is left unspent. Space's waited turn is where mana comes back outside
+combat (DECISION 23).
 
 The other members walk into formation behind the leader (DECISION 13), and `E`
 with the leader on the stairs takes the whole line (DECISION 19).
@@ -204,8 +239,9 @@ When a fight starts mid-walk, the walking turn in progress is dropped and
 `TurnCount` moves on: combat opens on a new turn (DECISION 15).
 
 The party may act while exploring — heal, drink, swap — without spending
-movement, and nothing it does credits XP or banks wear (DECISION 21). Space plays
-one rest turn (8.4, DECISION 20); time otherwise passes only by walking.
+movement (DECISION 21), and what it does teaches as in combat (DECISION 24).
+Space waits one turn out, banking an idle turn's mana (DECISION 23); time
+otherwise passes only by walking.
 
 ## 8.3 Enemies moving at the same time
 
@@ -215,10 +251,19 @@ the party's speed (DECISION 3) along the path `EnemyAi` plans for it, re-planned
 each world turn. A pursuer heads for the spot where it last saw the party and
 stops there (DECISION 14); passive enemies stay put until patrols exist. An enemy that walks into the party's view starts combat (8.1),
 the scene's sight check running on enemy tile crossings as it does in the enemy
-phase today. Patrol routes plug in here later — a route is another plan for an
+phase today. A waited turn (Space, DECISION 23) moves every awake enemy a whole
+turn's worth, its full budget, with the party standing still; one that comes into
+sight on the way starts combat. The wait plays out over a second, as a second of
+walking would, so an enemy is seen arriving; a sighting partway cancels it, and
+its mana with it (banked at the waited turn's end, as combat's is), the fight's
+fresh party turn making up for it. Patrol routes plug in here later — a route is another plan for an
 enemy that is not passive — and are out of this phase.
 
-## 8.4 Resting
+## 8.4 Resting — withdrawn
+
+*Dropped by the user on 2026-11-17, after playing 8.2 (DECISION 23): no free HP
+outside combat, and Space's waited turn brings mana back. The plan as written is
+kept below for the record.*
 
 `R` (or the REST button) while exploring starts a rest, and the party stands
 where it is. A party already full and clear of negative statuses ends the rest
@@ -260,47 +305,36 @@ version 5's migration step writes the mode from it — a version-4 save, always
 taken in the party's phase, was exploring when it marched and in combat when it
 did not. Every older save still loads (the pinned saves are never edited), and a
 Phase 7 build refuses a version-5 save. Each enemy's last-seen spot (DECISION 14)
-is saved too, written empty for every enemy of an older save. A save never holds a
-rest: the pause menu ends it first (DECISION 18).
+is saved too, written empty for every enemy of an older save.
 
 ## 8.6 What the player sees
 
-A mode readout (EXPLORING, RESTING, COMBAT); `SPOTTED!` over the enemy that
-starts a fight; a clickable **REST  R** button while exploring and **STOP RESTING
-R** while resting (DECISION 8), each doing what its key does; a **SPACE: REST 1
-TURN** hint while exploring (DECISION 20); a rest's progress —
-every member's HP and mana filling; the reach overlay and the ruler only in
-combat. The older documents
+A mode readout (EXPLORING, COMBAT); `SPOTTED!` over the enemy that starts a
+fight; a **SPACE: WAIT 1 TURN** hint while exploring (DECISION 23); the reach
+overlay and the ruler only in combat. The older documents
 (§1.2's turns, §6.1, the marching rules) gain a note saying what Phase 8 changes.
 
 ## 8.7 Code impact
 
 - `TurnSystem`: `Mode`, `ModeChanged`, the transitions (8.1); the walking clock —
   an `AdvanceExploring(walked)` the scene feeds the leader's distance, raising
-  each world turn's boundaries (8.2); enemy movement on that clock (8.3); the rest
-  (8.4) and its stop. `CheckEncounterEnd` becomes the combat-to-exploring
+  each world turn's boundaries (8.2); enemy movement on that clock (8.3); the
+  waited turn's mana (DECISION 23). `CheckEncounterEnd` becomes the combat-to-exploring
   transition. Unspent movement banks mana only at a combat turn's end.
 - `DungeonScene`: movement without a ledger while exploring; marching followers as
   today; `EvaluateMarchingForTurn`, `_marchingThisTurn` and `AutoEndTurnWhenDry`
   removed; the overlay and swap cost read the mode; followers path into
-  formation; `R` toggles a rest; Space rests one turn outside combat; the pause
-  menu ends a rest; the leader takes the line down the stairs.
-- `DungeonHud`: the mode readout, and the REST / STOP RESTING buttons through
-  `ClickZones`.
+  formation; Space waits a turn out while exploring; the leader takes the line
+  down the stairs.
+- `DungeonHud`: the mode readout and the waiting hint.
 - `EnemyState`: the spot where it last saw the party.
-- `StatusRules`: which statuses are negative (DECISION 9), the rest's end check
-  reading it.
-- XP and wear: `CreditXp` and the wear a cast banks read the mode, crediting
-  nothing outside combat (DECISION 21) — an enchantment trigger's `ManaSpent`
-  record and a staff's forged entries alike; casts and drinks spend no movement while
-  exploring or resting.
+- XP and wear credit in every mode (DECISION 24); casts and drinks spend no
+  movement while exploring (DECISION 21).
 - `EnemyAi`: a walking plan sized to world time rather than a budget, a pursuer's
   to its last-seen spot.
 - Save: version 5 (8.5) — the mode, the walking clock, each enemy's last-seen
   spot — with its consistency checks.
-- Tuning: `RestHealthPercent` (played, hashed from version 5) and
-  `RestTurnsPerSecond` (`Played = false` for good), each with its reader and
-  `TuningSchema` clamp. The rest's mana needs no key (DECISION 11).
+- Tuning: no new keys (DECISION 23).
 
 ### Implementation steps
 
@@ -342,8 +376,7 @@ Each step lands with its tests and keeps the golden tests green.
      its banner.
    - **No budget.** Walking spends nothing while exploring, and neither do the
      followers. `AutoEndTurnWhenDry` is gone. Space or Enter while exploring
-     calls `WaitTurn`, which passes one world turn; 8.4 turns it into a rest
-     turn.
+     calls `WaitTurn`, which passes one world turn.
    - **A fight's new turn.** A live enemy coming into view in the party's phase
      of exploring opens the fight's own turn on the spot (`OpenFight`, DECISIONS
      7 and 15). The walk is dropped, `TurnCount` moves on, counters reset, zones
@@ -353,12 +386,16 @@ Each step lands with its tests and keeps the golden tests green.
    - **The mode crosses the stairs.** `TurnCarry.InCombat` carries it, so a
      party fleeing down mid-fight arrives in combat, with no fresh turn to
      exploit. The arrival check then ends the fight if nothing is in view.
-   - **Free actions teach nothing (DECISION 21).** Casts and drinks spend no
-     movement outside combat. `CreditXp`, `WearHit` and `CreditEnchantments`
-     credit nothing outside combat.
-     **Assumed, not ruled:** enchantment tiers stop too. They climb on mana
-     spent, and a rest's free mana would farm them just as it would farm mana
-     XP.
+   - **Free actions (DECISION 21).** Casts and drinks spend no movement
+     outside combat. As first built, `CreditXp`, `WearHit` and
+     `CreditEnchantments` credited nothing outside combat, and enchantment tiers
+     stopped too, as an assumption.
+   - **After play (2026-11-17): no resting, XP in every mode (DECISIONS 23 and
+     24).** The mode guards in `CreditXp`, `WearHit` and `CreditEnchantments`
+     went, and `DungeonMode.Resting` with them. `WaitTurn` plays its world turn
+     as an idle one: every living member banks its whole unspent budget as mana
+     (`RegenManaFromUnusedMovement`) before its statuses tick. A walking turn
+     still banks none.
    - **Stairs (DECISION 19).** `DungeonState.CanUse` waives the gathering while
      exploring when the leader standing on the stair is named. Asked without
      one, as `EndRun` asks of the way out, the gathering still holds.
@@ -382,7 +419,7 @@ Each step lands with its tests and keeps the golden tests green.
 3. **8.3 — Enemies move with the party.** Awake enemies at their budget's share of
    the party's speed, a pursuer to its last-seen spot; walking into view starts
    combat with the party first, on a new turn.
-4. **8.4 — Resting.** `R` and the REST / STOP RESTING buttons, the rest turns, the
+4. **8.4 — Resting. Withdrawn (DECISION 23).** As planned: `R` and the REST / STOP RESTING buttons, the rest turns, the
    restore without XP, the ways it ends. Tests: a rest stops on `R` and on the
    button alike; it stops on a sighting; it ends when all are full and clear;
    poisoned, it takes the poison's damage and runs on past full HP until the
@@ -398,7 +435,7 @@ Each step lands with its tests and keeps the golden tests green.
 
 ## Open questions
 
-None. The eleven the plan was written with were ruled on 2026-11-11 (PHASE 8
+None. Rulings 1, 2, 7, 8 and 9 below went with resting (DECISION 23). The eleven the plan was written with were ruled on 2026-11-11 (PHASE 8
 DECISIONS 9–19, with DECISION 8 added by the user):
 
 | # | Question | Ruling |
