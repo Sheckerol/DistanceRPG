@@ -401,8 +401,18 @@ public sealed record FloorDto(int Index, IReadOnlyList<EnemyDto> Enemies, IReadO
 /// after a load, whatever the tuning or the content says by then. Null on every
 /// other row. Appended by Phase 5.6, with its default.
 /// </param>
+/// <param name="LastSeen">
+/// Where the party stood when this enemy last saw it (PHASE 8 DECISION 14), the
+/// spot a pursuer walks to while the party explores; null until it has been seen
+/// and lost. Appended by Phase 8.3, with its default: an older save's rows have
+/// none, so their pursuers stand still until seen again.
+/// </param>
 public sealed record EnemyDto(int SpawnIndex, bool Boss, ActorDto Body, WeaponDto Weapon, int DefeatedAtTurn, int TurnsSinceSeen,
-    int DefeatCount, int RevivalsRolled, int RevivalDamage, int RevivalMaxHp, bool DropTaken, DropDto? GroundItem = null);
+    int DefeatCount, int RevivalsRolled, int RevivalDamage, int RevivalMaxHp, bool DropTaken, DropDto? GroundItem = null,
+    SpotDto? LastSeen = null);
+
+/// <summary>A point on the floor, in logic units (<see cref="EnemyDto.LastSeen"/>).</summary>
+public sealed record SpotDto(float X, float Y);
 
 /// <summary>The drop an untaken permanent kill lies on, pinned (<see cref="Drop"/>): the weapon, and whether the unique roll won. Its farm depth is the row's.</summary>
 public sealed record DropDto(WeaponDto Weapon, bool WasUniqueRoll);

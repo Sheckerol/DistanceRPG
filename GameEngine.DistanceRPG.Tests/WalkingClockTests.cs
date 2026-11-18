@@ -174,8 +174,24 @@ public sealed class WalkingClockTests : IDisposable
         Assert.Equal((1, 1, 0f), (turns.TurnCount, started, turns.WalkedThisTurn));
     }
 
+    /// <summary>Step the logic clock as live play does until the waited turn in progress has played out; how many steps it took.</summary>
+    private static int PlayOut(TurnSystem turns)
+    {
+        int steps = 0;
+        for (; turns.Waiting && steps < 10_000; steps++)
+            turns.Update(SaveGame.LogicStepSeconds);
+        return steps;
+    }
+
+    /// <summary>Wait a turn out and play it to its end.</summary>
+    private static void Wait(TurnSystem turns)
+    {
+        Assert.True(turns.WaitTurn());
+        PlayOut(turns);
+    }
+
     [Fact]
-    public void WaitTurn_PassesOneTurn_DroppingTheWalk_AndOnlyExploring()
+    public void WaitTurn_PlaysOneTurnOutAtWalkingPace_DroppingTheWalk_AndOnlyExploring()
     {
         var a = Member("A", 3, 3);
         var enemy = Far();
@@ -183,7 +199,13 @@ public sealed class WalkingClockTests : IDisposable
         turns.AdvanceExploring(100f);
 
         Assert.True(turns.WaitTurn());
-        Assert.Equal((1, 0f), (turns.TurnCount, turns.WalkedThisTurn));
+        Assert.Equal((0, 0f, true), (turns.TurnCount, turns.WalkedThisTurn, turns.Waiting));   // the walk dropped, the turn not yet out
+        Assert.False(turns.WaitTurn());                     // one wait at a time
+        Assert.Equal(0, turns.AdvanceExploring(TurnLength)); // and the party stands through it
+        int steps = PlayOut(turns);
+        Assert.Equal((1, false), (turns.TurnCount, turns.Waiting));
+        // A turn's walk at walking pace: a second at today's tuning.
+        Assert.InRange(steps * SaveGame.LogicStepSeconds, TurnLength / GameConstants.Speed - 0.02f, TurnLength / GameConstants.Speed + 0.02f);
 
         turns.NotifyEnemyVisible(enemy, true);   // a fight: the turn is ended, not waited out
         int count = turns.TurnCount;
@@ -247,14 +269,130 @@ public sealed class WalkingClockTests : IDisposable
         var turns = Exploring([a, down], Far());
         int perTurn = (int)(a.EffectiveMax / Math.Max(1, GameContent.Current.Tuning.MovementUnitsPerMana));
 
-        turns.WaitTurn();
+        Assert.True(turns.WaitTurn());
+        Assert.Equal(0, a.Mana);                                     // banked at the turn's end, not its start
+        PlayOut(turns);
 
         Assert.Equal(Math.Min(perTurn, a.UsableMaxMana), a.Mana);
         Assert.Equal((hp, manaXp), (a.Hp, a.ManaXp));
         Assert.Equal(0, down.Mana);                                  // nothing for the dead
 
-        for (int i = 0; i < 50; i++) turns.WaitTurn();
+        for (int i = 0; i < 50; i++) Wait(turns);
         Assert.Equal(a.UsableMaxMana, a.Mana);                       // capped at the spendable pool
+    }
+
+    [Fact]
+    public void AWaitCancelledByAFight_BanksNothing_AndTheFightOpensFresh()
+    {
+        var a = Member("A", 3, 3);
+        a.Mana = 0;
+        var enemy = Far();
+        var turns = Exploring([a], enemy);
+        Assert.True(turns.WaitTurn());
+        for (int i = 0; i < 30; i++) turns.Update(SaveGame.LogicStepSeconds);   // a quarter of the wait
+
+        turns.NotifyEnemyVisible(enemy, true);
+
+        Assert.Equal((DungeonMode.Combat, false), (turns.Mode, turns.Waiting));
+        Assert.Equal((1, 0), (turns.TurnCount, a.Mana));   // the fight's own turn; the wait's mana never came
+        Assert.Equal(a.EffectiveMax, a.DistLeft);
+    }
+
+    // ── Pursuers (Phase 8.3) ─────────────────────────────────────────────────
+
+    /// <summary>An awake enemy that saw the party and lost it, at (r, c), its last-seen spot set by leaving view.</summary>
+    private static (TurnSystem Turns, EnemyState Enemy) Pursuit(PartyMemberState[] party, int r, int c, int turnsSinceSeen = 0)
+    {
+        var enemy = new EnemyState { X = (c + 0.5f) * Tile, Y = (r + 0.5f) * Tile, TurnsSinceSeen = turnsSinceSeen };
+        var turns = new TurnSystem(new int[30, 30], party, [enemy], () => 10, mode: DungeonMode.Combat);
+        turns.NotifyEnemyInView(enemy, true);
+        turns.NotifyEnemyInView(enemy, false);
+        turns.ResumeMode(DungeonMode.Exploring);
+        return (turns, enemy);
+    }
+
+    [Fact]
+    public void LeavingView_AnEnemyKeepsWhereTheNearestMemberStood()
+    {
+        var near = Member("A", 3, 10);
+        var far = Member("B", 3, 3);
+        var (_, enemy) = Pursuit([far, near], 3, 20);
+        Assert.Equal((near.X, near.Y), enemy.LastSeenSpot);
+    }
+
+    [Fact]
+    public void APursuer_WalksItsBudgetsShareOfTheWalk_ToItsSpot_AndStopsThere()
+    {
+        var a = Member("A", 3, 3);
+        var (turns, enemy) = Pursuit([a], 3, 8);   // five tiles off: inside the two turns it stays awake
+        var spot = enemy.LastSeenSpot!.Value;
+        a.X = 10.5f * Tile;   // the party walked off; the spot stays where it was seen
+        int walks = 0;
+        turns.EnemiesWalked += () => walks++;
+        float startX = enemy.X;
+        float share = enemy.MoveBudget / TurnLength;
+
+        turns.AdvanceExploring(TurnLength / 2);
+
+        Assert.Equal(startX - TurnLength / 2 * share, enemy.X, 2);   // half a turn: half its budget, straight down the corridor
+        Assert.True(walks > 0);
+
+        turns.AdvanceExploring(20 * TurnLength);   // long enough, but it stops at the spot
+        Assert.Equal(spot, (enemy.X, enemy.Y));
+    }
+
+    [Fact]
+    public void AWaitedTurn_MovesAPursuerItsWholeBudget()
+    {
+        var a = Member("A", 3, 3);
+        var (turns, enemy) = Pursuit([a], 3, 25);
+        float startX = enemy.X;
+        Wait(turns);
+        Assert.Equal(startX - StatusBehaviours.MiredBudget(enemy, enemy.MoveBudget), enemy.X, 1);
+    }
+
+    [Fact]
+    public void APassiveEnemy_OrOneNeverLost_StaysPut()
+    {
+        var a = Member("A", 3, 3);
+        var (turns, passive) = Pursuit([a], 3, 20, turnsSinceSeen: 2);
+        float x = passive.X;
+        turns.AdvanceExploring(3 * TurnLength);
+        Assert.Equal(x, passive.X);
+
+        var b = Member("B", 3, 3);
+        var unseen = new EnemyState { X = 20.5f * Tile, Y = 3.5f * Tile, TurnsSinceSeen = 0 };
+        var other = Exploring([b], unseen);
+        other.AdvanceExploring(TurnLength);
+        Assert.Equal(20.5f * Tile, unseen.X);   // awake, but it never lost the party: nowhere to go
+    }
+
+    [Fact]
+    public void APursuerGoesPassive_AfterTwoTurnsUnseen()
+    {
+        var a = Member("A", 3, 3);
+        var (turns, enemy) = Pursuit([a], 3, 28, turnsSinceSeen: 1);
+        turns.AdvanceExploring(TurnLength);   // one walking turn: its wake reaches 2
+        float x = enemy.X;
+        turns.AdvanceExploring(TurnLength);
+        Assert.Equal(x, enemy.X);
+    }
+
+    [Fact]
+    public void APursuerSightedMidWalk_StartsTheFight_AndTheWalkStops()
+    {
+        var a = Member("A", 3, 3);
+        var (turns, enemy) = Pursuit([a], 3, 20);
+        bool sighted = false;
+        // The scene's part: the first step it walks puts it in view.
+        turns.EnemiesWalked += () => { if (!sighted) { sighted = true; turns.NotifyEnemyVisible(enemy, true); } };
+
+        int passed = turns.AdvanceExploring(3 * TurnLength);
+
+        Assert.Equal((0, DungeonMode.Combat, 1), (passed, turns.Mode, turns.TurnCount));   // the fight's own turn, the walk's dropped
+        float x = enemy.X;
+        turns.AdvanceExploring(TurnLength);
+        Assert.Equal(x, enemy.X);   // in combat its own phase moves it, not the walk
     }
 
     [Fact]

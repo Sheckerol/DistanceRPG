@@ -171,7 +171,8 @@ internal static class SaveMapper
             row.RevivalDamage,
             row.RevivalMaxHp,
             row.DropTaken,
-            lying is null ? null : new DropDto(Weapon(lying.Weapon), lying.WasUniqueRoll));
+            lying is null ? null : new DropDto(Weapon(lying.Weapon), lying.WasUniqueRoll),
+            row.LastSeenSpot is { } spot ? new SpotDto(spot.X, spot.Y) : null);
     }
 
     /// <summary>The party's XP at the door: each member's weapon XP by class name, a class at zero left out, in <see cref="WeaponClass"/> order, then its two pools.</summary>
@@ -1138,6 +1139,8 @@ internal static class SaveMapper
         enemy.RevivalDamage = Count(row.RevivalDamage, $"{at}.revivalDamage");
         enemy.RevivalMaxHp = Count(row.RevivalMaxHp, $"{at}.revivalMaxHp");
         enemy.DropTaken = row.DropTaken;
+        if (row.LastSeen is { } seen)
+            enemy.LastSeenSpot = (Coordinate(seen.X, MapGenerator.Cols, $"{at}.lastSeen.x"), Coordinate(seen.Y, MapGenerator.Rows, $"{at}.lastSeen.y"));
 
         if (row.GroundItem is { } lying)
         {

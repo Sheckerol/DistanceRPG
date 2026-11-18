@@ -140,6 +140,15 @@ public sealed class EnemyState : ActorState
     /// </summary>
     public int TurnsSinceSeen { get; set; } = 2;
 
+    /// <summary>
+    /// Where the party stood when this enemy last saw it (PHASE 8 DECISION 14):
+    /// the nearest living member's position at the moment the enemy left view.
+    /// While exploring, an awake enemy (<see cref="TurnsSinceSeen"/> below 2) walks
+    /// here and stops: no tracking through the fog. Null until it has been seen
+    /// and lost.
+    /// </summary>
+    public (float X, float Y)? LastSeenSpot { get; set; }
+
     // ── The farm (§3.2) ──────────────────────────────────────────────────────
     // Five plain fields, every one of them settable, because together they are
     // the whole of a dummy's history: a save stores accumulated values rather

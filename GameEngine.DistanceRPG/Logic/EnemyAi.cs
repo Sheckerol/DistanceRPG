@@ -94,6 +94,35 @@ public static class EnemyAi
     }
 
     /// <summary>
+    /// The whole walk to a point while exploring (PHASE 8 DECISION 14), with no
+    /// budget: the clock walks it a share at a time. Tile centres along the A*
+    /// path to the point's tile, with <paramref name="blockedTiles"/> as walls. A
+    /// blocked goal is walked up to, to a tile beside it. Empty when the enemy
+    /// stands on the goal's tile, already beside a blocked one, or has no way
+    /// there.
+    /// </summary>
+    public static List<(float X, float Y)> PlanWalkTo(
+        EnemyState enemy, float x, float y, int[,] grid, IReadOnlyCollection<(int R, int C)>? blockedTiles = null)
+    {
+        float tile = GameConstants.Tile;
+        int startR = (int)MathF.Floor(enemy.Y / tile), startC = (int)MathF.Floor(enemy.X / tile);
+        int goalR = (int)MathF.Floor(y / tile), goalC = (int)MathF.Floor(x / tile);
+        int rows = grid.GetLength(0), cols = grid.GetLength(1);
+        if ((startR, startC) == (goalR, goalC) || goalR < 0 || goalR >= rows || goalC < 0 || goalC >= cols)
+            return new List<(float X, float Y)>();
+
+        grid = MaskBlocked(grid, blockedTiles, startR, startC);
+        var path = grid[goalR, goalC] == 0
+            ? Pathfinder.FindPath(grid, startR, startC, goalR, goalC)
+            : Math.Max(Math.Abs(goalR - startR), Math.Abs(goalC - startC)) <= 1
+                ? null
+                : Pathfinder.FindPath(grid, startR, startC, goalR, goalC, 1);
+        if (path is not { Count: > 0 })
+            return new List<(float X, float Y)>();
+        return WalkTilePath(enemy.X, enemy.Y, path, float.PositiveInfinity).Item1;
+    }
+
+    /// <summary>
     /// Plan a budget-limited retreat: breadth-first over reachable floor within
     /// budget, pick the tile that maximises distance to the nearest living party
     /// member, and walk toward it. Used by a lone healer with no ally to mend.

@@ -1012,6 +1012,10 @@ public sealed class SaveConsistencyTests : IDisposable
                 $"{rows} is above {rows - 1}: a floor numbers its rows from 0 in the order it placed them, the boss last, and never loses one"),
             ("a row off the map", mid, tree => { }, tree => FloorNode(tree, 3)["enemies"]![0]!["body"]!["x"] = -1e30,
                 "campaign.visit.floors[3].enemies[0].body.x", $"{-1e30f} is off the map, 0 to {width}: a map is {MapGenerator.Cols} tiles of {GameConstants.Tile} {offTheMap}"),
+            ("a pursuer's spot off the map", mid,
+                tree => FloorNode(tree, 3)["enemies"]![0]!["lastSeen"] = JsonNode.Parse($$"""{ "x": {{width}}, "y": 0 }"""),
+                tree => FloorNode(tree, 3)["enemies"]![0]!["lastSeen"] = JsonNode.Parse($$"""{ "x": 16, "y": {{height + 1}} }"""),
+                "campaign.visit.floors[3].enemies[0].lastSeen.y", $"{height + 1} is off the map, 0 to {height}: a map is {MapGenerator.Rows} tiles of {GameConstants.Tile} {offTheMap}"),
         ];
         foreach (var (what, text, atCeiling, past, where, problem) in ceilings)
         {

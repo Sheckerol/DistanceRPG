@@ -719,9 +719,17 @@ public class DungeonScene : Scene
     internal void StepLogic()
     {
         _turns.Update(SaveGame.LogicStepSeconds);
-        if (_turns.Phase is not (TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking))
-            return;
+        if (_turns.Phase is TurnPhase.EnemyMoving or TurnPhase.EnemyAttacking)
+            SenseEnemyWalk();
+    }
 
+    /// <summary>
+    /// The enemies moved, in their own phase or while the party explores
+    /// (<see cref="TurnSystem.EnemiesWalked"/>): their stand-ins mirrored to where
+    /// the logic put them, and the sight refreshed when one crossed a tile.
+    /// </summary>
+    private void SenseEnemyWalk()
+    {
         bool crossedTile = false;
         foreach (var enemy in _enemies)
         {
@@ -1247,6 +1255,10 @@ public class DungeonScene : Scene
         };
 
         _turns.PlayerTurnStarted += OnPlayerTurnStarted;
+
+        // Pursuers walking while the party explores (Phase 8.3): mirrored, and one
+        // that crosses into sight starts the fight before the clock runs on.
+        _turns.EnemiesWalked += SenseEnemyWalk;
 
         _turns.EnemyHit += (enemy, res) =>
         {
@@ -1916,7 +1928,7 @@ public class DungeonScene : Scene
 
     private void UpdateActiveCharacterMovement(float deltaTime)
     {
-        if (Transiting || _turns.Phase != TurnPhase.Player || AnyMenuOpen) return;
+        if (Transiting || _turns.Phase != TurnPhase.Player || AnyMenuOpen || _turns.Waiting) return;
 
         // Exploring has no budget (PHASE 8 DECISION 4): the party walks as far as
         // the player likes, and the walk is the world's clock instead.
@@ -2066,7 +2078,10 @@ public class DungeonScene : Scene
     private void PassTurn()
     {
         if (_turns.Mode == DungeonMode.Exploring)
-            _turns.WaitTurn();
+        {
+            if (_turns.WaitTurn())
+                Log.Info($"[Turns] Waiting turn {_turns.TurnCount} out on floor {_floor.Index + 1}");
+        }
         else
             _turns.EndTurn();
     }

@@ -146,6 +146,31 @@ public sealed class TurnSystem
     /// </summary>
     public float WalkedThisTurn { get; private set; }
 
+    /// <summary>
+    /// A waited turn is playing out (<see cref="WaitTurn"/>, PHASE 8 DECISION 23):
+    /// the party stands while <see cref="Update"/> runs the world's clock at walking
+    /// pace, the awake enemies moving, until a whole turn has passed or a fight
+    /// cancels it. Not a safe point (<see cref="SaveGame.IsSafePoint"/>): the
+    /// enemies are moving.
+    /// </summary>
+    public bool Waiting => _waitLeft > 0f;
+
+    // The world clock the waited turn still has to run, in logic units.
+    private float _waitLeft;
+
+    // Each pursuer's walk to its last-seen spot while exploring, planned on its
+    // first step of a world turn and dropped at every turn's boundary and change
+    // of mode, so it is re-planned from where everyone then stands.
+    private readonly Dictionary<EnemyState, List<(float X, float Y)>> _pursuits = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>
+    /// Enemies moved while exploring (Phase 8.3): raised after a share of the
+    /// world's clock moved at least one awake enemy, so the scene can mirror them
+    /// and refresh the sight a tile crossing changes. Never in combat, where the
+    /// enemies' own phase moves them.
+    /// </summary>
+    public event Action? EnemiesWalked;
+
     // True while a turn's boundary runs (a player turn's start, a walking turn, a
     // fight's opening), so a fight that starts inside one (a dummy getting up in
     // view) opens on the turn being opened rather than a second one after it.
@@ -568,7 +593,11 @@ public sealed class TurnSystem
         var was = Mode;
         Mode = mode;
         if (was == DungeonMode.Exploring)
+        {
             WalkedThisTurn = 0f;   // the walking turn in progress is dropped (PHASE 8 DECISION 15)
+            _waitLeft = 0f;        // and a waited turn with it, its mana unbanked (PHASE 8 DECISION 23)
+        }
+        _pursuits.Clear();
         ModeChanged?.Invoke(was, mode);
     }
 
@@ -725,7 +754,10 @@ public sealed class TurnSystem
         ArgumentNullException.ThrowIfNull(enemy);
         if (!visible)
         {
-            _inView.Remove(enemy);
+            // Leaving view, it last saw the party where the nearest member stands
+            // (PHASE 8 DECISION 14): where a pursuer heads once the party explores.
+            if (_inView.Remove(enemy) && enemy.Alive && NearestLivingMember(enemy) is { } nearest)
+                enemy.LastSeenSpot = (nearest.X, nearest.Y);
             return;
         }
         _inView.Add(enemy);
@@ -1237,6 +1269,11 @@ public sealed class TurnSystem
     {
         switch (Phase)
         {
+            case TurnPhase.Player:
+                if (Waiting && Exploring)
+                    AdvanceWait(deltaTime);
+                break;
+
             case TurnPhase.TurnEnding:
                 _timer -= deltaTime;
                 if (_timer <= 0f && _enemyTurnPending)
@@ -1874,13 +1911,24 @@ public sealed class TurnSystem
     /// <returns>How many world turns the walk passed.</returns>
     public int AdvanceExploring(float walked)
     {
-        if (!Exploring || !(walked > 0f)) return 0;
-        float turnLength = Math.Max(1, GameContent.Current.Tuning.MovementBudget);
-        WalkedThisTurn += walked;
+        if (!Exploring || Waiting || !(walked > 0f)) return 0;
+        float turnLength = TurnLength;
         int passed = 0;
-        while (Exploring && WalkedThisTurn >= turnLength)
+        // The awake enemies walk at the same time (Phase 8.3), the clock split at
+        // each boundary so each turn's share is walked on that turn's plans.
+        while (Exploring && walked > 0f)
         {
-            WalkedThisTurn -= turnLength;
+            float toBoundary = turnLength - WalkedThisTurn;
+            if (walked < toBoundary)
+            {
+                WalkPursuers(walked);
+                WalkedThisTurn += walked;
+                break;
+            }
+            WalkPursuers(toBoundary);
+            walked -= toBoundary;
+            WalkedThisTurn = 0f;
+            if (!Exploring) break;   // a pursuer the scene saw would have made it a fight
             WorldTurn();
             passed++;
         }
@@ -1889,21 +1937,108 @@ public sealed class TurnSystem
 
     /// <summary>
     /// Wait one world turn out where the party stands (Space while exploring; PHASE 8
-    /// DECISION 23): the walking turn in progress is dropped and one whole turn
-    /// passes (<see cref="WorldTurn"/>) as an idle turn. Every living member banks
-    /// its whole unspent budget as mana, as an idle combat turn's end would
+    /// DECISION 23). The walking turn in progress is dropped, and a whole turn plays
+    /// out over the next <see cref="Update"/>s at walking pace, the party standing
+    /// and the awake enemies moving their whole budget (Phase 8.3): one that walks
+    /// into sight starts a fight, which cancels the wait, its mana unbanked. Played
+    /// out, it ends as an idle turn (<see cref="WorldTurn"/>): every living member
+    /// banks its whole unspent budget as mana, as an idle combat turn's end would
     /// (<see cref="ActorState.RegenManaFromUnusedMovement"/>, Mire's cut included),
     /// before its statuses tick. It restores no HP, and the conversion credits no
-    /// XP. Waiting is how mana comes back outside combat, and the enemies that
-    /// move meanwhile are its risk.
+    /// XP.
     /// </summary>
-    /// <returns>False, with nothing passed, outside the party's phase of exploring.</returns>
+    /// <returns>False, with nothing started, outside the party's phase of exploring or while a wait is already playing.</returns>
     public bool WaitTurn()
     {
-        if (!Exploring) return false;
+        if (!Exploring || Waiting) return false;
         WalkedThisTurn = 0f;
-        WorldTurn(idle: true);
+        _waitLeft = TurnLength;
         return true;
+    }
+
+    /// <summary>One step of a waited turn: the clock at walking pace, the pursuers with it, and the idle turn at its end.</summary>
+    private void AdvanceWait(float deltaTime)
+    {
+        float clock = MathF.Min(_waitLeft, GameConstants.Speed * deltaTime);
+        if (!(clock > 0f)) return;
+        WalkPursuers(clock);
+        if (!Exploring) return;   // the wait was cancelled
+        _waitLeft -= clock;
+        if (_waitLeft > 0f) return;
+        _waitLeft = 0f;
+        WorldTurn(idle: true);
+    }
+
+    /// <summary>The length of a world turn in walked units: one <see cref="Tuning.MovementBudget"/>.</summary>
+    private static float TurnLength => Math.Max(1, GameContent.Current.Tuning.MovementBudget);
+
+    /// <summary>
+    /// <paramref name="clock"/> units of the world's clock while exploring move every
+    /// awake enemy, one with <see cref="EnemyState.TurnsSinceSeen"/> below 2 and a
+    /// <see cref="EnemyState.LastSeenSpot"/>, toward that spot (PHASE 8 DECISIONS 3
+    /// and 14): its share of the party's pace, its (mired) budget over the party's,
+    /// so a whole turn of the clock walks its whole budget. It stops on the spot.
+    /// The path is planned on the turn's first step, around every other living
+    /// body, and re-planned each turn. Nothing reacts: an enemy near enough to the
+    /// party for a zone would be in view, and a fight. Raises
+    /// <see cref="EnemiesWalked"/> when anyone moved.
+    /// </summary>
+    private void WalkPursuers(float clock)
+    {
+        if (!(clock > 0f)) return;
+        bool moved = false;
+        foreach (var enemy in _enemies)
+        {
+            if (!enemy.Alive || enemy.TurnsSinceSeen >= 2 || enemy.LastSeenSpot is not { } spot) continue;
+            if (!_pursuits.TryGetValue(enemy, out var path))
+                _pursuits[enemy] = path = EnemyAi.PlanWalkTo(enemy, spot.X, spot.Y, _grid, OccupiedTilesExcept(enemy));
+            float step = clock * StatusBehaviours.MiredBudget(enemy, enemy.MoveBudget) / TurnLength;
+            moved |= WalkAlong(enemy, path, step);
+        }
+        if (moved)
+            EnemiesWalked?.Invoke();
+    }
+
+    /// <summary>Move <paramref name="actor"/> up to <paramref name="step"/> along <paramref name="path"/>, taking each waypoint reached off its front.</summary>
+    private static bool WalkAlong(ActorState actor, List<(float X, float Y)> path, float step)
+    {
+        bool moved = false;
+        while (step > 0f && path.Count > 0)
+        {
+            var (wx, wy) = path[0];
+            float dx = wx - actor.X, dy = wy - actor.Y;
+            float dist = MathF.Sqrt(dx * dx + dy * dy);
+            if (dist <= step)
+            {
+                actor.X = wx;
+                actor.Y = wy;
+                step -= dist;
+                path.RemoveAt(0);
+            }
+            else
+            {
+                actor.X += dx / dist * step;
+                actor.Y += dy / dist * step;
+                step = 0f;
+            }
+            moved = true;
+        }
+        return moved;
+    }
+
+    /// <summary>The living member nearest <paramref name="enemy"/>, or null with none standing.</summary>
+    private PartyMemberState? NearestLivingMember(EnemyState enemy)
+    {
+        PartyMemberState? best = null;
+        float bestSq = float.MaxValue;
+        foreach (var member in _party)
+        {
+            if (!member.Alive) continue;
+            float dx = member.X - enemy.X, dy = member.Y - enemy.Y;
+            float sq = dx * dx + dy * dy;
+            if (sq < bestSq) { bestSq = sq; best = member; }
+        }
+        return best;
     }
 
     /// <summary>The party's phase of exploring: where the walking clock runs.</summary>
@@ -1925,6 +2060,7 @@ public sealed class TurnSystem
     /// </summary>
     private void WorldTurn(bool idle = false)
     {
+        _pursuits.Clear();   // re-planned from where everyone stands on the turn it opens
         _atBoundary = true;
         try
         {

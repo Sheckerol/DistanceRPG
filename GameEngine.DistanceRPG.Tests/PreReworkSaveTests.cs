@@ -75,6 +75,7 @@ public class PreReworkSaveTests
         ("$.campaign.visit", "dungeonsCleared", JsonValue.Create(EnemyPlacer.Unprotected)),   // beginner protection: an older visit was placed uncapped
         ("$.campaign.lastResult", "deaths", null),   // Phase 7.5: before it, a death ended the run, so none was recorded
         ("$.campaign.visit", "deaths", null),
+        ("$.campaign.visit.floors[*].enemies[*]", "lastSeen", null),   // Phase 8.3: no pursuer had a spot to walk to
     ];
 
     /// <summary>Whether <paramref name="value"/> is <paramref name="expected"/>'s default as a capture writes it, compared as JSON: null, a number, a word.</summary>
@@ -82,13 +83,7 @@ public class PreReworkSaveTests
 
     /// <summary>Whether the object at <paramref name="path"/> is the place <paramref name="at"/> names: its end, and for a place ending <c>[*]</c>, any row of that list.</summary>
     private static bool IsAt(string path, string at)
-    {
-        if (!at.EndsWith("[*]", StringComparison.Ordinal))
-            return path.EndsWith(at, StringComparison.Ordinal);
-        int open = path.LastIndexOf('[');
-        return open >= 0 && path.EndsWith(']') && path[(open + 1)..^1].All(char.IsAsciiDigit) && path[(open + 1)..^1].Length > 0
-            && path[..open].EndsWith(at[..^"[*]".Length], StringComparison.Ordinal);
-    }
+        => System.Text.RegularExpressions.Regex.Replace(path, @"\[\d+\]", "[*]").EndsWith(at, StringComparison.Ordinal);
 
     private static readonly string[] Saves = [MidRun, BetweenRuns];
 
@@ -323,6 +318,9 @@ public class PreReworkSaveTests
                 "$.campaign.lastResult" => [tree["campaign"]?["lastResult"] as JsonObject],
                 "$.campaign.visit" => [tree["campaign"]?["visit"] as JsonObject],
                 "$.campaign.party[*]" => (tree["campaign"]?["party"] as JsonArray ?? []).Select(row => row as JsonObject).ToList(),
+                "$.campaign.visit.floors[*].enemies[*]" => tree["campaign"]?["visit"] is not JsonObject visit
+                    ? [null]   // no visit, no rows: nowhere for the member to be
+                    : (visit["floors"] as JsonArray ?? []).SelectMany(floor => floor?["enemies"] as JsonArray ?? []).Select(row => row as JsonObject).ToList(),
                 _ => throw new ArgumentOutOfRangeException(nameof(at), at, "a place the test does not walk"),
             };
             foreach (var (at, member, defaulted) in Appended)

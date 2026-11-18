@@ -305,7 +305,7 @@ version 5's migration step writes the mode from it — a version-4 save, always
 taken in the party's phase, was exploring when it marched and in combat when it
 did not. Every older save still loads (the pinned saves are never edited), and a
 Phase 7 build refuses a version-5 save. Each enemy's last-seen spot (DECISION 14)
-is saved too, written empty for every enemy of an older save.
+is saved already: 8.3 appended it with its default, null on an older save's rows.
 
 ## 8.6 What the player sees
 
@@ -332,8 +332,8 @@ overlay and the ruler only in combat. The older documents
   movement while exploring (DECISION 21).
 - `EnemyAi`: a walking plan sized to world time rather than a budget, a pursuer's
   to its last-seen spot.
-- Save: version 5 (8.5) — the mode, the walking clock, each enemy's last-seen
-  spot — with its consistency checks.
+- Save: version 5 (8.5) — the mode and the walking clock — with its consistency
+  checks; each enemy's last-seen spot appended in 8.3.
 - Tuning: no new keys (DECISION 23).
 
 ### Implementation steps
@@ -419,6 +419,35 @@ Each step lands with its tests and keeps the golden tests green.
 3. **8.3 — Enemies move with the party.** Awake enemies at their budget's share of
    the party's speed, a pursuer to its last-seen spot; walking into view starts
    combat with the party first, on a new turn.
+   *As built (step 3):*
+   - **The spot.** `EnemyState.LastSeenSpot` is set when an enemy leaves view
+     (`NotifyEnemyInView`, visible false): the nearest living member's position
+     at that moment. It is saved as `enemies[].lastSeen`, appended with its
+     default, so no version bump; an older save's rows have none, and the load
+     refuses a spot off the map. 8.5 has nothing left to add for it.
+   - **The walk.** `TurnSystem.WalkPursuers` moves every awake enemy
+     (`TurnsSinceSeen` below 2, with a spot) along `EnemyAi.PlanWalkTo`, an A*
+     path around every other living body, at its (mired) budget over
+     `MovementBudget` per unit of the clock, so a whole turn walks its whole
+     budget. It stops on the spot. The path is planned on a turn's first step and
+     dropped at every boundary and change of mode. `AdvanceExploring` splits the
+     walk at each boundary, so each turn's share walks on that turn's plans.
+     Nothing reacts to these steps: an enemy near enough for a zone would be in
+     view, and a fight.
+   - **The sight.** `TurnSystem.EnemiesWalked` is raised after each share that
+     moved anyone, and the scene's `SenseEnemyWalk` (the enemy phase's
+     tile-crossing check, now shared) mirrors the stand-ins and refreshes the
+     sight. A pursuer that crosses into view starts the fight right then, before
+     the clock runs on, and the rest of the walk is dropped.
+   - **The waited turn.** `WaitTurn` now starts a wait (`Waiting`) that
+     `Update` plays out at walking pace, a second at today's tuning, the
+     pursuers moving and the walking keys ignored. It ends as the idle world
+     turn, the mana banked then. A fight mid-wait cancels it, the mana unbanked.
+     A wait is not a safe point (`SaveGame.IsSafePoint`), so a quit's settle
+     plays it out first.
+   - **Short pursuits.** A pursuer's wake usually stands at 1 by the time the
+     fight ends (DECISION 22's grace turn), so it walks for about one world turn
+     before going passive. Longer hunts are the patrols' job.
 4. **8.4 — Resting. Withdrawn (DECISION 23).** As planned: `R` and the REST / STOP RESTING buttons, the rest turns, the
    restore without XP, the ways it ends. Tests: a rest stops on `R` and on the
    button alike; it stops on a sighting; it ends when all are full and clear;

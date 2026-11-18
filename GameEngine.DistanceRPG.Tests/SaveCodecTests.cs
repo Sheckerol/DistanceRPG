@@ -750,6 +750,8 @@ public class SaveCodecTests
             typeof(PotionDto), typeof(SpoiledPotionDto),
             // Phase 7: the deaths a run paid for.
             typeof(RunDeathDto), typeof(PoolCutDto),
+            // Phase 8.3: where a pursuer last saw the party.
+            typeof(SpotDto),
         ];
         Assert.Equal(expected.Select(t => t.Name).Order(StringComparer.Ordinal), dtos.Select(t => t.Name).Order(StringComparer.Ordinal));
         Assert.All(dtos, dto =>

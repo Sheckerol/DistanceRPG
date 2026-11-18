@@ -56,15 +56,16 @@ public static class SaveGame
     /// runs; in a visit with no floor's system open — right after the entry, or
     /// between the stairs and the arrival; or with the floor's system in the
     /// player phase and no raise running. Never while the enemies take their turn,
-    /// its banner included, and never inside a raise: a save holds none of the
-    /// enemy phase's working state, and a raise's cascade is half-settled.
+    /// its banner included, never while a waited turn plays out (PHASE 8 DECISION
+    /// 23, the enemies moving), and never inside a raise: a save holds none of the
+    /// enemies' working state, and a raise's cascade is half-settled.
     /// </summary>
     public static bool IsSafePoint(CampaignState campaign)
     {
         ArgumentNullException.ThrowIfNull(campaign);
         if (campaign.Visit is not { } visit || visit.Turns is not { } turns)
             return true;
-        return turns.Phase == TurnPhase.Player && !turns.Events.Running;
+        return turns.Phase == TurnPhase.Player && !turns.Waiting && !turns.Events.Running;
     }
 
     /// <summary>
