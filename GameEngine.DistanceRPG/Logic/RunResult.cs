@@ -236,7 +236,8 @@ public sealed record RunResult(string DungeonId, RunOutcome Outcome, bool BossDe
 /// rest <see cref="Stalled"/>; a run that did not count worked nothing, and
 /// reports every entry stalled with its runs as they were, a fresh deposit's at 0.
 /// So a stalled report has <c>0 ≤ RunsWorked ≤ Runs − 1</c>. A finished one says
-/// what its improvement roll did (Phase 6a.4). The summary reads these, after a
+/// what its improvement roll did (Phase 6a.4) and which enchantments its maintenance
+/// raised a tier (after play, 2026-11-19). The summary reads these, after a
 /// load too, since the save keeps them with the result — all but the roll as it
 /// was drawn, which is the log's. Nothing ties a report to a deposit in the shop:
 /// it outlives the entry it speaks of.
@@ -260,8 +261,16 @@ public sealed record RunResult(string DungeonId, RunOutcome Outcome, bool BossDe
 /// the run's end writes (Logic never logs), or null when nothing was rolled. Never
 /// saved: a report a load brings back has none.
 /// </param>
+/// <param name="Raised">
+/// On a finished service, the enchantments its maintenance raised a tier, each as
+/// it reads after — its new tier, from no XP (<see cref="Weapon.Maintain"/>; ruled
+/// after play, 2026-11-19) — in attachment order; null when none was full, and on
+/// every service not finished. Saved with the result, each by its id and its tier,
+/// so the summary says it after a load too. Not "deepened", which is what the
+/// improvement roll does to a modifier.
+/// </param>
 public sealed record ServiceReport(string WeaponId, Service Service, int RunsWorked, int Runs, bool Stalled = false, string? EnchantmentId = null,
-    Improvement? Improved = null, int? Tier = null, string? SourceId = null, ImproveRoll? Roll = null)
+    Improvement? Improved = null, int? Tier = null, string? SourceId = null, ImproveRoll? Roll = null, IReadOnlyList<Enchantment>? Raised = null)
 {
     /// <summary>Whether this run finished the service: worked, its last run done, its weapon back in the stable.</summary>
     public bool Finished => !Stalled && RunsWorked == Runs;

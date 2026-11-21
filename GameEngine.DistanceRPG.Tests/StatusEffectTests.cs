@@ -92,8 +92,8 @@ public sealed class StatusEffectTests : IDisposable
     {
         // The healing-staff buff after play (2026-10): two levels a cast, each worth double the
         // first guess's one HP. Pinned against the shipped numbers, which the premise never reads.
-        Assert.Equal(2, ShippedContent.Content.Enchantments["regeneration"].Potency);
-        Assert.Equal(2, ShippedContent.Tuning.EffectPerLevel[Regeneration]);
+        Assert.Equal(2, FixtureContent.Content.Enchantments["regeneration"].Potency);
+        Assert.Equal(2, FixtureContent.Tuning.EffectPerLevel[Regeneration]);
     }
 
     [Fact]

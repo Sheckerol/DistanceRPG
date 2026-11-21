@@ -752,6 +752,8 @@ public class SaveCodecTests
             typeof(RunDeathDto), typeof(PoolCutDto),
             // Phase 8.3: where a pursuer last saw the party.
             typeof(SpotDto),
+            // After play, 2026-11-19: the tiers a finished service's maintenance raised.
+            typeof(RaisedDto),
         ];
         Assert.Equal(expected.Select(t => t.Name).Order(StringComparer.Ordinal), dtos.Select(t => t.Name).Order(StringComparer.Ordinal));
         Assert.All(dtos, dto =>

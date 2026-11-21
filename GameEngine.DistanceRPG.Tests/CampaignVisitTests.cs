@@ -112,8 +112,8 @@ public class CampaignVisitTests
         Assert.NotEmpty(carried);
         Assert.Equal(carried, campaign.SeenInOrder);
         var fromTheRoster = roster
-            .SelectMany(def => def.BagWeaponIds.Prepend(def.StartingWeaponId))
-            .SelectMany(id => TestWeapons.Get(id).Enchantments.Select(e => e.Id))
+            .SelectMany(def => def.BagWeaponIds.Prepend(def.StartingWeaponId).Select(id => TestWeapons.Starting(def, id)))
+            .SelectMany(weapon => weapon.Enchantments.Select(e => e.Id))
             .Distinct()
             .OrderBy(id => id, StringComparer.Ordinal);
         Assert.Equal(fromTheRoster, campaign.SeenInOrder);
@@ -140,7 +140,7 @@ public class CampaignVisitTests
         // read from any other content would be one content's rows carrying
         // another's weapons. The campaign refuses to start that party rather than
         // build it half and half.
-        var other = TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);
+        var other = TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments, FixtureContent.Weapons);
         Assert.NotSame(GameContent.Current, other);
         Assert.Throws<ArgumentException>(() => CampaignState.Start(other));
         Assert.Throws<ArgumentNullException>(() => CampaignState.Start(null!));
@@ -308,7 +308,7 @@ public class CampaignVisitTests
             Assert.Equal(m.MaxHp, m.Hp);
             Assert.Equal(m.UsableMaxMana, m.Mana);
             Assert.Empty(m.StatusEffects);
-            Assert.Equal((ShippedContent.Budget, ShippedContent.Budget, 0f, 0), (m.DistLeft, m.EffectiveMax, m.SavedMovement, m.HeldShots));
+            Assert.Equal((FixtureContent.Budget, FixtureContent.Budget, 0f, 0), (m.DistLeft, m.EffectiveMax, m.SavedMovement, m.HeldShots));
         });
         Assert.Equal(TestPools.FixtureHp, a.Hp);
         Assert.Equal(kept, campaign.Party.Select(m => (m.HpXp, m.ManaXp, m.WeaponXp[WeaponClass.Dagger], string.Join(",", m.Inventory.Select(w => (w as Weapon)?.Id)))));

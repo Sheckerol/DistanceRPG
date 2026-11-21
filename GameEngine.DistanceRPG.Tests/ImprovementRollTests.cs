@@ -375,7 +375,7 @@ public sealed class ImprovementRollTests : IDisposable
         // movement bound it — and no other graft one. Each it finds is in the
         // shipped forgedOnly.
         var forgedOnly = rules.ForgedOnly;
-        using (TestContent.UsePremise(tuning: TestShop.Ruled, restricted: ShippedContent.Restricted with { ForgedOnly = [] }))
+        using (TestContent.UsePremise(tuning: TestShop.Ruled, restricted: FixtureContent.Restricted with { ForgedOnly = [] }))
         {
             var offered = GameContent.Current.Weapons.All
                 .SelectMany(def => Enchanter.GraftCandidates(Fresh(def.Id)).Select(t => (def.Id, Modifier: t)))

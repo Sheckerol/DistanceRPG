@@ -142,7 +142,8 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
 
     /// <summary>
     /// Mana this entry has spent into the tier it is on now — the remainder, not
-    /// a cumulative total (§3.3: "mana it spends is its XP").
+    /// a cumulative total (§3.3: "mana it spends is its XP") — up to that tier's
+    /// bar and no further (<see cref="WithXp"/>).
     /// <para>
     /// <strong>Tier is stored and XP is the remainder into it, which is a ruling
     /// against §3.5's wording rather than a reading of it.</strong> §3.5 says
@@ -206,7 +207,7 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// wizard's hands, is gone. The scale is <see cref="Tuning.EnchantmentTierScale"/>.
     /// <para>
     /// It carries no floor: the guard lives in <see cref="TierCost"/>, which is
-    /// this member floored at 1 and is what the climb charges <em>and</em> what a
+    /// this member floored at 1 and is the bar use fills <em>and</em> what a
     /// readout prints — one expression, so a tier can never be shown at one price
     /// and charged at another. This member is what a caller asking the unfloored
     /// arithmetic (the farm's grant of one tier's bar) reads.
@@ -218,15 +219,21 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
     /// <summary>
     /// This entry after <paramref name="manaSpent"/> more mana has gone through
     /// it (§3.3). The credit is the mana <em>spent</em> — the same figure §2.2
-    /// already credits to max mana, one number and two ladders — and the replay
-    /// is the definition: each tier costs the bar it just made, so the climb
-    /// self-slows with no curve authored anywhere, exactly as
-    /// <see cref="Progression.Pool"/> does.
+    /// already credits to max mana, one number and two ladders.
+    /// <para>
+    /// <strong>It banks, and never climbs</strong> (ruled after play, 2026-11-19):
+    /// the XP stops at the bar of the tier the entry is on (<see cref="TierCost"/>),
+    /// and a full bar buys its tier only at the enchanter, as a service finishes
+    /// (<see cref="Maintained"/>) — so use fills one bar between two services and
+    /// no more, as a weapon banks wear up to its capacity and no further. An entry
+    /// already at or over its bar (a tuning that lowered it since) banks nothing
+    /// and loses nothing.
+    /// </para>
     /// <para>
     /// A unique banks the spend and buys nothing (§3.3): it is pinned at tier 1,
     /// "they still accrue mana spent, since every trigger still costs; it simply
-    /// buys nothing". It is not a dead stack, because the same spend still grows
-    /// the wielder's max mana.
+    /// buys nothing", and with no bar to fill it has no cap. It is not a dead
+    /// stack, because the same spend still grows the wielder's max mana.
     /// </para>
     /// </summary>
     /// <param name="manaSpent">Mana this entry actually paid; never negative.</param>
@@ -240,25 +247,36 @@ public sealed record Enchantment(EnchantmentDef Def, int Tier)
         if (Unique)
             return this with { Xp = Xp + manaSpent };
 
-        var grown = this;
-        int xp = Xp + manaSpent;
-        int cost = grown.TierCost();
-        while (xp >= cost)
-        {
-            xp -= cost;
-            grown = grown with { Tier = grown.Tier + 1 };
-            cost = grown.TierCost();
-        }
-        return grown with { Xp = xp };
+        int bar = TierCost();
+        return Xp >= bar ? this : this with { Xp = (int)Math.Min(bar, (long)Xp + manaSpent) };
     }
+
+    /// <summary>
+    /// Whether this entry's bar is full: the enchanter's next service on its weapon
+    /// raises it a tier (<see cref="Maintained"/>), and until then it banks nothing
+    /// more (<see cref="WithXp"/>). Never a unique, pinned at tier 1, and never an
+    /// entry at <see cref="ContentBounds.DeepestTier"/>, the deepest a save holds
+    /// whole — which play never reaches.
+    /// </summary>
+    public bool BarFull => !Unique && Tier < ContentBounds.DeepestTier && Xp >= TierCost();
+
+    /// <summary>
+    /// This entry as a finished service at the enchanter leaves it (ruled after
+    /// play, 2026-11-19): a full bar (<see cref="BarFull"/>) buys one tier, the new
+    /// tier from no XP, and any other entry is as it was. One tier a service at the
+    /// most, since the bar it filled is all it could bank. The one door a tier
+    /// rises by: <see cref="Weapon.Maintain"/> asks it of every entry a weapon
+    /// carries.
+    /// </summary>
+    public Enchantment Maintained() => BarFull ? this with { Tier = Tier + 1, Xp = 0 } : this;
 
     /// <summary>
     /// What leaving the tier this entry is on actually costs:
     /// <see cref="XpToNextTier"/>, floored at 1. The floor lives here and never
     /// inside that member, for the same reason <see cref="Progression"/> splits
-    /// <c>XpToNext</c> from its own private step: <see cref="WithXp"/>'s loop is
-    /// the one caller a free step could hang. It is public because the price a
-    /// readout prints is the price the climb charges.
+    /// <c>XpToNext</c> from its own private step: a bar of nothing would read full
+    /// with nothing banked. It is public because the price a readout prints is the
+    /// bar <see cref="WithXp"/> fills.
     /// <see cref="ContentValidator.ValidateEnchantments"/> refuses a lock below 1
     /// at load, so the floor is a second door on a closed one.
     /// </summary>

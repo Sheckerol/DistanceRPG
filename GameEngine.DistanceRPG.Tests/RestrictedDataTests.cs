@@ -30,16 +30,16 @@ public class RestrictedDataTests
     [Fact]
     public void DefaultRestricted_Validates()
     {
-        var known = KnownPlus(ShippedContent.Enchantments.Enchantments.Select(e => e.Id).ToArray());   // the ids the shipped relations may name: the catalogue's
-        ContentValidator.ValidateRestricted(ShippedContent.Restricted, known);   // does not throw
-        Assert.NotNull(TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
+        var known = KnownPlus(FixtureContent.Enchantments.Enchantments.Select(e => e.Id).ToArray());   // the ids the shipped relations may name: the catalogue's
+        ContentValidator.ValidateRestricted(FixtureContent.Restricted, known);   // does not throw
+        Assert.NotNull(TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments, FixtureContent.Weapons));
         Assert.NotNull(GameContent.Current);   // the static init loaded the same defaults
     }
 
     [Fact]
     public void Default_DeclaresTheDocumentedRelations()
     {
-        var r = ShippedContent.Restricted;
+        var r = FixtureContent.Restricted;
 
         Assert.Equal(7, r.Excludes.Count);
         Assert.Equal(new[] { "Brace", "Opportunist", "Overwatch" }, r.Excludes[0]);
@@ -221,7 +221,7 @@ public class RestrictedDataTests
     {
         var before = GameContent.Current;
         var ex = Assert.Throws<ContentException>(() =>
-            TestContent.Load(ShippedContent.Tuning, Data(excludes: [["Brace", "Brace"]]), ShippedContent.Enchantments, ShippedContent.Weapons));
+            TestContent.Load(FixtureContent.Tuning, Data(excludes: [["Brace", "Brace"]]), FixtureContent.Enchantments, FixtureContent.Weapons));
         Assert.Equal(ContentValidator.RuleSelfExclusion, ex.Rule);
         Assert.Same(before, GameContent.Current);
     }
@@ -235,18 +235,18 @@ public class RestrictedDataTests
         // most — an offset a floor short of the deepest boss floor: a boss never pays as much as the
         // farm (PHASE4-045), and a load refuses one that would.
         var content = TestContent.Load(
-            ShippedContent.Tuning with { AcquiredHeadroom = 1, BossStackOffset = ShippedContent.Tuning.BossFloorMax - 1 },
+            FixtureContent.Tuning with { AcquiredHeadroom = 1, BossStackOffset = FixtureContent.Tuning.BossFloorMax - 1 },
             Data(excludes: [["Block", "Cleave"], ["flaming", "cold"], ["shocking", "acidic"]],
-                 neverRolled: ShippedContent.Restricted.NeverRolled),
-            ShippedContent.Enchantments, ShippedContent.Weapons);
+                 neverRolled: FixtureContent.Restricted.NeverRolled),
+            FixtureContent.Enchantments, FixtureContent.Weapons);
         Assert.Equal(1, content.Modifiers.AcquiredHeadroom);
         Assert.Equal(new[] { Cleave }, content.Modifiers.Excludes[Block]);
         Assert.NotSame(content, GameContent.Current);
-        Assert.Equal(ShippedContent.Tuning.AcquiredHeadroom, GameContent.Current.Modifiers.AcquiredHeadroom);   // the running content's is the shipped one still
+        Assert.Equal(FixtureContent.Tuning.AcquiredHeadroom, GameContent.Current.Modifiers.AcquiredHeadroom);   // the running content's is the shipped one still
 
         // Use makes content current; re-using the current content is the only safe swap in a parallel suite.
         GameContent.Use(GameContent.Current);
-        Assert.Same(ShippedContent.Tuning, GameContent.Current.Tuning);
+        Assert.Same(FixtureContent.Tuning, GameContent.Current.Tuning);
     }
 
     [Theory]

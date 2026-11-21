@@ -86,7 +86,10 @@ GameEngine.DistanceRPG/         # Game executable
                                 # an enchantment costs, a service's runs, and its improvement odds
     Enchanter.cs                # The enchanter (§6.2–§6.5): a deposit or a transfer, its gates, the
                                 # service clock every run's end ticks, the improvement roll (its own
-                                # stream), a take-back — the one place wear is spent
+                                # stream), a take-back — the one place wear is spent, and the one
+                                # place a tier rises: a finished service raises every enchantment
+                                # on the weapon whose bar use filled, one tier (Weapon.Maintain;
+                                # use only banks XP up to the bar, Enchantment.WithXp)
     Items.cs                    # What a bag slot holds (IItem): a weapon, or a potion — a value, its
                                 # type and quality (§3.4) — one a slot; the hand keeps a weapon
     Alchemist.cs                # What a potion restores (§3.4, §6.6): a share of the drinker's max,
@@ -104,6 +107,12 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
                                 # generated from the ORIGINAL JS modules under
                                 # Node — regenerate only from the Game repo,
                                 # never hand-edit
+  FixtureContent.cs             # The suite's one door to content: the FROZEN copies of the four data
+                                # files in TestData/content and a frozen starting party, made current
+                                # for every test. Premise.cs lays the older worked examples' numbers
+                                # and bags over it
+  ShippedDataTests.cs / ShippedFilesTests.cs   # The only tests that read the game's real Data/*.json
+                                # and StartingParty: that they load and a campaign starts, never values
 ```
 
 ## Rules of thumb
@@ -122,6 +131,15 @@ GameEngine.DistanceRPG.Tests/   # xUnit; TestData/distancerpg-golden.json is
   copy the build embeds as the fallback (the user's ruling of 2026-09-25). Never
   add a C# copy of a JSON value: the load validates the code catalogues against
   the JSON instead. Nothing the golden tests pin may go in `tuning.json`.
+- Tests never read the master JSON or `StartingParty` (the user's ruling of
+  2026-11-20): they run under the frozen configuration in
+  `GameEngine.DistanceRPG.Tests/TestData/content` (`FixtureContent`), so a
+  gameplay edit to `Data/*.json` or the roster fails no test. Ask
+  `FixtureContent` (or `TestContent`/`Premise`) for content, and
+  `FixtureContent.Load` for the loader — never `ShippedData` or
+  `ContentFiles.Load` outside `ShippedDataTests`/`ShippedFilesTests`. Do not sync
+  the frozen copies to the masters; do add a new `tuning.json` key to
+  `TestData/content/tuning.json` in the change that adds it, or the suite stops.
 - A `tuning.json` key arrives with the code that reads it — except a number the
   user has ruled and wants in the file first (the Enchanter group's were, until
   Phase 6a played each as it read it): declare it in `TuningSchema` with

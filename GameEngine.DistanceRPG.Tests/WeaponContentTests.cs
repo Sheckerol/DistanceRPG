@@ -25,7 +25,7 @@ public class WeaponContentTests
 
     /// <summary>The roll a wielder with <paramref name="stacks"/> of CritWindow crits on, as the tuning the game reads prices a stack.</summary>
     private static int ThresholdAt(int stacks)
-        => CombatRules.NaturalTwenty - (ShippedContent.Tuning.Offset[CritWindow] + ShippedContent.Tuning.PerStack[CritWindow] * stacks);
+        => CombatRules.NaturalTwenty - (FixtureContent.Tuning.Offset[CritWindow] + FixtureContent.Tuning.PerStack[CritWindow] * stacks);
 
     private static readonly WeaponClass[] MartialClasses =
         [WeaponClass.Dagger, WeaponClass.Sword, WeaponClass.Spear, WeaponClass.Axe, WeaponClass.Ranged, WeaponClass.Throwing];
@@ -454,7 +454,7 @@ public class WeaponContentTests
         foreach (var def in Catalogue.All.Where(d => d.Class is not (WeaponClass.Dagger or WeaponClass.Ranged)))
             Assert.Equal(ThresholdAt(0), CombatRules.CritThreshold(Any(def)));
 
-        var tuning = ShippedContent.Tuning;
+        var tuning = FixtureContent.Tuning;
         foreach (var def in Catalogue.All)
         {
             int stacks = def.Class is WeaponClass.Dagger or WeaponClass.Throwing ? 1 : 0;
@@ -516,9 +516,9 @@ public class WeaponContentTests
     {
         // Past MaxForged — a stack past whatever limit tuning.json sets — on Light, and on Resonant on a staff,
         // caught before the caster check reads the spread.
-        var ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, Rules.MaxForged(Light) + 1)) }, ShippedContent.Tuning);
+        var ex = LoadWith("flensing_knife", w => w with { Forged = Spread((CritWindow, 1), (CritMultiplier, 1), (Light, Rules.MaxForged(Light) + 1)) }, FixtureContent.Tuning);
         Assert.Equal(("flensing_knife", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
-        ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, Rules.MaxForged(Resonant) + 1)) }, ShippedContent.Tuning);
+        ex = LoadWith("staff_of_mire", w => w with { Forged = Spread((Resonant, Rules.MaxForged(Resonant) + 1)) }, FixtureContent.Tuning);
         Assert.Equal(("staff_of_mire", ContentValidator.RuleMaxForged), (ex.EntryId, ex.Rule));
 
         // A zero or negative count is a content error naming the entry, never an argument error out of ModifierSet.Of,
@@ -563,28 +563,28 @@ public class WeaponContentTests
         // Every dagger forged Block where CritWindow was: the baseline is the Dagger
         // row's now (the content rework, 1d), not what the four share, so the first
         // dagger is off its class row — it carries CritWindow x0 against the row's x1.
-        var bludgeons = ShippedContent.Weapons with
+        var bludgeons = FixtureContent.Weapons with
         {
-            Weapons = ShippedContent.Weapons.Weapons
+            Weapons = FixtureContent.Weapons.Weapons
                 .Select(w => w.Class == WeaponClass.Dagger
                     ? w with { Forged = w.Forged.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
                     : w)
                 .ToList(),
         };
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, bludgeons));
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments, bludgeons));
         Assert.Equal(("flensing_knife", ContentValidator.RuleVariantDelta), (ex.EntryId, ex.Rule));
 
         // And a class whose baseline lost its signature is its row's fault: the
         // Dagger row forging Block where CritWindow was, whatever its variants carry.
-        var bludgeonRow = ShippedContent.Weapons with
+        var bludgeonRow = FixtureContent.Weapons with
         {
-            Classes = ShippedContent.Weapons.Classes
+            Classes = FixtureContent.Weapons.Classes
                 .Select(c => c.Class == WeaponClass.Dagger
                     ? c with { Baseline = c.Baseline.ToDictionary(f => f.Key == CritWindow ? Block : f.Key, f => f.Value) }
                     : c)
                 .ToList(),
         };
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, bludgeonRow));
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments, bludgeonRow));
         Assert.Equal(("Dagger", ContentValidator.RuleClassBaseline), (ex.EntryId, ex.Rule));
         ex = LoadWith("routing_axe", w => w with { Role = VariantRole.Control });
         Assert.Equal(("Axe", ContentValidator.RuleVariantRoles), (ex.EntryId, ex.Rule));
@@ -605,13 +605,13 @@ public class WeaponContentTests
         Assert.Equal(("staff_of_renewal", ContentValidator.RuleUnknownId), (ex.EntryId, ex.Rule));
 
         // Ids are unique.
-        var doubled = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Append(ShippedContent.Weapons.Weapons[0]).ToList() };
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, doubled));
+        var doubled = FixtureContent.Weapons with { Weapons = FixtureContent.Weapons.Weapons.Append(FixtureContent.Weapons.Weapons[0]).ToList() };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments, doubled));
         Assert.Equal(("flensing_knife", ContentValidator.RuleDuplicateId), (ex.EntryId, ex.Rule));
 
         // Every forgedOnly id is forged somewhere, or it could never exist.
-        var restricted = ShippedContent.Restricted with { ForgedOnly = [nameof(Charges), nameof(OnHitPoison)] };
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
+        var restricted = FixtureContent.Restricted with { ForgedOnly = [nameof(Charges), nameof(OnHitPoison)] };
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, restricted, FixtureContent.Enchantments, FixtureContent.Weapons));
         Assert.Equal((nameof(OnHitPoison), ContentValidator.RuleForgedOnlyUnused), (ex.EntryId, ex.Rule));
 
         // Every abort names both the entry and the rule, and the defaults are untouched by any of it.
@@ -646,27 +646,27 @@ public class WeaponContentTests
         Assert.Equal(("shattering", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
         ex = LoadWithEnchantment("aegis", e => e with { Potency = 0 });
         Assert.Equal(("aegis", ContentValidator.RuleMagnitudeNamesAPotency), (ex.EntryId, ex.Rule));
-        TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted,
-            new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e =>
-                e.Id == "echoing" ? e with { Potency = 0 } : e).ToList()), ShippedContent.Weapons);   // a declared-inert kind is not asked
+        TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted,
+            new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Select(e =>
+                e.Id == "echoing" ? e with { Potency = 0 } : e).ToList()), FixtureContent.Weapons);   // a declared-inert kind is not asked
 
         // The chart: two elements carrying one type, or an element nobody opposes.
         ex = LoadWithEnchantment("cold", e => e with { DamageType = DamageType.Flaming });
         Assert.Equal(("cold", ContentValidator.RuleOpposition), (ex.EntryId, ex.Rule));
-        var unopposed = ShippedContent.Restricted with
+        var unopposed = FixtureContent.Restricted with
         {
-            Excludes = ShippedContent.Restricted.Excludes.Where(g => g[0] != "flaming").ToList(),
+            Excludes = FixtureContent.Restricted.Excludes.Where(g => g[0] != "flaming").ToList(),
         };
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, unopposed, ShippedContent.Enchantments, ShippedContent.Weapons));
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, unopposed, FixtureContent.Enchantments, FixtureContent.Weapons));
         Assert.Equal(("flaming", ContentValidator.RuleOpposition), (ex.EntryId, ex.Rule));
 
         // Duplicate ids.
-        var doubled = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Append(ShippedContent.Enchantments.Enchantments[0]).ToList());
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, doubled, ShippedContent.Weapons));
+        var doubled = new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Append(FixtureContent.Enchantments.Enchantments[0]).ToList());
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, doubled, FixtureContent.Weapons));
         Assert.Equal(("regeneration", ContentValidator.RuleDuplicateId), (ex.EntryId, ex.Rule));
 
         // The opposed pairs may be read off the relations: flaming-cold, shocking-acidic, and nothing across.
-        var excludes = ShippedContent.Restricted.Excludes;
+        var excludes = FixtureContent.Restricted.Excludes;
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "flaming", "cold" }));
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "shocking", "acidic" }));
         Assert.DoesNotContain(excludes, g => g.Contains("flaming") && g.Contains("shocking"));
@@ -677,9 +677,9 @@ public class WeaponContentTests
     {
         var before = GameContent.Current;
         int axe = TestWeapons.Get("great_axe").ResolvedCost, reaver = TestWeapons.Get("reaver").ResolvedCost;
-        var cheaper = ShippedContent.Weapons with
+        var cheaper = FixtureContent.Weapons with
         {
-            Weapons = ShippedContent.Weapons.Weapons
+            Weapons = FixtureContent.Weapons.Weapons
                 .Select(w => w.Id == "great_axe" ? w with { Cost = 10 } : w)
                 .ToList(),
         };
@@ -702,23 +702,23 @@ public class WeaponContentTests
     /// than any shipped weapon does (Cleave x3, Push x2), and how deep that may be is tuning.json's to say — the
     /// fixtures' premise, not their subject. The two cases about the limit itself load under the master's.
     /// </summary>
-    private static Tuning ForgeRoom => ShippedContent.Tuning with
+    private static Tuning ForgeRoom => FixtureContent.Tuning with
     {
-        MaxForged = ShippedContent.Tuning.MaxForged.ToDictionary(kv => kv.Key, kv => Math.Max(3, kv.Value)),
+        MaxForged = FixtureContent.Tuning.MaxForged.ToDictionary(kv => kv.Key, kv => Math.Max(3, kv.Value)),
     };
 
     private static ContentException LoadWith(string id, Func<WeaponDef, WeaponDef> edit, Tuning? tuning = null)
     {
-        var weapons = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() };
+        var weapons = FixtureContent.Weapons with { Weapons = FixtureContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() };
         return Assert.Throws<ContentException>(() =>
-            TestContent.Load(tuning ?? ForgeRoom, ShippedContent.Restricted, ShippedContent.Enchantments, weapons));
+            TestContent.Load(tuning ?? ForgeRoom, FixtureContent.Restricted, FixtureContent.Enchantments, weapons));
     }
 
     private static ContentException LoadWithEnchantment(string id, Func<EnchantmentDef, EnchantmentDef> edit)
     {
-        var enchantments = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList());
+        var enchantments = new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList());
         return Assert.Throws<ContentException>(() =>
-            TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, enchantments, ShippedContent.Weapons));
+            TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, enchantments, FixtureContent.Weapons));
     }
 
     [Theory]

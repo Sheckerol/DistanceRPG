@@ -16,7 +16,7 @@ namespace GameEngine.DistanceRPG.Tests;
 public class TuningSchemaTests
 {
     /// <summary>The built-in tuning: the master copy's numbers, as the game plays them.</summary>
-    private static Tuning BuiltIn => ShippedContent.Tuning;
+    private static Tuning BuiltIn => FixtureContent.Tuning;
 
     private static TuningKey Key(string name) => TuningSchema.Find(name) ?? throw new KeyNotFoundException(name);
 
@@ -93,7 +93,7 @@ public class TuningSchemaTests
         var tuning = TuningValues.With(BuiltIn,
             ("PerStack.Block", 7), ("Offset.Push", 1), ("MaxForged.Pin", 2), ("EffectPerLevel.Mire", 5),
             ("ApplyPercent.cold", 40), ("ApplyPercent.arcane", 60));
-        var content = TestContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);   // built, never made current
+        var content = TestContent.Load(tuning, FixtureContent.Restricted, FixtureContent.Enchantments, FixtureContent.Weapons);   // built, never made current
         var rules = content.Modifiers;
 
         foreach (var type in Enum.GetValues<ModifierType>())
@@ -492,7 +492,7 @@ public class TuningSchemaTests
         string[] changed = BuiltIn.SaveSlots == 9 ? [] : ["SaveSlots 9"];
         Assert.Equal(changed, read.Overrides);
         Assert.Equal(TuningJson.Hash(BuiltIn), TuningJson.Hash(read.Tuning));
-        var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "SaveSlots": 12 }""" });
+        var load = FixtureContent.Load(FixtureContent.Texts with { Tuning = """{ "SaveSlots": 12 }""" });
         Assert.Null(load.Error);
         Assert.Equal(9, load.Content!.Tuning.SaveSlots);
         string warning = Assert.Single(load.Notices);
@@ -536,7 +536,7 @@ public class TuningSchemaTests
 
             if (table != nameof(Tuning.EffectPerLevel))
             {
-                var rules = Assert.Throws<ContentException>(() => new ModifierRules(shortTuning, ShippedContent.Restricted));
+                var rules = Assert.Throws<ContentException>(() => new ModifierRules(shortTuning, FixtureContent.Restricted));
                 Assert.Equal(($"{table}.{missing}", ContentValidator.RuleTableNamesEveryMember), (rules.EntryId, rules.Rule));
             }
         }

@@ -34,7 +34,7 @@ public class StartupErrorTests
         // ID DOES NOT RESOLVE TO A MODIFIER OR AN ENCHANTMENT, with the id it is
         // nearest, what the tuning changed, and the way out.
         var shipped = DataTexts.Shipped;
-        var load = ShippedData.Load(shipped with
+        var load = FixtureContent.Load(shipped with
         {
             Tuning = """{ "MovementBudget": 200 }""",
             Restricted = DataTexts.Edit(shipped.Restricted!, "\"Riposte\": [\"Block\"]", "\"Riposte\": [\"Blok\"]"),
@@ -102,7 +102,7 @@ public class StartupErrorTests
         // relations beside it broke: the built-in weapons, against a
         // restricted.json that groups Push with Block.
         var shipped = DataTexts.Shipped;
-        var load = ShippedData.Load(shipped with
+        var load = FixtureContent.Load(shipped with
         {
             Weapons = null,
             Restricted = DataTexts.Edit(shipped.Restricted!, "[\"Light\", \"Resonant\"],", "[\"Light\", \"Resonant\"],\n    [\"Push\", \"Block\"],"),
@@ -131,14 +131,14 @@ public class StartupErrorTests
         const string FixTheMaster = "THE BUILT-IN WEAPONS.JSON IS BROKEN - FIX GAMEENGINE.DISTANCERPG/DATA/WEAPONS.JSON AND REBUILD - ESC QUITS";
         var shipped = DataTexts.Shipped;
         var brokenMaster = shipped with { Weapons = DataTexts.Edit(shipped.Weapons!, "\"id\": \"halberd\",", "\"id\": \"halberd\"") };
-        var alone = ContentFiles.Load(new ContentTexts(), brokenMaster);
+        var alone = FixtureContent.Load(new ContentTexts(), brokenMaster);
         Assert.Empty(alone.ReadBeside);
         var lines = StartupErrorScene.Lines(alone.Error!, alone.TuningOverrides, alone.ReadBeside);
         Assert.Equal("FILE: WEAPONS.JSON (BUILT-IN)", lines[1]);
         Assert.Equal(FixTheMaster, lines[^1]);
         Assert.Equal(lines[^1], new StartupErrorScene(game: null!, alone.Error!, alone.TuningOverrides, alone.ReadBeside, alone.Notices).Rows[^1]);
 
-        var withOthersBeside = ContentFiles.Load(shipped with { Weapons = null }, brokenMaster);
+        var withOthersBeside = FixtureContent.Load(shipped with { Weapons = null }, brokenMaster);
         Assert.Equal([RestrictedJson.FileName, DungeonsJson.FileName], withOthersBeside.ReadBeside);
         Assert.Equal((WeaponsJson.FileName, true, ContentValidator.RuleFileShape),
             (withOthersBeside.Error!.File, withOthersBeside.Error.BuiltIn, withOthersBeside.Error.Rule));
@@ -154,7 +154,7 @@ public class StartupErrorTests
         // the built-in weapons' stage, and it is that file beside it that broke it:
         // the line stays the one for a file.
         var pushBlocks = DataTexts.Edit(shipped.Restricted!, "[\"Light\", \"Resonant\"],", "[\"Light\", \"Resonant\"],\n    [\"Push\", \"Block\"],");
-        var besideAFile = ContentFiles.Load(new ContentTexts(Restricted: pushBlocks), shipped);
+        var besideAFile = FixtureContent.Load(new ContentTexts(Restricted: pushBlocks), shipped);
         Assert.Equal([RestrictedJson.FileName], besideAFile.ReadBeside);
         Assert.Equal((WeaponsJson.FileName, true, ContentValidator.RuleForgedNotAllowed),
             (besideAFile.Error!.File, besideAFile.Error.BuiltIn, besideAFile.Error.Rule));
@@ -163,7 +163,7 @@ public class StartupErrorTests
         // A rule broken with nothing beside the executable — a master variant
         // adding Light 0, a number out of its range — is the master's own.
         var zeroStack = shipped with { Weapons = DataTexts.InRow(shipped.Weapons!, "flensing_knife", "\"Light\": 1", "\"Light\": 0") };
-        var masterRule = ContentFiles.Load(new ContentTexts(), zeroStack);
+        var masterRule = FixtureContent.Load(new ContentTexts(), zeroStack);
         Assert.Equal((WeaponsJson.FileName, true, ContentValidator.RuleNumberInRange),
             (masterRule.Error!.File, masterRule.Error.BuiltIn, masterRule.Error.Rule));
         Assert.Equal(FixTheMaster, StartupErrorScene.Lines(masterRule.Error!, masterRule.TuningOverrides, masterRule.ReadBeside)[^1]);
@@ -196,7 +196,7 @@ public class StartupErrorTests
         var shipped = DataTexts.Shipped;
         int tooHard = ContentBounds.Magnitude + 1;
         var brokenMaster = shipped with { Weapons = DataTexts.Edit(shipped.Weapons!, "\"id\": \"hatchet\",", $"\"id\": \"hatchet\", \"damage\": {tooHard},") };
-        var load = ContentFiles.Load(new ContentTexts(Restricted: shipped.Restricted), brokenMaster);
+        var load = FixtureContent.Load(new ContentTexts(Restricted: shipped.Restricted), brokenMaster);
         Assert.Equal([RestrictedJson.FileName], load.ReadBeside);
         Assert.Equal((WeaponsJson.FileName, true, "hatchet", ContentValidator.RuleNumberInRange),
             (load.Error!.File, load.Error.BuiltIn, load.Error.EntryId, load.Error.Rule));
@@ -212,7 +212,7 @@ public class StartupErrorTests
 
         // The same number in the copy beside the executable is that copy's, and the
         // screen says to fix the file.
-        var beside = ShippedData.Load(shipped with { Weapons = brokenMaster.Weapons });
+        var beside = FixtureContent.Load(shipped with { Weapons = brokenMaster.Weapons });
         Assert.Equal((WeaponsJson.FileName, false, ContentValidator.RuleNumberInRange), (beside.Error!.File, beside.Error.BuiltIn, beside.Error.Rule));
         Assert.Equal(StartupErrorScene.KeysLine, StartupErrorScene.Lines(beside.Error!, beside.TuningOverrides, beside.ReadBeside)[^1]);
     }
@@ -226,7 +226,7 @@ public class StartupErrorTests
         // touching a tuning that is not there.
         var shipped = DataTexts.Shipped;
         var gap = shipped with { Tuning = DataTexts.WithoutKey(shipped.Tuning!, nameof(Tuning.MovementBudget)) };
-        var load = ContentFiles.Load(shipped, gap);
+        var load = FixtureContent.Load(shipped, gap);
         Assert.Null(load.Content);
         Assert.Null(load.Tuning);
         Assert.Empty(load.TuningOverrides);

@@ -23,7 +23,7 @@ public class CodeCatalogueTests
 
     private static ContentException Fails(ContentTexts texts)
     {
-        var load = ShippedData.Load(texts);
+        var load = FixtureContent.Load(texts);
         Assert.Null(load.Content);
         return load.Error ?? throw new Xunit.Sdk.XunitException("the load has neither content nor an error");
     }
@@ -44,7 +44,7 @@ public class CodeCatalogueTests
         // tier; the relation is the file's alone, which the load no longer holds
         // to the flag (the rework's audit), so this is the shipped file's choice.
         Assert.Equal(9, rows.Count(e => e.Unique));
-        Assert.Equal(ShippedContent.Restricted.NeverRolled.Order(StringComparer.Ordinal),
+        Assert.Equal(FixtureContent.Restricted.NeverRolled.Order(StringComparer.Ordinal),
             rows.Where(e => e.Unique).Select(e => e.Id).Order(StringComparer.Ordinal));
 
         // PHASE5-137's fields, as the rows hold them: an applier quotes no flat
@@ -67,7 +67,7 @@ public class CodeCatalogueTests
         Assert.All(rows, e => Assert.True(Enum.IsDefined(e.Effect), e.Id));
 
         // And the game plays these rows, in this order, from the shipped files.
-        var content = ShippedData.Load(Shipped).Content!;
+        var content = FixtureContent.Load(Shipped).Content!;
         Assert.Equal(rows.Select(e => e.Id), content.Enchantments.All.Select(e => e.Id));
     }
 
@@ -78,7 +78,7 @@ public class CodeCatalogueTests
         // four members, each spread a permutation of 1-4, every weapon there and
         // within the carry, a caster in hand.
         var shipped = TestContent.Load();
-        ContentValidator.ValidateParty(StartingParty.Data, shipped.Weapons, shipped.Tuning);   // does not throw
+        ContentValidator.ValidateParty(FixtureContent.Party, shipped.Weapons, shipped.Tuning);   // does not throw
         Assert.Equal(["A", "B", "C", "D"], shipped.Party.All.Select(member => member.Id));
 
         // PHASE5-175 through the one file that can break it: a weapons.json that
@@ -99,7 +99,7 @@ public class CodeCatalogueTests
         // at the weapons' stage — so it is pinned through records built in code:
         // a D whose bag names staff_of_nothing. Records handed in as they stand
         // are no built-in copy, so the stamp is weapons.json alone.
-        var party = new PartyData(StartingParty.Data.Members.Select(m => m.Id == "D" ? m with { BagWeaponIds = ["staff_of_nothing"] } : m).ToList());
+        var party = new PartyData(FixtureContent.Party.Members.Select(m => m.Id == "D" ? m with { BagWeaponIds = ["staff_of_nothing"] } : m).ToList());
         var bag = Assert.Throws<ContentException>(() => TestContent.Load(party: party));
         Assert.Equal((WeaponsJson.FileName, false, "D", ContentValidator.RulePartyWeaponExists), Stamp(bag));
         Assert.Equal("staff_of_nothing", bag.Detail);
@@ -144,7 +144,7 @@ public class CodeCatalogueTests
         // An enchantment that is no soul, never rolled: it plays, and leaves the
         // rollable entries — the file alone saying so (UniqueContentTests follows
         // it out of the drops).
-        var vampiricKept = ShippedData.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", ", \"burning\", \"vampiric\"]") });
+        var vampiricKept = FixtureContent.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", ", \"burning\", \"vampiric\"]") });
         Assert.Null(vampiricKept.Error);
         Assert.Empty(vampiricKept.Notices);
         Assert.Contains("vampiric", vampiricKept.Content!.Enchantments.NeverRolled);
@@ -153,7 +153,7 @@ public class CodeCatalogueTests
 
         // And a soul the file forgets plays too, rollable by the catalogue's word
         // and still pinned at tier 1 by its flag.
-        var burningLeft = ShippedData.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", "]") });
+        var burningLeft = FixtureContent.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, ", \"burning\"]", "]") });
         Assert.Null(burningLeft.Error);
         Assert.Contains(burningLeft.Content!.Enchantments.Rollable, e => e.Id == "burning");
         Assert.Equal(Enchantment.UniqueTier, new Enchantment(burningLeft.Content.Enchantments["burning"], 3).Tier);
@@ -191,7 +191,7 @@ public class CodeCatalogueTests
         Assert.All(ContentFiles.Retired.Keys, name => Assert.DoesNotContain(name, ContentFiles.FileNames));
 
         // The build carries no file for either: its four built-in copies are the four.
-        var builtIn = ShippedData.Texts;
+        var builtIn = FixtureContent.Texts;
         Assert.All(new[] { builtIn.Tuning, builtIn.Restricted, builtIn.Weapons, builtIn.Dungeons }, text => Assert.NotNull(text));
         Assert.Null(builtIn.Retired);
     }
@@ -215,33 +215,33 @@ public class CodeCatalogueTests
 
         // The loaded catalogue plays the dials: each the number the built-in
         // tuning.json holds, and none left unset.
-        var content = ShippedContent.Content;
-        Assert.All(dialled, id => Assert.Equal(ShippedContent.Tuning.ApplyPercent[id], content.Enchantments[id].ApplyPercent));
-        Assert.Equal(ShippedContent.Tuning.ArcanePotency, content.Enchantments[Tuning.ArcaneId].Potency);
+        var content = FixtureContent.Content;
+        Assert.All(dialled, id => Assert.Equal(FixtureContent.Tuning.ApplyPercent[id], content.Enchantments[id].ApplyPercent));
+        Assert.Equal(FixtureContent.Tuning.ArcanePotency, content.Enchantments[Tuning.ArcaneId].Potency);
         Assert.All(content.Enchantments.All, e => Assert.True(e.ApplyPercent != EnchantmentDefinitions.SetByTuning && e.Potency != EnchantmentDefinitions.SetByTuning, e.Id));
 
         // A built-in tuning.json without ApplyPercent.cold — a master edited and
         // never tested — with no tuning.json beside the game to name it stops the
         // game: no number stands under cold's percentage. Stamped tuning.json
         // (built-in), naming cold and the rule.
-        var shipped = ShippedData.Texts;
+        var shipped = FixtureContent.Texts;
         string noCold = DataTexts.WithoutMember(shipped.Tuning!, nameof(Tuning.ApplyPercent), "cold");
-        var gap = ContentFiles.Load(shipped with { Tuning = null }, shipped with { Tuning = noCold });
+        var gap = FixtureContent.Load(shipped with { Tuning = null }, shipped with { Tuning = noCold });
         Assert.Null(gap.Content);
         Assert.Equal((TuningJson.FileName, true, "cold", ContentValidator.RuleTuningOwnsTheNumber), Stamp(gap.Error!));
 
         // A copy beside the game cannot drop the dial: it merges over the built-in
         // table, so a copy without cold plays the built-in cold, and says nothing.
-        var beside = ShippedData.Load(shipped with { Tuning = noCold });
+        var beside = FixtureContent.Load(shipped with { Tuning = noCold });
         Assert.Null(beside.Error);
         Assert.Empty(beside.Notices);
-        Assert.Equal(ShippedContent.Tuning.ApplyPercent["cold"], beside.Content!.Enchantments["cold"].ApplyPercent);
+        Assert.Equal(FixtureContent.Tuning.ApplyPercent["cold"], beside.Content!.Enchantments["cold"].ApplyPercent);
 
         // Records built in code meet the same rule at the load's first stage: a
         // tuning whose ApplyPercent table names no cold.
-        var noDial = ShippedContent.Tuning with
+        var noDial = FixtureContent.Tuning with
         {
-            ApplyPercent = ShippedContent.Tuning.ApplyPercent.Where(dial => dial.Key != "cold").ToDictionary(dial => dial.Key, dial => dial.Value, StringComparer.Ordinal),
+            ApplyPercent = FixtureContent.Tuning.ApplyPercent.Where(dial => dial.Key != "cold").ToDictionary(dial => dial.Key, dial => dial.Value, StringComparer.Ordinal),
         };
         var refused = Assert.Throws<ContentException>(() => TestContent.Load(noDial));
         Assert.Equal((TuningJson.FileName, true, "cold", ContentValidator.RuleTuningOwnsTheNumber), Stamp(refused));
@@ -250,7 +250,7 @@ public class CodeCatalogueTests
         // And Arcane's dial is the tuning's scalar, clamped 0 to 1000 where 0 is
         // the legal way to switch it off: a file that turns it to 0 loads, and
         // Arcane adds nothing.
-        var off = ShippedData.Load(shipped with { Tuning = """{ "ArcanePotency": 0 }""" });
+        var off = FixtureContent.Load(shipped with { Tuning = """{ "ArcanePotency": 0 }""" });
         Assert.Null(off.Error);
         Assert.Equal(0, off.Content!.Enchantments[Tuning.ArcaneId].Potency);
     }

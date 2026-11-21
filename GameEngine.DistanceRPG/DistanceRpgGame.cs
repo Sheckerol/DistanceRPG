@@ -742,7 +742,9 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
     /// <c>deepened …</c>, or <c>landed, nothing to deepen or graft</c>), or <c>…
     /// finished: refined; no wear, no roll</c>; a transfer's says where its soul
     /// went (Phase 6a.6), <c>… finished: vampiric moved on at T2 from Nameless
-    /// Knife; …</c>, or a reorder's <c>… flaming moved to the end at T1; …</c>. The
+    /// Knife; …</c>, or a reorder's <c>… flaming moved to the end at T1; …</c>; and
+    /// ahead of the roll, the enchantments its maintenance raised a tier, where any
+    /// bar was full (<c>… refined; vampiric to T4; improvement roll …</c>). The
     /// line shows the roll without its
     /// keys, which the log names where each was made: the run's map seed as the run
     /// begins, and the deposit's ordinal where the deposit was made (<c>deposit
@@ -776,6 +778,7 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
                         : $"{soul} moved to the end at T{report.Tier}",
                     _ => "refined",
                 }
+                + RaisedSaid(report)
                 + RollSaid(report));
         return lines;
     }
@@ -832,6 +835,10 @@ public class DistanceRpgGame : Game, IRunHost, IBetweenRunsHost, ITitleHost
                 + string.Join(", ", spoiled.Select(potion => $"{potion.Type} Q{potion.Quality}")));
         return lines;
     }
+
+    /// <summary>What a finished service's maintenance raised, in its log line (ruled after play, 2026-11-19): <c>; vampiric to T4, flaming to T2</c>, each enchantment whose full bar bought its tier — or nothing, where none was full.</summary>
+    private static string RaisedSaid(ServiceReport report)
+        => report.Raised is { Count: > 0 } raised ? "; " + string.Join(", ", raised.Select(entry => $"{entry.Id} to T{entry.Tier}")) : "";
 
     /// <summary>What a finished service's improvement roll was and did, as its log line ends: the draw against its odds, and what it did — or that nothing was rolled.</summary>
     private static string RollSaid(ServiceReport report)

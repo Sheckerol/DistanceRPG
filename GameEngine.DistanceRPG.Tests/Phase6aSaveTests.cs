@@ -52,7 +52,7 @@ public class Phase6aSaveTests
             Assert.All(TuningSchema.Keys.Where(key => !named.Contains(key.Name)), key => Assert.True(!key.Played || key.HashedFrom > SavedVersion,
                 $"{key.Name} is played at version {SavedVersion}, and the save's tuning has no number for it"));
         }
-        return TuningJson.Read(text, ShippedContent.Tuning);
+        return TuningJson.Read(text, FixtureContent.Tuning);
     }
 
     /// <summary>Whether a number version 2 hashes is not the same in the two tunings: what the game says has changed.</summary>
@@ -202,7 +202,7 @@ public class Phase6aSaveTests
                 return SaveGame.Restore(file, GameContent.Current).TuningChanged;
         }
 
-        Assert.Equal(Version2NumbersMoved(played, ShippedContent.Tuning), Changed(ShippedContent.Tuning));
+        Assert.Equal(Version2NumbersMoved(played, FixtureContent.Tuning), Changed(FixtureContent.Tuning));
         Assert.False(Changed(played));
         Assert.True(Changed(played with { MovementBudget = played.MovementBudget + 1 }));
         Assert.True(Changed(played with { WearPerHit = played.WearPerHit + 1 }));

@@ -13,7 +13,8 @@ namespace GameEngine.DistanceRPG;
 /// (<see cref="BetweenRunsHud.PanelRows"/>).
 /// <list type="bullet">
 /// <item><strong>Services</strong>: <c>DEPOSIT THE BUCKLER AND SWORD</c>, the weapon's
-/// wear, enchantments, open slots and runs in the shop, and the three services on
+/// wear, enchantments, open slots and runs in the shop, how many of its enchantments
+/// are full and so come back a tier deeper (<see cref="FullLine"/>), and the three services on
 /// their number keys — <c>1  ENCHANT</c>, <c>2  REFINE</c> and <c>3  MOVE AN
 /// ENCHANTMENT ONTO IT</c> (Phase 6a.6) — each with the odds its return improves
 /// the weapon anyway (<see cref="Wear.ImproveOdds"/>). One the enchanter would
@@ -174,6 +175,27 @@ internal sealed class DepositPanel
         int count = weapon.Enchantments.Count;
         return $"WEAR {weapon.Wear} OF {weapon.WearCapacity} - ENCHANTMENTS {count} OF {GameContent.Current.Tuning.EnchantmentSlots}"
             + $" - SLOTS OPEN {Wear.SlotsOpen(weapon.WearCapacity)} - {DungeonHud.Runs(Wear.ServiceRuns(count))} IN THE SHOP";
+    }
+
+    /// <summary>
+    /// What any service does for the weapon's enchantments, under its state (ruled
+    /// after play, 2026-11-19): how many have filled their bar, each of which the
+    /// service's return raises a tier (<see cref="Weapon.Maintain"/>) — <c>1
+    /// ENCHANTMENT IS FULL - ANY SERVICE RAISES IT A TIER</c>, <c>2 ENCHANTMENTS ARE
+    /// FULL - ANY SERVICE RAISES EACH A TIER</c> — or null where none has. A count,
+    /// never the names: the page's detail beside the panel marks each one
+    /// <c>XP FULL</c>, and five names would not fit the line.
+    /// </summary>
+    internal static string? FullLine(Weapon weapon)
+    {
+        ArgumentNullException.ThrowIfNull(weapon);
+        int full = weapon.Enchantments.Count(entry => entry.BarFull);
+        return full switch
+        {
+            0 => null,
+            1 => "1 ENCHANTMENT IS FULL - ANY SERVICE RAISES IT A TIER",
+            _ => $"{full} ENCHANTMENTS ARE FULL - ANY SERVICE RAISES EACH A TIER",
+        };
     }
 
     /// <summary>

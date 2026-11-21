@@ -205,7 +205,9 @@ public sealed record Offer(string Id, string? Refusal, string? Note);
 /// tick: every run's end asks it, the visit already gone. A run that counts works
 /// the newest <see cref="Tuning.EnchanterWorksOn"/> deposits a run on — every
 /// other deposit stalls, a transfer counting as one — and a service whose last run
-/// is worked finishes: an Enchant attaches its enchantment last, at tier 1 with no
+/// is worked finishes: the weapon is maintained, every enchantment on it whose bar
+/// use filled going up one tier — the only place a tier rises (ruled after play,
+/// 2026-11-19) — an Enchant attaches its enchantment last, at tier 1 with no
 /// XP, a Transfer moves its soul last a tier down, the improvement roll is made
 /// (<see cref="Improve"/>, Phase 6a.4), and the weapon goes to the end of the
 /// stable, a transfer's source after it (PHASE 6a DECISION 7). A run that does not
@@ -672,7 +674,7 @@ public static class Enchanter
             for (int index = 0; index < giver.Enchantments.Count; index++)
             {
                 var soul = giver.Enchantments[index];
-                offers.Add(new TransferOffer(from, source, index, soul, soul.Transferred().Tier, TransferRuns(weapon, reorder: source is null),
+                offers.Add(new TransferOffer(from, source, index, soul, Arriving(soul, reorder: source is null).Tier, TransferRuns(weapon, reorder: source is null),
                     TransferRefusal(campaign, weapon, source, index), MoveNote(weapon, soul.Def)));
             }
         }
@@ -687,6 +689,18 @@ public static class Enchanter
         Each(null, null);
         return offers;
     }
+
+    /// <summary>
+    /// <paramref name="soul"/> as a finished transfer lands it (§6.5): a tier down,
+    /// tier 1 the floor (<see cref="Enchantment.Transferred"/>) — off the soul as
+    /// it lies on another weapon, which the service never maintains, and, for a
+    /// <paramref name="reorder"/>, off the soul as the weapon's own maintenance
+    /// leaves it first (<see cref="Enchantment.Maintained"/>; <see cref="Tick"/>):
+    /// a full bar's tier is gained and then the move's is lost. What the source
+    /// list says a soul arrives at, in the order the clock does it.
+    /// </summary>
+    private static Enchantment Arriving(Enchantment soul, bool reorder)
+        => (reorder ? soul.Maintained() : soul).Transferred();
 
     /// <summary>
     /// The note on a soul the source list offers to move onto <paramref name="weapon"/>,
@@ -794,7 +808,7 @@ public static class Enchanter
         if (Stranded(giver.Enchantments, left, stood) is { } stranded)
             return stranded;
 
-        IReadOnlyList<Enchantment> landed = [.. ahead, soul.Transferred()];
+        IReadOnlyList<Enchantment> landed = [.. ahead, Arriving(soul, reorder)];
         return CastRefusal(weapon, weapon.Enchantments, landed)
             ?? (source is null ? null : CastRefusal(source, source.Enchantments, left));
     }
@@ -1072,7 +1086,12 @@ public static class Enchanter
     /// <list type="bullet">
     /// <item><strong>A run that counted</strong> works each deposit
     /// <see cref="Worked"/> names a run on, in deposit order, and finishes each
-    /// whose last run that was: an Enchant attaches its enchantment last, at
+    /// whose last run that was. First the weapon is maintained
+    /// (<see cref="Weapon.Maintain"/>; ruled after play, 2026-11-19): every
+    /// enchantment on it whose bar use filled goes up one tier — whatever the
+    /// service and whatever wear it cashed, and the only place a tier rises; a
+    /// transfer's source, whose wear was never cashed, is not maintained, and a
+    /// deposit taken back never was. Then an Enchant attaches its enchantment last, at
     /// <see cref="AttachedTier"/> with no XP — the deposit asked the offer and the
     /// ceiling, and the weapon has been in the shop since — a Transfer moves its soul
     /// off its source, or off the weapon, and on last a tier down, and a refinement
@@ -1112,9 +1131,10 @@ public static class Enchanter
             reports[i] = Report(entry, stalled: false);
             if (entry.RunsWorked >= entry.Runs)
             {
+                var raised = entry.Weapon.Maintain();   // before the service's own work: a reorder moves its soul as maintained
                 var moved = Complete(entry);
                 var (improved, roll) = Improve(entry.Weapon, entry.Service, entry.WearAtDeposit, mapSeed, entry.Ordinal);
-                reports[i] = reports[i] with { Improved = improved, Roll = roll, Tier = moved?.Tier };
+                reports[i] = reports[i] with { Improved = improved, Roll = roll, Tier = moved?.Tier, Raised = raised.Count > 0 ? raised : null };
                 campaign.Return(entry);
             }
         }

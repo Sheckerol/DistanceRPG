@@ -102,15 +102,15 @@ public class CampaignStateTests
         var roster = GameContent.Current.Party.All;
         foreach (var def in roster)
         {
-            var carrier = TestPools.Holding(def.Id, TestWeapons.Get(def.StartingWeaponId));
+            var carrier = TestPools.Holding(def.Id, TestWeapons.Starting(def, def.StartingWeaponId));
             for (int i = 0; i < def.BagWeaponIds.Count; i++)
-                carrier.Inventory[i + 1] = TestWeapons.Get(def.BagWeaponIds[i]);
+                carrier.Inventory[i + 1] = TestWeapons.Starting(def, def.BagWeaponIds[i]);
             campaign.See(carrier);
         }
 
         var carried = roster
-            .SelectMany(def => def.BagWeaponIds.Prepend(def.StartingWeaponId))
-            .SelectMany(id => TestWeapons.Get(id).Enchantments.Select(e => e.Id))
+            .SelectMany(def => def.BagWeaponIds.Prepend(def.StartingWeaponId).Select(id => TestWeapons.Starting(def, id)))
+            .SelectMany(weapon => weapon.Enchantments.Select(e => e.Id))
             .Distinct()
             .OrderBy(id => id, StringComparer.Ordinal);
         Assert.Equal(carried, campaign.SeenInOrder);

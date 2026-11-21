@@ -17,7 +17,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// predicate every graft asks (<see cref="ModifierRules.Allowed"/>) and explained
 /// by <see cref="ContentValidator.WhyNotAllowed"/>. Every case reads text or
 /// builds rules it never makes current; the shipped file is the master copy the
-/// build carries (<see cref="ShippedData.Texts"/>).
+/// build carries (<see cref="FixtureContent.Texts"/>).
 /// </summary>
 public class WeaponsJsonTests
 {
@@ -33,7 +33,7 @@ public class WeaponsJsonTests
     private static readonly string[] UniqueFields = ["id", "name", "derivedFrom", "raises", "enchantments"];
 
     private static ContentLoad Load(string? weapons = null, string? restricted = null)
-        => ShippedData.Load(DataTexts.Shipped with { Weapons = weapons ?? Shipped, Restricted = restricted ?? ShippedRestricted });
+        => FixtureContent.Load(DataTexts.Shipped with { Weapons = weapons ?? Shipped, Restricted = restricted ?? ShippedRestricted });
 
     /// <summary>The four relations edits the section's tests make, as restricted.json texts, each passing every restricted and enchantment stage first.</summary>
     private static readonly string PushBlocks = DataTexts.Edit(ShippedRestricted, "[\"Light\", \"Resonant\"],", "[\"Light\", \"Resonant\"],\n    [\"Push\", \"Block\"],");
@@ -59,7 +59,7 @@ public class WeaponsJsonTests
         // leave Weapons.cs" — "statline, forged spread, area shape, innate
         // enchantment id". The shipped file is the master copy of every weapon
         // and every class: no second record of them is kept to hold it to.
-        string text = ShippedData.Texts.Weapons!;
+        string text = FixtureContent.Texts.Weapons!;
         var data = WeaponsJson.Read(text);
         var read = data.Weapons;
         Assert.Equal(32, read.Count(w => !w.Unique));
@@ -305,7 +305,7 @@ public class WeaponsJsonTests
         // forged-only modifier can refuse — under the shipped relations and each
         // edit above, it is named exactly when Allowed refuses.
         var spreads = new List<ModifierSet> { ModifierSet.Empty };
-        foreach (var def in ShippedContent.Weapons.Weapons)
+        foreach (var def in FixtureContent.Weapons.Weapons)
         {
             spreads.Add(ModifierSet.Of(def.Forged.Select(entry => (entry.Key, entry.Value)).ToArray()));
             foreach (var left in def.Forged.Keys)
@@ -318,7 +318,7 @@ public class WeaponsJsonTests
         int refusals = 0, asked = 0;
         foreach (var restricted in relations)
         {
-            var rules = new ModifierRules(ShippedContent.Tuning, restricted);
+            var rules = new ModifierRules(FixtureContent.Tuning, restricted);
             foreach (var t in Enum.GetValues<ModifierType>())
                 foreach (var kind in new[] { WeaponKind.Melee, WeaponKind.Ranged, WeaponKind.Caster, WeaponKind.Any })
                     foreach (var present in spreads)
@@ -336,7 +336,7 @@ public class WeaponsJsonTests
 
         // When several clauses refuse, the one named is the first Allowed asks:
         // outside the table, then the kind, forgedOnly, excludes, requires.
-        var shipped = ShippedContent.Restricted;
+        var shipped = FixtureContent.Restricted;
         Assert.Equal("Momentum is not in the modifier table", ContentValidator.WhyNotAllowed(Momentum, WeaponKind.Melee, ModifierSet.Empty, shipped));
         Assert.Equal("restricted.json kind Brace: melee", ContentValidator.WhyNotAllowed(Brace, WeaponKind.Ranged, ModifierSet.Of((Opportunist, 1)), shipped));
         Assert.Equal("restricted.json forgedOnly Charges", ContentValidator.WhyNotAllowed(Charges, WeaponKind.Melee, ModifierSet.Empty, shipped));
@@ -348,11 +348,11 @@ public class WeaponsJsonTests
 
         // And every shipped spread is allowed as it is forged, on the kind its
         // class row gives it: nothing to name.
-        foreach (var def in ShippedContent.Weapons.Weapons)
+        foreach (var def in FixtureContent.Weapons.Weapons)
         {
             var spread = ModifierSet.Of(def.Forged.Select(entry => (entry.Key, entry.Value)).ToArray());
             foreach (var (t, _) in spread.Entries)
-                Assert.Null(ContentValidator.WhyNotAllowed(t, ShippedContent.Weapons.ClassOf(def.Class)!.Kind, spread, shipped));
+                Assert.Null(ContentValidator.WhyNotAllowed(t, FixtureContent.Weapons.ClassOf(def.Class)!.Kind, spread, shipped));
         }
     }
 

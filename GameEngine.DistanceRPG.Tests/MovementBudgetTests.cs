@@ -17,7 +17,7 @@ public class MovementBudgetTests
 {
     private const float Tile = GameConstants.Tile;
 
-    private static Tuning Budget(int units) => ShippedContent.Tuning with { MovementBudget = units };
+    private static Tuning Budget(int units) => FixtureContent.Tuning with { MovementBudget = units };
 
     private static void Put(ActorState actor, (int R, int C) tile) => (actor.X, actor.Y) = (tile.C * Tile + Tile / 2f, tile.R * Tile + Tile / 2f);
 
@@ -47,7 +47,7 @@ public class MovementBudgetTests
         // pin): phase-1-weapons.md derives the mana divisor from it,
         // (160 - 40) / (8 + 3), so an edit that moves it fails here by name, and
         // the doc and MovementUnitsPerMana move with it.
-        Assert.Equal(160, ShippedContent.Tuning.MovementBudget);
+        Assert.Equal(160, FixtureContent.Tuning.MovementBudget);
         Assert.Equal(160, GameContent.Current.Tuning.MovementBudget);
 
         using (TestContent.Use(tuning: Budget(200)))
@@ -77,10 +77,10 @@ public class MovementBudgetTests
             Assert.Equal(3, DummySwings());
         using (TestContent.UsePremise())
             Assert.Equal(2, DummySwings());
-        Assert.Equal(ShippedContent.Budget, TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")).DistLeft);
+        Assert.Equal(FixtureContent.Budget, TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto")).DistLeft);
 
         // And a file turns it: the playtest's edit is the game's budget.
-        var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "MovementBudget": 240 }""" });   // beside the shipped content files
+        var load = FixtureContent.Load(FixtureContent.Texts with { Tuning = """{ "MovementBudget": 240 }""" });   // beside the shipped content files
         Assert.Empty(load.Notices);
         Assert.Equal(["MovementBudget 240"], load.TuningOverrides);
         Assert.Equal(240, load.Content!.Tuning.MovementBudget);
@@ -98,7 +98,7 @@ public class MovementBudgetTests
         var banked = TestPools.Holding("A", TestWeapons.Get("weakspot_stiletto"));
         banked.SavedMovement = 30f;
         Assert.Equal(230f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, Budget(200)));
-        Assert.Equal(ShippedContent.Budget + 30f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, ShippedContent.Tuning));
+        Assert.Equal(FixtureContent.Budget + 30f, DungeonScene.BudgetBeforeMire(banked, TurnPhase.TurnEnding, FixtureContent.Tuning));
 
         using (TestContent.Use(tuning: Budget(200)))
         {

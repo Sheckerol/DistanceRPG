@@ -395,9 +395,9 @@ public sealed class BossTests : IDisposable
         // a seed whose class draws never touched the axe keeps its class and its
         // role, and only a seed with a class draw on the axe moves: to the axe, the
         // first draw that now stands.
-        var braceFreed = ShippedContent.Restricted with
+        var braceFreed = FixtureContent.Restricted with
         {
-            Excludes = ShippedContent.Restricted.Excludes
+            Excludes = FixtureContent.Restricted.Excludes
                 .Select(g => g.Contains(nameof(Brace)) ? g.Where(id => id != nameof(Brace)).ToArray() : g)
                 .ToList(),
         };

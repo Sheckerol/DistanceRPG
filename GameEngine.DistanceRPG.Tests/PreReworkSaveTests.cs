@@ -135,7 +135,7 @@ public class PreReworkSaveTests
             Assert.All(lacking, key => Assert.True(!key.Played || key.HashedFrom > 1,
                 $"{key.Name} is played at version 1, and the saves' tuning has no number for it"));
         }
-        return TuningJson.Read(text, ShippedContent.Tuning);
+        return TuningJson.Read(text, FixtureContent.Tuning);
     }
 
     /// <summary>Whether any number <paramref name="now"/> holds is not the number the saves were played under.</summary>
@@ -381,7 +381,7 @@ public class PreReworkSaveTests
         // moved, always — but for a number no rule played at version 1, one version
         // 2 began to hash, which is none it was played under (PHASE 6a DECISION 9).
         var played = ReadPlayedTuning().Tuning;
-        bool moved = NumbersMoved(ShippedContent.Tuning);
+        bool moved = NumbersMoved(FixtureContent.Tuning);
         foreach (string name in Saves)
         {
             var file = SaveCodec.Read(TextOf(name));

@@ -56,13 +56,13 @@ public sealed class CarryLimitTests : IDisposable
 
         // The roster is measured against the same six: the starting weapon and a
         // bag of five fit, and one more does not.
-        var five = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 3
+        var five = new PartyData(FixtureContent.Party.Members.Select((m, i) => i == 3
             ? m with { BagWeaponIds = ["staff_of_mire", "staff_of_blight", "staff_of_warding", "staff_of_renewal", "arming_sword"] }
             : m).ToList());
         using (TestContent.UsePremise(party: five))
             Assert.Equal(5, GameContent.Current.Party["D"].BagWeaponIds.Count);
 
-        var six = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 3
+        var six = new PartyData(FixtureContent.Party.Members.Select((m, i) => i == 3
             ? m with { BagWeaponIds = [.. five.Members[3].BagWeaponIds, "hatchet"] }
             : m).ToList());
         var refused = Assert.Throws<ContentException>(() => TestContent.UsePremise(party: six));
@@ -159,19 +159,19 @@ public sealed class CarryLimitTests : IDisposable
         // carry under four leaves somebody without a hand.
         foreach (int carry in new[] { 25, 26, 27, 3, 0, -4 })
         {
-            var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ShippedContent.Tuning with { PartyCarrySlots = carry }));
+            var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(FixtureContent.Tuning with { PartyCarrySlots = carry }));
             Assert.Equal((nameof(Tuning.PartyCarrySlots), ContentValidator.RuleCarryFillsTheParty), (ex.EntryId, ex.Rule));
         }
 
         // Refused at load, before anything is built on it, leaving the running content alone.
         var before = GameContent.Current;
-        var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: ShippedContent.Tuning with { PartyCarrySlots = 30 }));
+        var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: FixtureContent.Tuning with { PartyCarrySlots = 30 }));
         Assert.Equal(ContentValidator.RuleCarryFillsTheParty, loaded.Rule);
         Assert.Same(before, GameContent.Current);
 
         // Every multiple of the party from a hand each to nine slots each divides evenly and loads.
         foreach (int carry in new[] { 4, 24, 28, 36 })
-            ContentValidator.ValidateTuning(ShippedContent.Tuning with { PartyCarrySlots = carry });
+            ContentValidator.ValidateTuning(FixtureContent.Tuning with { PartyCarrySlots = carry });
     }
 
     [Fact]
@@ -185,16 +185,16 @@ public sealed class CarryLimitTests : IDisposable
         Assert.Equal(9, GameConstants.MaxInventorySlots);
         int deepest = GameConstants.PartySize * GameConstants.MaxInventorySlots;
         Assert.Equal(36, deepest);
-        ContentValidator.ValidateTuning(ShippedContent.Tuning with { PartyCarrySlots = deepest });
+        ContentValidator.ValidateTuning(FixtureContent.Tuning with { PartyCarrySlots = deepest });
         foreach (int carry in new[] { deepest + GameConstants.PartySize, 400 })
         {
-            var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ShippedContent.Tuning with { PartyCarrySlots = carry }));
+            var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(FixtureContent.Tuning with { PartyCarrySlots = carry }));
             Assert.Equal((nameof(Tuning.PartyCarrySlots), ContentValidator.RuleEverySlotHasAKey), (ex.EntryId, ex.Rule));
         }
 
         // Refused at load, before a member is built on it, leaving the running content alone.
         var before = GameContent.Current;
-        var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: ShippedContent.Tuning with { PartyCarrySlots = deepest + GameConstants.PartySize }));
+        var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: FixtureContent.Tuning with { PartyCarrySlots = deepest + GameConstants.PartySize }));
         Assert.Equal(ContentValidator.RuleEverySlotHasAKey, loaded.Rule);
         Assert.Same(before, GameContent.Current);
 
@@ -202,7 +202,7 @@ public sealed class CarryLimitTests : IDisposable
         // slot the loader admits. At the deepest carry a member holds nine, the
         // bag reads 2-9, and each of its eight slots has its key.
         Assert.InRange(GameConstants.MaxInventorySlots, 1, DungeonScene.HighestSlotKey);
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { PartyCarrySlots = deepest }))
+        using (TestContent.Use(tuning: FixtureContent.Tuning with { PartyCarrySlots = deepest }))
         {
             var member = TestPools.Char("A");
             Assert.Equal(GameConstants.MaxInventorySlots, member.Inventory.Length);

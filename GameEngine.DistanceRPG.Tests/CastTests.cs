@@ -515,7 +515,7 @@ public sealed class CastTests : IDisposable
             Forged: new Dictionary<ModifierType, int> { [Resonant] = 1 },
             Enchantments: [new EnchantmentRef("searing_flame")], Shape: null, Unique: false, DerivedFrom: null);
         using var _ = TestContent.UsePremise(
-            enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, searing]),
+            enchantments: new EnchantmentsData([.. FixtureContent.Enchantments.Enchantments, searing]),
             weapons: w => w with { Weapons = [.. w.Weapons, embers] });
 
         var (turns, a, b, enemy) = Scene("staff_of_embers");

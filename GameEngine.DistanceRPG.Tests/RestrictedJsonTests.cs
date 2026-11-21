@@ -11,13 +11,13 @@ namespace GameEngine.DistanceRPG.Tests;
 /// game naming the file and the path — and checked before anything reads them,
 /// so a typo in a relation aborts startup rather than "a rule that silently does
 /// not apply". Every case reads text; the shipped file is the master copy the
-/// build carries (<see cref="ShippedData.Texts"/>).
+/// build carries (<see cref="FixtureContent.Texts"/>).
 /// </summary>
 public class RestrictedJsonTests
 {
     private static readonly string Shipped = DataTexts.Shipped.Restricted!;
 
-    private static ContentLoad Load(string restricted) => ShippedData.Load(DataTexts.Shipped with { Restricted = restricted });
+    private static ContentLoad Load(string restricted) => FixtureContent.Load(DataTexts.Shipped with { Restricted = restricted });
 
     [Fact]
     public void TheFileIsSectionFivePointFivesKeys()
@@ -25,7 +25,7 @@ public class RestrictedJsonTests
         // PHASE5-105–110: the shipped file holds §5.5's five keys verbatim, in
         // §5.5's order. (It is the master copy: the relations are its alone, so
         // there is no second record to hold it to.)
-        string text = ShippedData.Texts.Restricted!;
+        string text = FixtureContent.Texts.Restricted!;
         var read = RestrictedJson.Read(text);
 
         using var document = JsonDocument.Parse(text, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip });
@@ -71,7 +71,7 @@ public class RestrictedJsonTests
         var read = RestrictedJson.Read("""
             { "excludes": [["Brace", "Opportunist", "Overwatch"]], "requires": {}, "kind": {}, "forgedOnly": [], "neverRolled": [] }
             """);
-        var rules = new ModifierRules(ShippedContent.Tuning, read);
+        var rules = new ModifierRules(FixtureContent.Tuning, read);
         var pairs = rules.Excludes.SelectMany(entry => entry.Value.Select(other => (entry.Key, other))).ToList();
         (ModifierType, ModifierType)[] six =
             [(Brace, Opportunist), (Brace, Overwatch), (Opportunist, Brace), (Opportunist, Overwatch), (Overwatch, Brace), (Overwatch, Opportunist)];
@@ -79,7 +79,7 @@ public class RestrictedJsonTests
 
         // Through the loader and the shipped file, the same closure: every member
         // of every group excludes every other, both ways.
-        var content = ShippedData.Load(DataTexts.Shipped).Content!;
+        var content = FixtureContent.Load(DataTexts.Shipped).Content!;
         foreach (var group in RestrictedJson.Read(Shipped).Excludes.Where(group => group.All(ModifierRules.ModifierIds.Contains)))
             foreach (var a in group)
                 foreach (var b in group.Where(b => b != a))
@@ -109,7 +109,7 @@ public class RestrictedJsonTests
         var read = RestrictedJson.Read("""
             { "excludes": [], "requires": {}, "kind": { "Brace": "melee", "Overwatch": "ranged", "Resonant": "caster" }, "forgedOnly": [], "neverRolled": [] }
             """);
-        var rules = new ModifierRules(ShippedContent.Tuning, read);
+        var rules = new ModifierRules(FixtureContent.Tuning, read);
         Assert.Equal(WeaponKind.Melee, rules.RequiresKind[Brace]);
         Assert.Equal(WeaponKind.Ranged, rules.RequiresKind[Overwatch]);
         Assert.Equal(WeaponKind.Caster, rules.RequiresKind[Resonant]);

@@ -2436,16 +2436,21 @@ public sealed class DungeonHud
     /// it — <c>XP 9/20</c> — because tier is earned by use (§3.3) and the bar is
     /// the only thing that says a swing is buying anything. <strong>It prints
     /// from zero</strong>: <c>XP 0/20</c> is what says a weapon just taken up can
-    /// be deepened at all, and an entry that crosses its bar exactly would
-    /// otherwise lose the row at the one moment it has most to say. The bar is
-    /// <see cref="Enchantment.TierCost"/> at the <em>wielder's</em> INT — the
-    /// price the climb charges rather than the unfloored
-    /// <see cref="Enchantment.XpToNextTier"/>, so the readout and the ladder can
-    /// never state two figures — and like the lock it reads only where there is a
-    /// wielder. A unique prints what it has banked and no bar, since it is pinned
-    /// at tier 1 and the mana buys nothing; with nothing banked it prints
-    /// neither, there being no progress to state and no next tier to be partway
-    /// to.
+    /// be deepened at all. The bar is <see cref="Enchantment.TierCost"/> — the bar
+    /// use fills rather than the unfloored <see cref="Enchantment.XpToNextTier"/>,
+    /// so the readout and the ladder can never state two figures — and like the
+    /// lock it reads only where there is a wielder. A unique prints what it has
+    /// banked and no bar, since it is pinned at tier 1 and the mana buys nothing;
+    /// with nothing banked it prints neither, there being no progress to state and
+    /// no next tier to be partway to.
+    /// </para>
+    /// <para>
+    /// <strong>A full bar says so wherever the entry is read</strong> (ruled after
+    /// play, 2026-11-19): it banks nothing more until the enchanter's next service
+    /// on the weapon raises its tier, so in hand it reads <c>XP 20/20 FULL</c>, as
+    /// wear does, and in the bag, the stable or the shop, where no bar prints,
+    /// <c>XP FULL</c> — which is what tells the WEAPONS page which weapons a
+    /// service would deepen.
     /// </para>
     /// </summary>
     internal static string EnchantmentReadout(Weapon weapon, ActorState? wielder = null)
@@ -2466,14 +2471,29 @@ public sealed class DungeonHud
             {
                 text += $" LOCK {entry.EffectiveLock}";
                 if (!entry.Unique)
-                    text += $" XP {entry.Xp}/{entry.TierCost()}";
+                    text += $" XP {entry.Xp}/{entry.TierCost()}{(entry.BarFull ? " FULL" : "")}";
                 else if (entry.Xp > 0)
                     text += $" XP {entry.Xp}";
                 if (wielder!.IsDormant(i)) text += " (ASLEEP)";
             }
+            else if (entry.BarFull)
+            {
+                text += " XP FULL";
+            }
             parts.Add(text);
         }
         return parts;
+    }
+
+    /// <summary>
+    /// The beat over a wielder whose enchantment's bar has just filled (ruled after
+    /// play, 2026-11-19): <c>VAMPIRIC XP FULL</c> — never a tier, which rises at the
+    /// enchanter on the weapon's next service.
+    /// </summary>
+    internal static string BarFilled(Enchantment entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        return $"{entry.Def.Name.ToUpperInvariant()} XP FULL";
     }
 
     private static string ShapeName(AreaShape shape) => shape.Kind.ToString().ToUpperInvariant();

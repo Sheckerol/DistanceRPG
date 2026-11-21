@@ -414,7 +414,9 @@ public sealed class BetweenRunsHud : IDisposable
     /// its soul went to (<see cref="SourceBack"/>) — then each worked one — <c>THE
     /// ENCHANTER WORKED THE ROTWOOD - 1 OF 2 RUNS</c> — at most <paramref name="most"/>
     /// lines of those together, a service never split, and then <c>AND 2 MORE AT THE
-    /// ENCHANTER</c>, <paramref name="moreTail"/> after it; then the stalled weapons
+    /// ENCHANTER</c>, <paramref name="moreTail"/> after it; then, green, the one line
+    /// of the tiers those finished services raised (<see cref="RaisedLine"/>), where
+    /// any did; then the stalled weapons
     /// in yellow, wrapped, <c>STALLED AT THE ENCHANTER: RAPIER AND DAGGER</c>. On a run
     /// that did not count, the one grey line <see cref="WorkedNothing"/>. A weapon
     /// and an enchantment are named by the content's rows, and by the bare id where
@@ -451,6 +453,8 @@ public sealed class BetweenRunsHud : IDisposable
         }
         if (said < told.Count)
             yield return new Run(MoreAtTheEnchanter(told.Count - said) + moreTail, DungeonHud.Cyan);
+        if (RaisedLine(reports) is { } raised)
+            yield return new Run(raised, DungeonHud.Green);   // the tier use earned, cut in: the story, as a graft is
 
         var stalled = reports.Where(report => report.Stalled).Select(report => WeaponName(report.WeaponId)).ToList();
         if (stalled.Count > 0)
@@ -499,6 +503,39 @@ public sealed class BetweenRunsHud : IDisposable
         return report is { Service: Service.Transfer, SourceId: { } source }
             ? $"{WeaponName(source)} IS BACK FROM THE ENCHANTER - {(report.EnchantmentId is { } soul ? EnchantmentName(soul) : "ITS ENCHANTMENT")} MOVED OFF"
             : null;
+    }
+
+    /// <summary>
+    /// The summary's one line for the tiers the run's finished services raised
+    /// (<see cref="ServiceReport.Raised"/>; ruled after play, 2026-11-19), green, or
+    /// null when none rose: one enchantment named with its weapon and its new tier,
+    /// <c>VAMPIRIC ON THE ROTWOOD ROSE TO T3</c>; two on one weapon named together,
+    /// <c>VAMPIRIC AND FLAMING ON THE ROTWOOD ROSE A TIER</c>; more on one weapon
+    /// counted, <c>3 ENCHANTMENTS ON THE ROTWOOD ROSE A TIER</c>; and across several
+    /// weapons counted, <c>3 ENCHANTMENTS ROSE A TIER AT THE ENCHANTER</c>. One line
+    /// whatever came back, and said for every finished service — one the summary
+    /// only counts among <see cref="MoreAtTheEnchanter"/>'s too — so it is never cut
+    /// and costs the run's end panel one line at the most; the WEAPONS page says
+    /// each tier. "Rose", never "deepened", which is the improvement roll's word for
+    /// a modifier (<see cref="Outcome"/>).
+    /// </summary>
+    internal static string? RaisedLine(IReadOnlyList<ServiceReport> reports)
+    {
+        ArgumentNullException.ThrowIfNull(reports);
+        var back = reports.Where(report => report.Finished && report.Raised is { Count: > 0 }).ToList();
+        int rose = back.Sum(report => report.Raised!.Count);
+        if (rose == 0)
+            return null;
+        if (back.Count > 1)
+            return $"{rose} ENCHANTMENTS ROSE A TIER AT THE ENCHANTER";
+        var raised = back[0].Raised!;
+        string weapon = HubWeapons.The(WeaponName(back[0].WeaponId));
+        return raised.Count switch
+        {
+            1 => $"{EnchantmentName(raised[0].Id)} ON {weapon} ROSE TO T{raised[0].Tier}",
+            2 => $"{EnchantmentName(raised[0].Id)} AND {EnchantmentName(raised[1].Id)} ON {weapon} ROSE A TIER",
+            _ => $"{rose} ENCHANTMENTS ON {weapon} ROSE A TIER",
+        };
     }
 
     /// <summary>What an improvement roll did, as a finished service's line ends: <c>DEEPENED CRIT WINDOW</c>, <c>GRAFTED BLOCK</c>, or <c>NO CHANGE</c>.</summary>
@@ -1131,7 +1168,9 @@ public sealed class BetweenRunsHud : IDisposable
     /// page, top to bottom (<see cref="DepositPanel"/>):
     /// <list type="bullet">
     /// <item>on the services — and on the confirm of a refinement — the heading, the
-    /// weapon's state in grey, and a service a line: white, dimmed where refused, the
+    /// weapon's state in grey, under it in cyan what any service raises where an
+    /// enchantment's bar is full (<see cref="DepositPanel.FullLine"/>), and a
+    /// service a line: white, dimmed where refused, the
     /// one confirmed yellow and marked <c>&gt; … &lt;</c>;</item>
     /// <item>on the offer list — and the confirm of an enchantment — its heading, and
     /// a window of <paramref name="offerRows"/> of its lines that scrolls with the
@@ -1189,6 +1228,8 @@ public sealed class BetweenRunsHud : IDisposable
             default:
                 rows.Add(new ListRow(DepositPanel.Heading(weapon), DungeonHud.White, PanelHeadingScale, PanelHeadingPitch));
                 rows.Add(new ListRow(DepositPanel.StateLine(weapon), DungeonHud.Grey, PanelStateScale, PanelStatePitch));
+                if (DepositPanel.FullLine(weapon) is { } full)
+                    rows.Add(new ListRow(full, DungeonHud.Cyan, PanelStateScale, PanelStatePitch));
                 foreach (var option in panel.Services)
                 {
                     bool chosen = panel.Current == DepositPanel.Step.Confirm && option.Service == panel.Service;

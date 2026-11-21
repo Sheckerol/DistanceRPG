@@ -501,8 +501,8 @@ public sealed class SoulBehaviourTests : IDisposable
         Assert.Equal((200 - 16 - 3, 2), (seared.Hp, seared.StatusLevel(Searing, Flaming)));
 
         // Without Flaming on the weapon, content refuses the burn: a lingering element needs its element.
-        var ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
-            ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList() }));
+        var ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments,
+            FixtureContent.Weapons with { Weapons = FixtureContent.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList() }));
         Assert.Equal(("wand_of_the_nova_unique", ContentValidator.RuleEnchantmentDependency), (ex.EntryId, ex.Rule));
 
         // And transfer the Flaming off, as a later transfer (section 6.5) will leave a weapon built past the
@@ -580,14 +580,14 @@ public sealed class SoulBehaviourTests : IDisposable
         // levels each, and the burn's price paid once for the cast beside the element's.
         var shock = new EnchantmentDef("test_static", "Static", EffectKind.LingeringElement, TargetSide.Enemy, Lock: 20, Trigger: null,
             Potency: 0, ApplyPercent: 100, Applies: Mire, DamageType: Shocking, Unique: true);
-        var requires = new Dictionary<string, string[]>(ShippedContent.Restricted.Requires, StringComparer.Ordinal) { ["test_static"] = ["shocking"] };
+        var requires = new Dictionary<string, string[]>(FixtureContent.Restricted.Requires, StringComparer.Ordinal) { ["test_static"] = ["shocking"] };
         var stormNova = Premise.Weapons.Weapons.Single(w => w.Id == "wand_of_the_nova_unique") with
         {
             Id = "test_storm_nova", Name = "Storm Nova", Enchantments = [new EnchantmentRef("shocking"), new EnchantmentRef("test_static")],
         };
         using (TestContent.UsePremise(
-            restricted: ShippedContent.Restricted with { NeverRolled = [.. ShippedContent.Restricted.NeverRolled, "test_static"], Requires = requires },
-            enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, shock]),
+            restricted: FixtureContent.Restricted with { NeverRolled = [.. FixtureContent.Restricted.NeverRolled, "test_static"], Requires = requires },
+            enchantments: new EnchantmentsData([.. FixtureContent.Enchantments.Enchantments, shock]),
             weapons: w => w with { Weapons = [.. w.Weapons, stormNova] }))
         {
             var a = Char("A", 5, 5, "test_storm_nova");
@@ -863,7 +863,7 @@ public sealed class SoulBehaviourTests : IDisposable
         // 4 — halved in a Flaming dungeon on the one element while the other still lands in full — and each
         // pays its trigger once at the cast. Priced here so the shares are visible: 4 each at 100%.
         using var _ = TestContent.UsePremise(
-            enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
+            enchantments: new EnchantmentsData(FixtureContent.Enchantments.Enchantments
                 .Select(e => e.Id is "shocking" or "flaming" ? e with { Potency = 4 } : e).ToList()),
             tuning: t => TuningValues.With(t, ("ApplyPercent.shocking", 100), ("ApplyPercent.flaming", 100)));
 

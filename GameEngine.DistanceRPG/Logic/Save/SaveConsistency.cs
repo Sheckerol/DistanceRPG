@@ -637,7 +637,8 @@ internal static class SaveConsistency
         // it as the run ended, in deposit order, each saying what its deposit bought
         // as the deposit does (25) — so no more reports than deposits were ever made
         // — and, on a service it brought back, what the improvement roll did to the
-        // weapon, if anything (Phase 6a.4). A run that counted worked the newest few
+        // weapon, if anything (Phase 6a.4), and which enchantments its maintenance
+        // raised a tier (after play, 2026-11-19). A run that counted worked the newest few
         // a run on — the newest always, the enchanter working on one at least — and
         // left the older ones stalled, short of their last run; a run that did not
         // count worked nothing. Nothing ties a report to a deposit still in the shop:
@@ -682,6 +683,12 @@ internal static class SaveConsistency
                 if (report.Improved is not null && (report.Stalled || report.RunsWorked != report.Runs))
                     throw new SaveFormatException($"{where}[{i}].improved",
                         $"{report.Improved} on a service {(report.Stalled ? "stalled" : $"at {report.RunsWorked} of {report.Runs} runs")}: the improvement roll is made as a service comes back, its last run worked");
+
+                // What its maintenance raised (after play, 2026-11-19): only as the
+                // service came back — a tier rises as its last run is worked.
+                if (report.Raised is { Count: > 0 } && (report.Stalled || report.RunsWorked != report.Runs))
+                    throw new SaveFormatException($"{where}[{i}].raised",
+                        $"{report.Raised.Count} raised on a service {(report.Stalled ? "stalled" : $"at {report.RunsWorked} of {report.Runs} runs")}: a tier rises as its service comes back, its last run worked");
 
                 if (report.Stalled)
                 {

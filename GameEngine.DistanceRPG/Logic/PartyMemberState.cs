@@ -35,7 +35,7 @@ public sealed class PartyMemberState : ActorState
     /// <para>
     /// The def is trusted here because <see cref="ContentValidator.ValidateParty"/>
     /// has already refused an unknown weapon id, a bag deeper than
-    /// <see cref="InventorySlots"/> and a spread that is not a permutation: a
+    /// <see cref="InventorySlots"/>, a wand with no element named for it and a spread that is not a permutation: a
     /// broken roster is a startup failure, never half a party.
     /// </para>
     /// </summary>
@@ -53,10 +53,13 @@ public sealed class PartyMemberState : ActorState
             Y = y,
         };
 
+        // A wand's element is its drop's to roll, and a starting weapon is no drop:
+        // the roster names it (PartyMemberDef.WandElement), for the wands that take one.
         var catalogue = GameContent.Current.Weapons;
-        member.Inventory[0] = catalogue.Instantiate(def.StartingWeaponId);
+        Weapon Made(string id) => catalogue.Instantiate(id, catalogue.TakesElement(id) ? def.WandElement : null);
+        member.Inventory[0] = Made(def.StartingWeaponId);
         for (int i = 0; i < def.BagWeaponIds.Count; i++)
-            member.Inventory[i + 1] = catalogue.Instantiate(def.BagWeaponIds[i]);
+            member.Inventory[i + 1] = Made(def.BagWeaponIds[i]);
 
         return member;
     }

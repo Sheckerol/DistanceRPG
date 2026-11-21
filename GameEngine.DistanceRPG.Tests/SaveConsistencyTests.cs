@@ -1099,6 +1099,10 @@ public sealed class SaveConsistencyTests : IDisposable
             Refused(Edited(shop, tree => { DepositNode(tree, 2)["weapon"]!["wearCashed"] = most; DepositNode(tree, 2)["wearAtDeposit"] = cashedAtMost + 1; })).Where);
     }
 
+    /// <summary>A report's <c>raised</c> list, as a save writes it: each an id and the tier it rose to.</summary>
+    private static JsonArray Raised(params (string Id, int Tier)[] rose)
+        => new(rose.Select(entry => (JsonNode?)new JsonObject { ["id"] = entry.Id, ["tier"] = entry.Tier }).ToArray());
+
     [Fact]
     public void AQueueThatContradictsItselfIsRefused()
     {
@@ -1283,9 +1287,30 @@ public sealed class SaveConsistencyTests : IDisposable
                 "flensing_knife_unique named on an Enchant: only a transfer takes a soul from another weapon"),
             (tree => { ReportNode(tree, 0)["service"] = "Refine"; ReportNode(tree, 0)["enchantment"] = null; ReportNode(tree, 0)["sourceId"] = null; },
                 "campaign.lastResult.services[0].tier", "2 on a Refine: only a transfer lands a soul at a tier"),
+            // 27, and the mapper's: what a finished service's maintenance raised (after play, 2026-11-19) — an
+            // enchantment the content has and never a unique, to tier 2 at the least, no more of them than a
+            // weapon holds, and only on a service that came back.
+            (tree => ReportNode(tree, 0)["raised"] = Raised(("vampiric", 2), ("serrated", 2)), "campaign.lastResult.services[0].raised[1].id",
+                "serrated is a unique enchantment, pinned at tier 1: no service raises it"),
+            (tree => ReportNode(tree, 0)["raised"] = Raised(("vampiric", 1)), "campaign.lastResult.services[0].raised[0].tier",
+                "1 is no tier an enchantment rises to: a service raises one a tier, so to tier 2 or deeper"),
+            (tree => ReportNode(tree, 0)["raised"] = Raised(("vampiric", ContentBounds.DeepestTier + 1)), "campaign.lastResult.services[0].raised[0].tier",
+                $"{ContentBounds.DeepestTier + 1} is above {ContentBounds.DeepestTier}: tier is uncapped and play never climbs near this, but past it the lock and the levels of the entry would pass the largest whole number"),
+            (tree => ReportNode(tree, 0)["raised"] = Raised(Enumerable.Repeat(("vampiric", 2), ContentBounds.MostEnchantments + 1).ToArray()), "campaign.lastResult.services[0].raised",
+                $"{ContentBounds.MostEnchantments + 1} enchantments raised on one weapon, above {ContentBounds.MostEnchantments}: a service raises no more than a weapon holds (EnchantmentSlots at its most)"),
+            (tree => { ReportNode(tree, 0)["stalled"] = true; ReportNode(tree, 0)["runsWorked"] = 0; ReportNode(tree, 0)["tier"] = null; ReportNode(tree, 0)["raised"] = Raised(("vampiric", 2)); },
+                "campaign.lastResult.services[0].raised",
+                "1 raised on a service stalled: a tier rises as its service comes back, its last run worked"),
         ];
         foreach (var (edit, where, problem) in contradictions)
             RefusedAt(Edited(moves, edit), where, problem);
+
+        // And what play writes of it loads: a finished service that raised two, the
+        // same enchantment twice among them, which a weapon may carry; and none, as
+        // an empty list or as no list at all.
+        Restores(Edited(moves, tree => ReportNode(tree, 0)["raised"] = Raised(("vampiric", 2), ("vampiric", ContentBounds.DeepestTier))), "a report that raised two");
+        Restores(Edited(moves, tree => ReportNode(tree, 0)["raised"] = new JsonArray()), "a report that raised none, written empty");
+        Restores(Edited(moves, tree => ReportNode(tree, 0).Remove("raised")), "a report from before the ruling, with no list");
 
         // 29's transfer half: a weapon taking a soul from another has room for it; a
         // reorder's count does not move, so a weapon holding the most reorders.
@@ -1749,7 +1774,7 @@ public sealed class SaveConsistencyTests : IDisposable
         string shop;
         using (TestContent.UsePremise(tuning: TestShop.Ruled))
             shop = Save(TestShop.Shop());
-        var restricted = ShippedContent.Restricted;
+        var restricted = FixtureContent.Restricted;
         foreach (var edited in new[]
                  {
                      restricted with { NeverRolled = [.. restricted.NeverRolled, "vampiric"] },

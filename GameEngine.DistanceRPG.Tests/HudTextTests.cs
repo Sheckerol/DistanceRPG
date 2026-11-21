@@ -222,9 +222,8 @@ public sealed class HudTextTests : IDisposable
             member.Credit(new XpCredit(XpPool.Mana, null, member.ManaPool.XpToNext));
 
         // Nothing spent yet, and the bar still reads: XP 0/60 is what says this
-        // circle can be deepened at all, and an entry that crosses its bar
-        // exactly lands back here rather than losing the row at the moment it has
-        // just earned a tier. A unique has no next tier, so it prints no bar --
+        // circle can be deepened at all, and an entry a service has just raised
+        // lands back here. A unique has no next tier, so it prints no bar --
         // and with nothing banked, nothing at all.
         Assert.Equal("SERRATED LOCK 20  VAMPIRIC T3 LOCK 60 XP 0/60  OVERHEAL LOCK 25",
             DungeonHud.EnchantmentReadout(knife, member));
@@ -1709,6 +1708,7 @@ public sealed class HudTextTests : IDisposable
         var soul = GameContent.Current.Enchantments.All.MaxBy(def => def.Name.Length)!;
         var deepest = Enum.GetValues<ModifierType>().Where(t => !ModifierRules.NeverStacked.Contains(t)).MaxBy(t => DungeonHud.ModifierName(t).Length);
         var improved = new Improvement(ImprovementKind.Deepen, deepest);   // DEEPENED is the longer outcome
+        var rising = GameContent.Current.Enchantments.All.Where(def => !def.Unique).MaxBy(def => def.Name.Length)!;   // a unique never rises
         var haul = Enumerable.Range(0, GameContent.Current.Tuning.PartyCarrySlots).Select(_ => TestWeapons.Get(longest.Id)).ToArray();
         string[] members = ["A", "B", "C", "D"];
         XpClawback[] Pools(string member) =>
@@ -1718,7 +1718,8 @@ public sealed class HudTextTests : IDisposable
             new XpClawback(member, XpSnapshot.ManaPool, 9999, 0),
         ];
         var reports = Enumerable.Range(0, 20).Select(_ => new ServiceReport(longest.Id, Service.Refine, 0, ContentBounds.MostServiceRuns, Stalled: true))
-            .Append(new ServiceReport(longest.Id, Service.Enchant, ContentBounds.MostServiceRuns, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id, Improved: improved))
+            .Append(new ServiceReport(longest.Id, Service.Enchant, ContentBounds.MostServiceRuns, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id, Improved: improved,
+                Raised: [new Enchantment(rising, 2)]))   // and its maintenance raised a tier: the summary's one line of it (after play, 2026-11-19)
             .Concat(Enumerable.Range(0, ContentBounds.MostWorked - 1).Select(_ => new ServiceReport(longest.Id, Service.Enchant, 1, ContentBounds.MostServiceRuns, EnchantmentId: soul.Id)))
             .ToArray();
         // And the farm's two lines (Phase 6b.3), as a run's end writes them together:
@@ -1755,13 +1756,16 @@ public sealed class HudTextTests : IDisposable
         Assert.All(farmForms.Append(BetweenRunsHud.SpoiledLine(bagSlots)), form => Assert.True(form.Length * 6f * 2f <= 1240f, $"'{form}' runs off the window"));
 
         // Every line the panel is handed is drawn. The worst a run's end can write is
-        // 34 lines, and a 720 window holds 35 at the least step and not 36: one line
-        // of room is left. A line added anywhere in the summary fails here by count,
-        // so the next one takes that room knowingly; past it, a line has to be paid
-        // for — by a cap, a shorter list, or a smaller step.
+        // 35 lines, and a 720 window holds 35 at the least step and not 36: no room
+        // is left. It was 34, with one line of room, which the line of the tiers a
+        // finished service raised took knowingly (after play, 2026-11-19: the user
+        // asked that the player be told). A line added anywhere in the summary fails
+        // here by count, and from here it has to be paid for — by a cap, a shorter
+        // list, or a smaller step.
         bool Fits(int count) => DungeonHud.RunSummaryTop(h, count) + DungeonHud.RunSummaryHeight(h, count) <= h - DungeonHud.SummaryBottomClearance;
-        Assert.True(lines.Count == 34, $"the worst summary is {lines.Count} lines, not 34: the run's end panel had one line of room left at 34, a 720 window holding 35 at the least step — say here what took it");
-        Assert.True(Fits(lines.Count + 1) && !Fits(lines.Count + 2), $"a 720 window no longer holds exactly {lines.Count + 1} lines at the least step");
+        Assert.True(lines.Count == 35, $"the worst summary is {lines.Count} lines, not 35: a 720 window holds 35 at the least step and no more — a new line has to be paid for");
+        Assert.True(Fits(lines.Count) && !Fits(lines.Count + 1), $"a 720 window no longer holds exactly {lines.Count} lines at the least step");
+        Assert.Contains($"{rising.Name.ToUpperInvariant()} ON THE {longest.Name.ToUpperInvariant()} ROSE TO T2", texts);
         string back = $"{longest.Name.ToUpperInvariant()} IS BACK FROM THE ENCHANTER - ATTACHED {soul.Name.ToUpperInvariant()} - DEEPENED {DungeonHud.ModifierName(deepest)}";
         Assert.Equal(new[] { back, $"THE ENCHANTER WORKED THE {longest.Name.ToUpperInvariant()} - 1 OF {ContentBounds.MostServiceRuns} RUNS" }.Take(DungeonHud.DungeonServiceLines),
             texts.Where(text => text.Contains(" IS BACK FROM THE ENCHANTER", StringComparison.Ordinal) || text.StartsWith("THE ENCHANTER WORKED", StringComparison.Ordinal)));
@@ -1821,7 +1825,7 @@ public sealed class HudTextTests : IDisposable
         // the host's notices to its HUD over the first floor's banner, and the rows
         // it draws are the one wrapper's rows of them. The HUD lays them out with
         // no window — the drawing is untested, as ever — so it is built without one.
-        var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }""" });   // beside the shipped content files: the two notices are the tuning's
+        var load = FixtureContent.Load(FixtureContent.Texts with { Tuning = """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }""" });   // beside the shipped content files: the two notices are the tuning's
         Assert.Equal(2, load.Notices.Count);
 
         // The scene the host builds with them has them up for its first floor.

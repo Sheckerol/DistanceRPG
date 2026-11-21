@@ -152,7 +152,7 @@ public sealed class LootTableTests : IDisposable
             Id: "test_glimmer", Name: "Glimmer", Effect: EffectKind.Vampiric, Targets: TargetSide.Ally,
             Lock: 20, Trigger: 3, Potency: 1, ApplyPercent: 100, Applies: null, DamageType: null, Unique: false);
 
-        using var _ = TestContent.UsePremise(enchantments: new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, appended]));
+        using var _ = TestContent.UsePremise(enchantments: new EnchantmentsData([.. FixtureContent.Enchantments.Enchantments, appended]));
 
         Assert.Equal(14, GameContent.Current.Enchantments.Rollable.Count);   // the content-ordered list did grow
         Assert.Equal(dagger, LootTable.DropOrder(WeaponClass.Dagger));       // the code-ordered one did not
@@ -662,7 +662,7 @@ public sealed class LootTableTests : IDisposable
         Assert.All(LootTable.DropPool, id => Assert.True(GameContent.Current.Enchantments.TryGet(id, out _)));
 
         var before = GameContent.Current;
-        var missing = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Where(e => e.Id != "vampiric").ToList());
+        var missing = new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Where(e => e.Id != "vampiric").ToList());
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(enchantments: missing));
 
         Assert.Equal(("vampiric", ContentValidator.RuleDropPoolResolves), (ex.EntryId, ex.Rule));
@@ -737,7 +737,7 @@ public sealed class LootTableTests : IDisposable
         // that is not there — an exception deep inside a collection rather than at
         // load. Refused here instead, the way the drop pool's own dangling ids are.
         var before = GameContent.Current;
-        var threeStaves = ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Where(w => w.Id != "staff_of_mire").ToList() };
+        var threeStaves = FixtureContent.Weapons with { Weapons = FixtureContent.Weapons.Weapons.Where(w => w.Id != "staff_of_mire").ToList() };
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: threeStaves));
 
         Assert.Equal(("staff_of_mire", ContentValidator.RuleCasterVariantPool), (ex.EntryId, ex.Rule));
@@ -754,9 +754,9 @@ public sealed class LootTableTests : IDisposable
         // win and hand over nothing — reported as a lost roll, so nobody would
         // ever see it — which is a content failure and is refused as one.
         var before = GameContent.Current;
-        var noDaggerUnique = ShippedContent.Weapons with
+        var noDaggerUnique = FixtureContent.Weapons with
         {
-            Weapons = ShippedContent.Weapons.Weapons.Where(w => !(w.Unique && w.Class == WeaponClass.Dagger)).ToList(),
+            Weapons = FixtureContent.Weapons.Weapons.Where(w => !(w.Unique && w.Class == WeaponClass.Dagger)).ToList(),
         };
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: noDaggerUnique));
 
@@ -775,9 +775,9 @@ public sealed class LootTableTests : IDisposable
         // listed one, both silently, so the assumption is enforced where it is
         // made rather than assumed.
         var before = GameContent.Current;
-        var venomous = ShippedContent.Weapons with
+        var venomous = FixtureContent.Weapons with
         {
-            Weapons = ShippedContent.Weapons.Weapons
+            Weapons = FixtureContent.Weapons.Weapons
                 .Select(w => w.Id == "assassins_fang" ? w with { Enchantments = [new EnchantmentRef("vampiric")] } : w).ToList(),
         };
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(weapons: venomous));

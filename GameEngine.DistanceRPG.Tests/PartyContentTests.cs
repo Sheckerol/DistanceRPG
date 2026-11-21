@@ -17,7 +17,7 @@ public class PartyContentTests
 
     /// <summary>The compiled roster with <paramref name="edit"/> applied to the member at <paramref name="index"/>.</summary>
     private static PartyData With(int index, Func<PartyMemberDef, PartyMemberDef> edit)
-        => new(ShippedContent.Party.Members.Select((m, i) => i == index ? edit(m) : m).ToList());
+        => new(FixtureContent.Party.Members.Select((m, i) => i == index ? edit(m) : m).ToList());
 
     private static ContentException Rejected(PartyData party)
         => Assert.Throws<ContentException>(() => TestContent.Use(party: party));
@@ -47,19 +47,38 @@ public class PartyContentTests
             new[] { WeaponClass.Sword, WeaponClass.Axe, WeaponClass.Staff, WeaponClass.Dagger },
             Roster.All.Select(m => catalogue[m.StartingWeaponId].Class));
 
-        // The slot-1 staff the party has always carried, and C's second, debuff
-        // staff: Mire, not Blight -- the on-theme choice for a game where
-        // movement is the resource.
-        Assert.Equal(new[] { "staff_of_renewal" }, Member("A").BagWeaponIds);
-        Assert.Equal(new[] { "staff_of_renewal" }, Member("B").BagWeaponIds);
-        Assert.Equal(new[] { "staff_of_mire" }, Member("C").BagWeaponIds);
-        Assert.Equal(new[] { "staff_of_renewal" }, Member("D").BagWeaponIds);
+        // A second weapon in each bag, each member's own (the user's swap of
+        // 2026-11-19, after play; until then a Staff of Renewal in every bag, and a
+        // Staff of Mire in C's): Darts for A, a Hasta for B, a Wand of the Blast for
+        // C and a Shortbow for D.
+        Assert.Equal(new[] { "darts" }, Member("A").BagWeaponIds);
+        Assert.Equal(new[] { "skirmishers_pike" }, Member("B").BagWeaponIds);
+        Assert.Equal(new[] { "wand_of_the_blast" }, Member("C").BagWeaponIds);
+        Assert.Equal(new[] { "hunting_bow" }, Member("D").BagWeaponIds);
+        Assert.Equal(
+            new[] { WeaponClass.Throwing, WeaponClass.Spear, WeaponClass.Wand, WeaponClass.Ranged },
+            Roster.All.Select(m => catalogue[m.BagWeaponIds.Single()].Class));
 
-        // No spear anywhere: the party's own Brace demonstration is dropped, and
-        // Brace is taught from the receiving end instead.
-        Assert.DoesNotContain(
-            WeaponClass.Spear,
-            Roster.All.SelectMany(m => m.BagWeaponIds.Prepend(m.StartingWeaponId)).Select(id => catalogue[id].Class));
+        // Each bag weapon levels on a stat its member has at 3 or 4, so none is a
+        // weapon its member is the party's worst with.
+        Assert.All(Roster.All, m => Assert.True(
+            Progression.GoverningStat(catalogue[m.BagWeaponIds.Single()].Class, m.Stats) >= 3,
+            $"{m.Id} levels its {m.BagWeaponIds.Single()} on a {Progression.GoverningStat(catalogue[m.BagWeaponIds.Single()].Class, m.Stats)}"));
+
+        // A wand's element is its drop's to roll, and a starting weapon is no drop:
+        // the roster names C's, and nobody else's. Flaming is the user's choice, not a
+        // guess (2026-11-20). The party is made with it — a Flaming wand, forged, at tier 1.
+        Assert.Equal(new DamageType?[] { null, null, DamageType.Flaming, null }, Roster.All.Select(m => m.WandElement));
+        var party = CampaignState.Start(GameContent.Current).Party;   // the roster made, as NEW CAMPAIGN makes it
+        var c = party.Single(member => member.Id == "C");
+        var wand = Assert.IsType<Weapon>(c.Inventory[1]);
+        Assert.Equal(("wand_of_the_blast", "flaming", 1), (wand.Id, Assert.Single(wand.Enchantments).Id, wand.Enchantments[0].Tier));
+        Assert.True(wand.IsForged(0));
+        Assert.True(wand.CastsWith(wand.Enchantments[0].Def));
+        Assert.Equal("staff_of_renewal", c.EquippedWeapon!.Id);   // the party's one heal, in hand
+
+        // And every member is made, each holding two weapons.
+        Assert.All(party, member => Assert.Equal(2, member.Inventory.OfType<Weapon>().Count()));
 
         // The catalogue's own lookups: by id, and a miss that names itself.
         Assert.True(Roster.TryGet("D", out var d));
@@ -128,13 +147,13 @@ public class PartyContentTests
         Assert.Equal("B", equipped.EntryId);
         Assert.Equal(ContentValidator.RulePartyWeaponExists, equipped.Rule);
 
-        var bagged = Rejected(With(2, m => m with { BagWeaponIds = ["staff_of_mire", "staff_of_blght"] }));
+        var bagged = Rejected(With(2, m => m with { BagWeaponIds = ["staff_of_mire", "staff_of_blght"], WandElement = null }));
         Assert.Equal("C", bagged.EntryId);
         Assert.Equal(ContentValidator.RulePartyWeaponExists, bagged.Rule);
 
         // One equipped plus a whole share of the carry bagged is a weapon more
         // than a member's slots, whatever share tuning.json gives each.
-        int slots = ShippedContent.Tuning.PartyCarrySlots / GameConstants.PartySize;
+        int slots = FixtureContent.Tuning.PartyCarrySlots / GameConstants.PartySize;
         var deep = Rejected(With(2, m => m with
         {
             BagWeaponIds = Enumerable.Range(0, slots)
@@ -152,12 +171,28 @@ public class PartyContentTests
         var martial = Rejected(With(2, m => m with { StartingWeaponId = "great_axe" }));
         Assert.Equal(ContentValidator.RulePartyHasACaster, martial.Rule);
 
+        // A wand's element is its drop's to roll, so a member who starts with one
+        // names it — or NEW CAMPAIGN would throw making the party, long after the
+        // load passed: none named, one no wand carries, and one named by a member
+        // with no wand to carry it are each refused, naming the member.
+        var unnamed = Rejected(With(2, m => m with { WandElement = null }));
+        Assert.Equal(("C", ContentValidator.RulePartyWandElement), (unnamed.EntryId, unnamed.Rule));
+        Assert.Contains("wand_of_the_blast has no element named for it", unnamed.Message);
+        var unmade = Rejected(With(2, m => m with { WandElement = DamageType.None }));
+        Assert.Equal(("C", ContentValidator.RulePartyWandElement), (unmade.EntryId, unmade.Rule));
+        Assert.Contains("wand_of_the_blast cannot be made of None", unmade.Message);
+        var stray = Rejected(With(0, m => m with { WandElement = DamageType.Cold }));
+        Assert.Equal(("A", ContentValidator.RulePartyWandElement), (stray.EntryId, stray.Rule));
+        foreach (var element in new[] { DamageType.Flaming, DamageType.Cold, DamageType.Shocking, DamageType.Acidic })   // any element a wand carries will do
+            using (TestContent.Use(party: With(2, m => m with { WandElement = element })))
+                Assert.Equal(element, CampaignState.Start(GameContent.Current).Party[2].WeaponIn(1)!.Enchantments[0].Def.DamageType);
+
         // A roster longer or shorter than the party's slots would otherwise
         // spawn a prefix and drop whoever came last, silently.
-        var short_ = Rejected(new PartyData(ShippedContent.Party.Members.Take(3).ToList()));
+        var short_ = Rejected(new PartyData(FixtureContent.Party.Members.Take(3).ToList()));
         Assert.Equal(ContentValidator.RulePartySize, short_.Rule);
 
-        var long_ = Rejected(new PartyData([.. ShippedContent.Party.Members, ShippedContent.Party.Members[0] with { Id = "E" }]));
+        var long_ = Rejected(new PartyData([.. FixtureContent.Party.Members, FixtureContent.Party.Members[0] with { Id = "E" }]));
         Assert.Equal(ContentValidator.RulePartySize, long_.Rule);
 
         // Every refusal left the running content alone.
@@ -167,7 +202,7 @@ public class PartyContentTests
     [Fact]
     public void DefaultParty_Validates_AndIsReachableThroughGameContent()
     {
-        ContentValidator.ValidateParty(ShippedContent.Party, GameContent.Current.Weapons);   // does not throw
+        ContentValidator.ValidateParty(FixtureContent.Party, GameContent.Current.Weapons);   // does not throw
 
         var before = GameContent.Current;
         var renamed = With(3, m => m with { Name = "Thief" });
@@ -186,11 +221,11 @@ public class PartyContentTests
         // The two tuning keys the roster's pools are measured against are
         // tuning.json's to set; what is the code's is the loader's refusal of a
         // bar there is no step off.
-        var zeroPool = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ShippedContent.Tuning with { StartingPool = 0 }));
+        var zeroPool = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(FixtureContent.Tuning with { StartingPool = 0 }));
         Assert.Equal(ContentValidator.RulePoolBarIsPositive, zeroPool.Rule);
         Assert.Equal(nameof(Tuning.StartingPool), zeroPool.EntryId);
 
-        var zeroLadder = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(ShippedContent.Tuning with { WeaponXpPerLevel = 0 }));
+        var zeroLadder = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(FixtureContent.Tuning with { WeaponXpPerLevel = 0 }));
         Assert.Equal(ContentValidator.RulePoolBarIsPositive, zeroLadder.Rule);
         Assert.Equal(nameof(Tuning.WeaponXpPerLevel), zeroLadder.EntryId);
     }
@@ -200,7 +235,7 @@ public class PartyContentTests
     {
         // The roster is content and so is the bar it grows from: a tuning swap
         // moves every member's first point, because nothing caches a maximum.
-        using var _ = TestContent.Use(tuning: ShippedContent.Tuning with { StartingPool = 40 });
+        using var _ = TestContent.Use(tuning: FixtureContent.Tuning with { StartingPool = 40 });
 
         Assert.Equal(40, Progression.Pool(0, 4).Max);
         Assert.Equal(10, Progression.Pool(0, 4).XpToNext);   // 40 / 4

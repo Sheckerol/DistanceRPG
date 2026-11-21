@@ -5,11 +5,11 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <summary>
 /// The numbers the suite's worked examples were written against: what a test
 /// stands on without testing it — its premise, stated as its own input (the
-/// content rework's R5) — so the master copy may move any of them and no test
-/// that stands on them fails. It is never compared with the master and the game
-/// never reads it: the files in <c>GameEngine.DistanceRPG/Data</c> are the
-/// master, and the suites that are about the shipped content read those
-/// (<see cref="ShippedContent"/>). A suite whose scenarios stand on these numbers
+/// content rework's R5) — so no test that stands on them fails when a number
+/// moves. It is a layer over the suite's frozen configuration
+/// (<see cref="FixtureContent"/>, the copies in <c>TestData/content</c>): never
+/// compared with the game's master files in <c>GameEngine.DistanceRPG/Data</c>,
+/// which no part of it reads, and the game never reads it. A suite whose scenarios stand on these numbers
 /// — a push that moves a tile, a dagger that hits for 15 into Block 3, a seed that
 /// rolls a dungeon five floors deep — makes them current for each of its tests
 /// (<see cref="TestContent.UsePremise"/>).
@@ -17,8 +17,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <item>The tuning: <c>TestData/saves/pre-rework-tuning.json</c>, tuning.json at
 /// commit <c>febe036</c> byte for byte — the numbers the worked examples were
 /// written against, and the ones the pre-rework saves were played under — read by
-/// the game's own reader over the shipped tuning, so a key the file predates
-/// keeps the master's number.</item>
+/// the game's own reader over the fixture's tuning, so a key the file predates
+/// keeps the frozen copy's number.</item>
 /// <item>The weapon classes' statlines, the two staves that name their own mana,
 /// and the wands' shapes: phase-1-weapons.md §1.2–§1.4's tables — the numbers
 /// REWORK DECISION 3 pins against the master in <c>WeaponContentTests</c> and
@@ -26,20 +26,27 @@ namespace GameEngine.DistanceRPG.Tests;
 /// <item>The bosses' statlines: the golem's, which phase-5-save.md fixes (80 HP, a
 /// movement budget of 40), and the four provisional bosses' first guesses (200,
 /// 70).</item>
+/// <item>The starting party's bags (<see cref="Party"/>): the roster the worked
+/// examples were written against — a Staff of Renewal in every bag but C's, which
+/// holds a Staff of Mire — as it shipped until the user's swap of 2026-11-19 (A
+/// Darts, B a Hasta, C a Wand of the Blast, D a Shortbow). The suite's shops, saves
+/// and screens deposit, move and read those bags without being about them; the
+/// members, their spreads and the weapons in their hands are the fixture's roster's
+/// (<see cref="FixtureContent.Party"/>).</item>
 /// </list>
-/// Every other part of the content — the relations, the rows, the enchantment
-/// catalogue, the starting party — is the shipped content's: a premise states
-/// numbers, never rows.
+/// Every other part of the content — the relations, the rows — is the fixture's,
+/// and the enchantment catalogue the game's own code: a premise states numbers and
+/// the bags the examples open on, never rows.
 /// </summary>
 internal static class Premise
 {
     private static readonly Lazy<Tuning> TuningHolder = new(() =>
-        TuningJson.Read(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", "pre-rework-tuning.json")), ShippedContent.Tuning).Tuning
+        TuningJson.Read(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "saves", "pre-rework-tuning.json")), FixtureContent.Tuning).Tuning
             // The file predates EnchantmentTierScale (2026-10), and a key it lacks would read the shipped
             // number: 1 is the scale its tiers were climbed at - lock x tier, as at INT 1 when INT still divided.
             with { EnchantmentTierScale = 1 });
 
-    private static readonly Lazy<WeaponsData> WeaponsHolder = new(() => Set(ShippedContent.Weapons,
+    private static readonly Lazy<WeaponsData> WeaponsHolder = new(() => Set(FixtureContent.Weapons,
     [
         // §1.2: range, damage, cost; the martial classes cast nothing.
         ("Dagger", 40, 15, 30, 0),
@@ -53,7 +60,7 @@ internal static class Premise
         ("Wand", 160, 8, 45, 20),
     ]));
 
-    private static readonly Lazy<DungeonsData> DungeonsHolder = new(() => SetBosses(ShippedContent.Dungeons,
+    private static readonly Lazy<DungeonsData> DungeonsHolder = new(() => SetBosses(FixtureContent.Dungeons,
     [
         ("tutorial", 80, 40),
         ("spear_hall", 200, 70),
@@ -62,13 +69,28 @@ internal static class Premise
         ("quiver_pits", 200, 70),
     ]));
 
-    private static readonly Lazy<GameContent> ContentHolder = new(() => TestContent.Load(Tuning, weapons: Weapons, dungeons: Dungeons));
+    /// <summary>What each member's bag held as the worked examples were written, by member id: a staff apiece.</summary>
+    private static readonly IReadOnlyDictionary<string, string[]> Bags = new Dictionary<string, string[]>
+    {
+        ["A"] = ["staff_of_renewal"],
+        ["B"] = ["staff_of_renewal"],
+        ["C"] = ["staff_of_mire"],
+        ["D"] = ["staff_of_renewal"],
+    };
+
+    private static readonly Lazy<PartyData> PartyHolder = new(() =>
+        new PartyData(FixtureContent.Party.Members.Select(member => member with { BagWeaponIds = Bags[member.Id], WandElement = null }).ToList()));
+
+    private static readonly Lazy<GameContent> ContentHolder = new(() => TestContent.Load(Tuning, weapons: Weapons, party: Party, dungeons: Dungeons));
 
     /// <summary>The tuning the worked examples were written against.</summary>
     public static Tuning Tuning => TuningHolder.Value;
 
     /// <summary>The shipped weapons with the statlines and shapes the worked examples were written against.</summary>
     public static WeaponsData Weapons => WeaponsHolder.Value;
+
+    /// <summary>The shipped roster with the bags the worked examples were written against: a staff in each.</summary>
+    public static PartyData Party => PartyHolder.Value;
 
     /// <summary>The shipped dungeons with the boss statlines the worked examples were written against.</summary>
     public static DungeonsData Dungeons => DungeonsHolder.Value;

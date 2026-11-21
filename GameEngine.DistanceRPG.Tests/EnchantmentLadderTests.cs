@@ -44,45 +44,81 @@ public class EnchantmentLadderTests
 
         // The staff that tiered too soon: 75 trigger mana to its second tier, in
         // anyone's hands — the shipped scale.
-        Assert.Equal(5, ShippedContent.Tuning.EnchantmentTierScale);
+        Assert.Equal(5, FixtureContent.Tuning.EnchantmentTierScale);
         Assert.Equal(75, new Enchantment(GameContent.Current.Enchantments["regeneration"], Tier: 1).XpToNextTier());
     }
 
     [Fact]
-    public void WithXp_SelfSlows_EachTierCostingTheNewLock()
+    public void WithXp_BanksUpToTheBar_AndATierRisesOnlyWhenMaintained()
     {
-        // The replay is the definition: each tier costs the bar it just made, so
-        // the climb slows on its own with no curve authored anywhere. At a scale
-        // of 1 off a lock of 30 the steps are 30, 60, 90, 120, 150.
+        // Ruled after play (2026-11-19): use fills the bar of the tier an entry is
+        // on and no more, and the tier rises at the enchanter, one a service. So a
+        // credit never climbs, however large, and what it banks stops at the bar.
+        // At a scale of 1 off a lock of 30 the bars are 30, 60, 90, 120, 150: each
+        // tier costs the bar it just made, so the climb still slows on its own
+        // with no curve authored anywhere.
         using var flat = TestContent.UsePremise(tuning: t => t with { EnchantmentTierScale = 1 });
         var entry = new Enchantment(Arcane, Tier: 1);
 
         Assert.Equal((1, 0), Tiered(entry.WithXp(0)));
         Assert.Equal((1, 29), Tiered(entry.WithXp(29)));     // Xp is the remainder into the current tier
-        Assert.Equal((2, 0), Tiered(entry.WithXp(30)));
-        Assert.Equal((2, 59), Tiered(entry.WithXp(89)));     // one short of the second tier's 60
-        Assert.Equal((3, 0), Tiered(entry.WithXp(90)));
-        Assert.Equal((4, 0), Tiered(entry.WithXp(180)));
-        Assert.Equal((5, 0), Tiered(entry.WithXp(300)));
-        Assert.Equal((6, 0), Tiered(entry.WithXp(450)));
+        Assert.False(entry.WithXp(29).BarFull);
+        Assert.Equal((1, 30), Tiered(entry.WithXp(30)));     // full, and still tier 1
+        Assert.True(entry.WithXp(30).BarFull);
+        Assert.Equal((1, 30), Tiered(entry.WithXp(450)));    // five tiers' worth at once banks one bar
+        Assert.Equal((1, 30), Tiered(entry.WithXp(30).WithXp(1)));   // and a full bar banks nothing more
+        Assert.Equal((1, 30), Tiered(entry.WithXp(int.MaxValue).WithXp(int.MaxValue)));
 
-        // One lump and four hundred and fifty credits agree, because the tier is
-        // stored and the XP is the remainder into it.
+        // Short of its bar, maintenance changes nothing; full, it buys one tier,
+        // the new one from no XP — and only one, whatever was spent.
+        Assert.Equal((1, 29), Tiered(entry.WithXp(29).Maintained()));
+        Assert.Same(entry, entry.Maintained());
+        Assert.Equal((2, 0), Tiered(entry.WithXp(30).Maintained()));
+        Assert.Equal((2, 0), Tiered(entry.WithXp(450).Maintained()));
+        Assert.Equal((2, 0), Tiered(entry.WithXp(450).Maintained().Maintained()));
+
+        // So the ladder is a bar and a service a tier: 30, 60, 90, 120 and 150
+        // spent, and five services, reach tier 6.
+        var climbing = entry;
+        foreach (int bar in new[] { 30, 60, 90, 120, 150 })
+        {
+            Assert.Equal(bar, climbing.TierCost());
+            climbing = climbing.WithXp(bar - 1);
+            Assert.False(climbing.BarFull);
+            climbing = climbing.WithXp(1);
+            Assert.True(climbing.BarFull);
+            climbing = climbing.Maintained();
+        }
+        Assert.Equal((6, 0), Tiered(climbing));
+
+        // One lump and thirty credits agree.
         var drip = entry;
-        for (int i = 0; i < 450; i++)
+        for (int i = 0; i < 30; i++)
             drip = drip.WithXp(1);
-        Assert.Equal(Tiered(entry.WithXp(450)), Tiered(drip));
+        Assert.Equal(Tiered(entry.WithXp(30)), Tiered(drip));
+
+        // An entry over its bar — a tuning lowered it since, or a hand wrote the
+        // save — banks nothing and loses nothing, and its service still buys one
+        // tier, from no XP.
+        var over = new Enchantment(Arcane, Tier: 1) { Xp = 500 };
+        Assert.Equal((1, 500), Tiered(over.WithXp(7)));
+        Assert.Equal((2, 0), Tiered(over.Maintained()));
+
+        // The deepest tier a save holds whole is never left, so no service writes
+        // a weapon the next load refuses.
+        var deepest = new Enchantment(Arcane, ContentBounds.DeepestTier) { Xp = int.MaxValue };
+        Assert.False(deepest.BarFull);
+        Assert.Same(deepest, deepest.Maintained());
 
         Assert.Throws<ArgumentOutOfRangeException>(() => entry.WithXp(-1));
     }
 
     [Fact]
-    public void TheBarAReadoutShowsIsTheXpTheClimbCharges()
+    public void TheBarAReadoutShowsIsTheBarUseFills()
     {
-        // One tier, one price. XpToNextTier is the line, TierCost is what the
-        // climb charges and what a readout prints, and the replay walks the
-        // entry itself so the second is the first floored at 1 — nothing
-        // restates the arithmetic. With a lock of 1 at least (the load rule) and
+        // One tier, one price. XpToNextTier is the line, TierCost is the bar use
+        // fills and what a readout prints, and the second is the first floored
+        // at 1 — nothing restates the arithmetic. With a lock of 1 at least (the load rule) and
         // a scale of 1 at least (its clamp) the floor never bites, so for every
         // entry, at every scale, the two are equal.
         foreach (int scale in new[] { 1, 5, 1000 })
@@ -97,7 +133,10 @@ public class EnchantmentLadderTests
                     Assert.Equal(def.Lock * tier * scale, bar);
                     Assert.Equal(bar, entry.TierCost());
                     Assert.Equal((tier, bar - 1), Tiered(entry.WithXp(bar - 1)));
-                    Assert.Equal((tier + 1, 0), Tiered(entry.WithXp(bar)));
+                    Assert.False(entry.WithXp(bar - 1).BarFull);
+                    Assert.Equal((tier, bar), Tiered(entry.WithXp(bar)));
+                    Assert.True(entry.WithXp(bar).BarFull);
+                    Assert.Equal((tier + 1, 0), Tiered(entry.WithXp(bar).Maintained()));
                 }
         }
     }
@@ -166,7 +205,7 @@ public class EnchantmentLadderTests
         Assert.Equal(0, new Enchantment(broken, Tier: 9).XpToNextTier());
 
         var before = GameContent.Current;
-        var data = new EnchantmentsData([.. ShippedContent.Enchantments.Enchantments, broken]);
+        var data = new EnchantmentsData([.. FixtureContent.Enchantments.Enchantments, broken]);
         var ex = Assert.Throws<ContentException>(() => TestContent.Use(enchantments: data));
 
         Assert.Equal(("voidlock", ContentValidator.RuleEnchantmentLockIsPositive), (ex.EntryId, ex.Rule));

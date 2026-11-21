@@ -47,10 +47,10 @@ public class DungeonContentTests
 
     /// <summary>The shipped dungeons with <paramref name="edit"/> applied to the one named <paramref name="id"/>.</summary>
     private static DungeonsData With(string id, Func<DungeonDef, DungeonDef> edit)
-        => new(ShippedContent.Dungeons.Dungeons.Select(d => d.Id == id ? edit(d) : d).ToList());
+        => new(FixtureContent.Dungeons.Dungeons.Select(d => d.Id == id ? edit(d) : d).ToList());
 
     /// <summary>The shipped dungeons with <paramref name="extra"/> appended.</summary>
-    private static DungeonsData Plus(DungeonDef extra) => new([.. ShippedContent.Dungeons.Dungeons, extra]);
+    private static DungeonsData Plus(DungeonDef extra) => new([.. FixtureContent.Dungeons.Dungeons, extra]);
 
     /// <summary>An unpinned, unattuned dungeon themed on <paramref name="theme"/>, its boss carrying the theme.</summary>
     private static DungeonDef Themed(string id, ModifierType theme)
@@ -63,16 +63,16 @@ public class DungeonContentTests
 
     /// <summary>The shipped content with <paramref name="dungeons"/>, loaded (and never made current) — under <paramref name="tuning"/> when one is named.</summary>
     private static GameContent Load(DungeonsData dungeons, Tuning? tuning = null)
-        => TestContent.Load(tuning ?? ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons,
+        => TestContent.Load(tuning ?? FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments, FixtureContent.Weapons,
             dungeons: dungeons);
 
     /// <summary>The shipped content under <paramref name="tuning"/>, loaded (and never made current).</summary>
     private static GameContent LoadTuned(Tuning tuning)
-        => TestContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);
+        => TestContent.Load(tuning, FixtureContent.Restricted, FixtureContent.Enchantments, FixtureContent.Weapons);
 
     /// <summary>The shipped tuning with <paramref name="t"/>'s forge limit set to <paramref name="limit"/>, every other limit as shipped.</summary>
     private static Tuning WithMaxForged(ModifierType t, int limit)
-        => ShippedContent.Tuning with { MaxForged = new Dictionary<ModifierType, int>(ShippedContent.Tuning.MaxForged) { [t] = limit } };
+        => FixtureContent.Tuning with { MaxForged = new Dictionary<ModifierType, int>(FixtureContent.Tuning.MaxForged) { [t] = limit } };
 
     private static ContentException Rejected(DungeonsData dungeons, Tuning? tuning = null) => Assert.Throws<ContentException>(() => Load(dungeons, tuning));
 
@@ -246,22 +246,22 @@ public class DungeonContentTests
         // The relations with Brace taken out of the threat-zone group: an axe's
         // Opportunist no longer excludes it. No dungeon row changes (PHASE4-059,
         // P5:425-427: "with no other edit anywhere").
-        var braceFreed = ShippedContent.Restricted with
+        var braceFreed = FixtureContent.Restricted with
         {
-            Excludes = ShippedContent.Restricted.Excludes
+            Excludes = FixtureContent.Restricted.Excludes
                 .Select(g => g.Contains(nameof(Brace)) ? g.Where(id => id != nameof(Brace)).ToArray() : g)
                 .ToList(),
         };
 
         // Read off what Load returns while the shipped content is still current:
         // a table computed off GameContent.Current would still say three classes.
-        var edited = TestContent.Load(ShippedContent.Tuning, braceFreed, ShippedContent.Enchantments, ShippedContent.Weapons);
+        var edited = TestContent.Load(FixtureContent.Tuning, braceFreed, FixtureContent.Enchantments, FixtureContent.Weapons);
         Assert.NotSame(edited, GameContent.Current);
         Assert.Equal(new[] { Dagger, Sword, Spear, Axe }, edited.Dungeons.ThemeClasses(Brace));
         Assert.Equal(new[] { Dagger, Sword, Spear }, Dungeons.ThemeClasses(Brace));   // the current content's, untouched
 
         // The Spear Hall is the same row, and its boss may now hold an axe too.
-        Assert.Same(ShippedContent.Dungeons.Dungeons[1], edited.Dungeons["spear_hall"]);
+        Assert.Same(FixtureContent.Dungeons.Dungeons[1], edited.Dungeons["spear_hall"]);
         Assert.Equal(new[] { Dagger, Sword, Spear, Axe }, edited.Dungeons.WieldClasses(edited.Dungeons["spear_hall"]));
 
         // And through the game's own content swap, the game reads the moved table.
@@ -349,16 +349,16 @@ public class DungeonContentTests
         // Ranged row itself is refused first, its baseline forging Longshot on a
         // ranged class; this rule guards what the weapon rules cannot see
         // (P5:436-438).
-        var meleeLongshot = ShippedContent.Restricted with
+        var meleeLongshot = FixtureContent.Restricted with
         {
-            Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.MeleeKind },
+            Kind = new Dictionary<string, string>(FixtureContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.MeleeKind },
         };
         var ex = Assert.Throws<ContentException>(() =>
-            new DungeonCatalogue(ShippedContent.Dungeons, new ModifierRules(ShippedContent.Tuning, meleeLongshot), Weapons, ShippedContent.Tuning));
+            new DungeonCatalogue(FixtureContent.Dungeons, new ModifierRules(FixtureContent.Tuning, meleeLongshot), Weapons, FixtureContent.Tuning));
         Assert.Equal(("long_gallery", ContentValidator.RuleThemeReachesItsOwnClass), (ex.EntryId, ex.Rule));
 
         var viaLoad = Assert.Throws<ContentException>(() =>
-            TestContent.Load(ShippedContent.Tuning, meleeLongshot, ShippedContent.Enchantments, ShippedContent.Weapons));
+            TestContent.Load(FixtureContent.Tuning, meleeLongshot, FixtureContent.Enchantments, FixtureContent.Weapons));
         Assert.Equal(("Ranged", ContentValidator.RuleForgedNotAllowed), (viaLoad.EntryId, viaLoad.Rule));
     }
 
@@ -387,7 +387,7 @@ public class DungeonContentTests
         // dungeon that hunts it, is refused.
         var blockToFour = WithMaxForged(Block, 4);
         var towerGuard = Spread(Weapons["tower_guard"]);
-        Assert.True(new ModifierRules(blockToFour, ShippedContent.Restricted).CanGraft(Block, WeaponKind.Melee, towerGuard, towerGuard, asForged: true));
+        Assert.True(new ModifierRules(blockToFour, FixtureContent.Restricted).CanGraft(Block, WeaponKind.Melee, towerGuard, towerGuard, asForged: true));
         Assert.Equal(3, towerGuard.Stacks(Block) + 1);
         var ex = Assert.Throws<ContentException>(() => LoadTuned(blockToFour));
         Assert.Equal(("tutorial", ContentValidator.RuleThemeHasAUnique), (ex.EntryId, ex.Rule));
@@ -409,26 +409,26 @@ public class DungeonContentTests
         // Longshot kept to the bows alone. Ranged-only is not enough on its own:
         // a throwing weapon is a ranged weapon too, so a thrown Longshot stays
         // legal and the boss could still hold one.
-        var rangedOnly = ShippedContent.Restricted with
+        var rangedOnly = FixtureContent.Restricted with
         {
-            Kind = new Dictionary<string, string>(ShippedContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.RangedKind },
+            Kind = new Dictionary<string, string>(FixtureContent.Restricted.Kind, StringComparer.Ordinal) { [nameof(Longshot)] = RestrictedData.RangedKind },
         };
-        var loose = new DungeonCatalogue(ShippedContent.Dungeons, new ModifierRules(ShippedContent.Tuning, rangedOnly), Weapons, ShippedContent.Tuning);
+        var loose = new DungeonCatalogue(FixtureContent.Dungeons, new ModifierRules(FixtureContent.Tuning, rangedOnly), Weapons, FixtureContent.Tuning);
         Assert.Equal(new[] { Ranged, Throwing }, loose.ThemeClasses(Longshot));
         Assert.Equal(new[] { Throwing }, loose.WieldClasses(loose["long_gallery"]));
 
         // Excluded beside Charges as well, it reaches the bows and nothing else: a
         // table no enemy fields, so the Long Gallery's boss would have nothing to hold.
-        var bowsOnly = rangedOnly with { Excludes = [.. ShippedContent.Restricted.Excludes, [nameof(Longshot), nameof(Charges)]] };
-        var rules = new ModifierRules(ShippedContent.Tuning, bowsOnly);
-        var ex = Assert.Throws<ContentException>(() => new DungeonCatalogue(ShippedContent.Dungeons, rules, Weapons, ShippedContent.Tuning));
+        var bowsOnly = rangedOnly with { Excludes = [.. FixtureContent.Restricted.Excludes, [nameof(Longshot), nameof(Charges)]] };
+        var rules = new ModifierRules(FixtureContent.Tuning, bowsOnly);
+        var ex = Assert.Throws<ContentException>(() => new DungeonCatalogue(FixtureContent.Dungeons, rules, Weapons, FixtureContent.Tuning));
         Assert.Equal(("long_gallery", ContentValidator.RuleBossWieldsAClass), (ex.EntryId, ex.Rule));
 
         // The same relations without the gallery: the table is Ranged alone.
-        var withoutGallery = new DungeonsData(ShippedContent.Dungeons.Dungeons.Where(d => d.Id != "long_gallery").ToList());
-        var tables = new DungeonCatalogue(withoutGallery, rules, Weapons, ShippedContent.Tuning);
+        var withoutGallery = new DungeonsData(FixtureContent.Dungeons.Dungeons.Where(d => d.Id != "long_gallery").ToList());
+        var tables = new DungeonCatalogue(withoutGallery, rules, Weapons, FixtureContent.Tuning);
         Assert.Equal(new[] { Ranged }, tables.ThemeClasses(Longshot));
-        Assert.Empty(tables.WieldClasses(ShippedContent.Dungeons.Dungeons.Single(d => d.Id == "long_gallery")));
+        Assert.Empty(tables.WieldClasses(FixtureContent.Dungeons.Dungeons.Single(d => d.Id == "long_gallery")));
     }
 
     [Fact]
@@ -456,7 +456,7 @@ public class DungeonContentTests
         // A pinned range is its own; an unpinned one is the tuning's.
         var tuning = GameContent.Current.Tuning;
         Assert.Equal((tuning.BossFloorMin, tuning.BossFloorMax), Dungeons.BossFloorRange(Dungeons["spear_hall"]));
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { BossFloorMin = 3, BossFloorMax = 4 }))
+        using (TestContent.Use(tuning: FixtureContent.Tuning with { BossFloorMin = 3, BossFloorMax = 4 }))
         {
             var swapped = GameContent.Current.Dungeons;
             Assert.Equal((3, 4), swapped.BossFloorRange(swapped["spear_hall"]));
@@ -473,7 +473,7 @@ public class DungeonContentTests
         Assert.Equal((tuning.BossFloorMin, tuning.BossFloorMin + 1), shallow.Dungeons.BossFloorRange(shallow.Dungeons["spear_hall"]));
 
         // And an id is declared once.
-        Refused(Plus(ShippedContent.Dungeons.Dungeons[1]), "spear_hall", ContentValidator.RuleDuplicateId);
+        Refused(Plus(FixtureContent.Dungeons.Dungeons[1]), "spear_hall", ContentValidator.RuleDuplicateId);
     }
 
     [Fact]
@@ -567,12 +567,12 @@ public class DungeonContentTests
 
         // The ends of every range are choices, not errors: a one-floor range, no
         // offset, no lock, no clawback or all of it, one slot a member or nine, one tile.
-        ContentValidator.ValidateTuning(ShippedContent.Tuning with
+        ContentValidator.ValidateTuning(FixtureContent.Tuning with
         {
             BossFloorMin = 1, BossFloorMax = 1, BossStackOffset = 0, CooldownRunsPerFloor = 0,
             MercyFloor = 1, DeathXpLossPercent = 0, PartyCarrySlots = GameConstants.PartySize, StairGatherTiles = 1,
         });
-        ContentValidator.ValidateTuning(ShippedContent.Tuning with
+        ContentValidator.ValidateTuning(FixtureContent.Tuning with
         {
             DeathXpLossPercent = 100, PartyCarrySlots = GameConstants.PartySize * GameConstants.MaxInventorySlots,
         });
@@ -660,7 +660,7 @@ public class DungeonContentTests
     /// <summary><paramref name="edit"/> to the shipped tuning — or to <paramref name="over"/> — refused at <paramref name="key"/> for <paramref name="rule"/>, by the validator and by the load.</summary>
     private static void Rejected(Func<Tuning, Tuning> edit, string key, string rule, Tuning? over = null)
     {
-        var tuning = over ?? ShippedContent.Tuning;
+        var tuning = over ?? FixtureContent.Tuning;
         var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(edit(tuning)));
         Assert.Equal((key, rule), (ex.EntryId, ex.Rule));
         Assert.Contains(ex.Rule, ex.Message);

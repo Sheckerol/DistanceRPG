@@ -14,13 +14,13 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </summary>
 public class TuningFitTests
 {
-    private static readonly Tuning BuiltIn = ShippedContent.Tuning;
+    private static readonly Tuning BuiltIn = FixtureContent.Tuning;
 
     private static Tuning Fit(Tuning tuning, List<string> warnings, WeaponsData? weapons = null, DungeonsData? dungeons = null, PartyData? party = null)
-        => TuningFit.ToContent(tuning, weapons ?? ShippedContent.Weapons, dungeons ?? ShippedContent.Dungeons, party ?? ShippedContent.Party, warnings);
+        => TuningFit.ToContent(tuning, weapons ?? FixtureContent.Weapons, dungeons ?? FixtureContent.Dungeons, party ?? FixtureContent.Party, warnings);
 
     private static GameContent Load(Tuning tuning, PartyData? party = null, DungeonsData? dungeons = null, WeaponsData? weapons = null)
-        => TestContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments, weapons ?? ShippedContent.Weapons, party, dungeons);
+        => TestContent.Load(tuning, FixtureContent.Restricted, FixtureContent.Enchantments, weapons ?? FixtureContent.Weapons, party, dungeons);
 
     [Fact]
     public void ACarryTheRosterCannotFitIsRaisedToIt_NamingTheMember()
@@ -32,8 +32,8 @@ public class TuningFitTests
         var warnings = new List<string>();
         var fitted = Fit(BuiltIn with { PartyCarrySlots = 4 }, warnings);
         Assert.Equal(8, fitted.PartyCarrySlots);
-        Assert.Equal(["tuning.json: PartyCarrySlots 4 is 1 slot a member, and A carries 2 weapons (tower_guard, staff_of_renewal) - using 8"], warnings);
-        ContentValidator.ValidateParty(ShippedContent.Party, Load(fitted).Weapons, fitted);
+        Assert.Equal(["tuning.json: PartyCarrySlots 4 is 1 slot a member, and A carries 2 weapons (tower_guard, darts) - using 8"], warnings);
+        ContentValidator.ValidateParty(FixtureContent.Party, Load(fitted).Weapons, fitted);
         Assert.Throws<ContentException>(() => Load(BuiltIn with { PartyCarrySlots = 4 }));   // unfitted, the roster does not
 
         // A carry that already fits is left alone, and says nothing.
@@ -43,7 +43,7 @@ public class TuningFitTests
         Assert.Empty(warnings);
 
         // Through the loader, as a playtest meets it: a file of 4 plays 8, and says so.
-        var load = ShippedData.Load(new ContentTexts(Tuning: """{ "PartyCarrySlots": 4 }"""));
+        var load = FixtureContent.Load(new ContentTexts(Tuning: """{ "PartyCarrySlots": 4 }"""));
         Assert.Equal(8, load.Content!.Tuning.PartyCarrySlots);
         Assert.Contains(load.Notices, notice => notice.Contains("A carries 2 weapons", StringComparison.Ordinal));
     }
@@ -91,23 +91,29 @@ public class TuningFitTests
         // with the Long Gallery that hunts one, and the Ranged row forging Longshot
         // x2 under a limit of 1, which the spears' own x1 is within: unfitted, the
         // row is refused; fitted, the limit is raised to 2 naming the class, and
-        // the content loads.
-        var noBows = ShippedContent.Weapons with
+        // the content loads. The roster puts its own bow down for it — D's Shortbow
+        // (the user's swap of 2026-11-19) — since a roster names only weapons there are.
+        var noBowman = new PartyData(FixtureContent.Party.Members.Select(member => member with
         {
-            Classes = ShippedContent.Weapons.Classes
+            BagWeaponIds = member.BagWeaponIds.Where(id => FixtureContent.Weapons.Weapons.Single(w => w.Id == id).Class != WeaponClass.Ranged).ToList(),
+        }).ToList());
+        Assert.Equal([], noBowman.Members.Single(member => member.Id == "D").BagWeaponIds);
+        var noBows = FixtureContent.Weapons with
+        {
+            Classes = FixtureContent.Weapons.Classes
                 .Select(row => row.Class == WeaponClass.Ranged ? row with { Baseline = new Dictionary<ModifierType, int> { [CritWindow] = 1, [Longshot] = 2 } } : row)
                 .ToList(),
-            Weapons = ShippedContent.Weapons.Weapons.Where(w => w.Class != WeaponClass.Ranged).ToList(),
+            Weapons = FixtureContent.Weapons.Weapons.Where(w => w.Class != WeaponClass.Ranged).ToList(),
         };
-        var noGallery = new DungeonsData(ShippedContent.Dungeons.Dungeons.Where(d => d.Theme != Longshot).ToList());
+        var noGallery = new DungeonsData(FixtureContent.Dungeons.Dungeons.Where(d => d.Theme != Longshot).ToList());
         var low = BuiltIn with { MaxForged = new Dictionary<ModifierType, int>(BuiltIn.MaxForged) { [Longshot] = 1 } };
-        Assert.Equal(("Ranged", ContentValidator.RuleMaxForged), Refusal(() => Load(low, dungeons: noGallery, weapons: noBows)));
+        Assert.Equal(("Ranged", ContentValidator.RuleMaxForged), Refusal(() => Load(low, noBowman, noGallery, noBows)));
 
         var warnings = new List<string>();
-        var fitted = Fit(low, warnings, weapons: noBows, dungeons: noGallery);
+        var fitted = Fit(low, warnings, weapons: noBows, dungeons: noGallery, party: noBowman);
         Assert.Equal(2, fitted.MaxForged[Longshot]);
         Assert.Equal(["tuning.json: MaxForged.Longshot 1 is below the Ranged class, whose baseline carries Longshot x2 - using 2"], warnings);
-        Assert.Equal(2, Load(fitted, dungeons: noGallery, weapons: noBows).Modifiers.MaxForged(Longshot));
+        Assert.Equal(2, Load(fitted, noBowman, noGallery, noBows).Modifiers.MaxForged(Longshot));
     }
 
     [Fact]
@@ -149,14 +155,14 @@ public class TuningFitTests
         // anything reads the floor.
         var warnings = new List<string>();
 
-        var ten = new PartyData(ShippedContent.Party.Members.Select((m, i) => i == 0
+        var ten = new PartyData(FixtureContent.Party.Members.Select((m, i) => i == 0
             ? m with { BagWeaponIds = Enumerable.Repeat("staff_of_renewal", 9).ToList() }
             : m).ToList());
         var carry = Fit(BuiltIn, warnings, party: ten);
         Assert.Equal(BuiltIn.PartyCarrySlots, carry.PartyCarrySlots);   // left as it was
         Assert.Equal(ContentValidator.RulePartyBagFits, Assert.Throws<ContentException>(() => Load(carry, party: ten)).Rule);
 
-        var deep = new DungeonsData(ShippedContent.Dungeons.Dungeons
+        var deep = new DungeonsData(FixtureContent.Dungeons.Dungeons
             .Select(d => d.Id == "spear_hall" ? d with { BossFloorMin = 500, BossFloorMax = 500 } : d).ToList());
         var offset = Fit(BuiltIn, warnings, dungeons: deep);
         Assert.Equal(BuiltIn.BossStackOffset, offset.BossStackOffset);
@@ -164,13 +170,13 @@ public class TuningFitTests
         Assert.Equal(("spear_hall", ContentValidator.RuleNumberInRange), (refused.EntryId, refused.Rule));
         Assert.StartsWith($"bossFloorMin 500 is outside 1 to {ContentBounds.DeepestBossFloor} - ", refused.Detail, StringComparison.Ordinal);
 
-        var forged = ShippedContent.Weapons with
+        var forged = FixtureContent.Weapons with
         {
-            Weapons = ShippedContent.Weapons.Weapons
+            Weapons = FixtureContent.Weapons.Weapons
                 .Select(w => w.Id == "widowmaker" ? w with { Forged = new Dictionary<ModifierType, int>(w.Forged) { [CritWindow] = 4 } } : w).ToList(),
         };
         var limit = Fit(BuiltIn, warnings, weapons: forged);
-        Assert.Equal(BuiltIn.MaxForged[CritWindow], new ModifierRules(limit, ShippedContent.Restricted).MaxForged(CritWindow));
+        Assert.Equal(BuiltIn.MaxForged[CritWindow], new ModifierRules(limit, FixtureContent.Restricted).MaxForged(CritWindow));
         Assert.Equal(("widowmaker", ContentValidator.RuleMaxForged), Refusal(() => Load(limit, weapons: forged)));
 
         Assert.Empty(warnings);

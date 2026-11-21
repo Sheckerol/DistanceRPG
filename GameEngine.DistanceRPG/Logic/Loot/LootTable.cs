@@ -489,7 +489,9 @@ public static class LootTable
     /// modifier gains an acquired stack; the enchantment entry (null) banks a
     /// tier's worth of XP rather than a tier outright — the same credit a trigger
     /// the wielder paid for would have made, so the farm has no path of its own
-    /// into the ladder. The caller counts the tiers banked, against
+    /// into the ladder — and the full bar is cut in as the drop is made
+    /// (<see cref="Weapon.Maintain"/>), since a drop arrives with its depth and
+    /// waits on no service for it. The caller counts the tiers banked, against
     /// <see cref="Eligible"/>'s ceiling. The boss's guaranteed stacks land here
     /// too (<see cref="BossLoot"/>): distributed exactly as a farm's are.
     /// </summary>
@@ -504,6 +506,7 @@ public static class LootTable
 
         var innate = weapon.Enchantments[InnateIndex];
         weapon.CreditEnchantment(InnateIndex, innate.XpToNextTier());
+        weapon.Maintain();
     }
 
     /// <summary>

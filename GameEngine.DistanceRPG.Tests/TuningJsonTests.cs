@@ -20,7 +20,7 @@ namespace GameEngine.DistanceRPG.Tests;
 public class TuningJsonTests
 {
     /// <summary>The built-in tuning: the master copy's numbers, as the game plays them, which a file beside the game is read over.</summary>
-    private static Tuning BuiltIn => ShippedContent.Tuning;
+    private static Tuning BuiltIn => FixtureContent.Tuning;
 
     private static TuningKey Key(string name) => TuningSchema.Find(name) ?? throw new KeyNotFoundException(name);
 
@@ -61,18 +61,18 @@ public class TuningJsonTests
         // The loader adds the missing file's notice — and only for a missing one.
         // The other data files sit beside it, as they ship, so any notice is the
         // tuning's (an absent content file has a notice of its own).
-        var others = ShippedData.Texts with { Tuning = null };
-        Assert.Equal(["tuning.json is missing - the built-in numbers are playing"], ShippedData.Load(others).Notices);
-        Assert.Empty(ShippedData.Load(others with { Tuning = "{}" }).Notices);
+        var others = FixtureContent.Texts with { Tuning = null };
+        Assert.Equal(["tuning.json is missing - the built-in numbers are playing"], FixtureContent.Load(others).Notices);
+        Assert.Empty(FixtureContent.Load(others with { Tuning = "{}" }).Notices);
 
         // A file that is there and could not be read is not a missing file. The
         // edge says why, the notice says so, and the built-in numbers play. A
         // text that was read wins over any reason given beside it.
         var unreadable = others with { Unreadable = new Dictionary<string, string> { [TuningJson.FileName] = "another program has it open" } };
-        var locked = ShippedData.Load(unreadable);
+        var locked = FixtureContent.Load(unreadable);
         Assert.Equal(["tuning.json could not be read (another program has it open) - the built-in numbers are playing"], locked.Notices);
         TuningValues.Same(BuiltIn, locked.Content!.Tuning);
-        Assert.Empty(ShippedData.Load(unreadable with { Tuning = "{}" }).Notices);
+        Assert.Empty(FixtureContent.Load(unreadable with { Tuning = "{}" }).Notices);
     }
 
     [Fact]
@@ -105,7 +105,7 @@ public class TuningJsonTests
 
         // And the game reads the merged table so: Block is worth what the file
         // says a stack, Brace still its built-in number.
-        var rules = new ModifierRules(TuningJson.Read($$"""{ "PerStack": { "Block": {{block}} } }""", BuiltIn).Tuning, ShippedContent.Restricted);
+        var rules = new ModifierRules(TuningJson.Read($$"""{ "PerStack": { "Block": {{block}} } }""", BuiltIn).Tuning, FixtureContent.Restricted);
         Assert.Equal((block, BuiltIn.PerStack[ModifierType.Brace]), (rules.PerStack(ModifierType.Block), rules.PerStack(ModifierType.Brace)));
     }
 
@@ -194,7 +194,7 @@ public class TuningJsonTests
         var said = new List<string>();
         foreach (string file in files)
         {
-            var load = ShippedData.Load(ShippedData.Texts with { Tuning = file });
+            var load = FixtureContent.Load(FixtureContent.Texts with { Tuning = file });
             Assert.NotNull(load.Content);
             string notice = Assert.Single(load.Notices);
             Assert.StartsWith("tuning.json: ", notice);
@@ -222,7 +222,7 @@ public class TuningJsonTests
         // The ladder is the docs' spelling a playtester is likeliest to type, the
         // ruling having replaced it: its warning takes fewer rows than the cap, so
         // a second notice beside it is still shown, never only counted in the log.
-        var two = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "WearCapacityLadder": [30, 40, 55], "MovementUnitsPerMana": 0 }""" });
+        var two = FixtureContent.Load(FixtureContent.Texts with { Tuning = """{ "WearCapacityLadder": [30, 40, 55], "MovementUnitsPerMana": 0 }""" });
         Assert.Equal([ladder, "tuning.json: MovementUnitsPerMana 0 is below 1 - using 1"], two.Notices);
         var rows = NoticeText.Rows(two.Notices);
         Assert.True(NoticeText.Wrap(ladder).Count < NoticeText.MaxRows, $"the ladder's warning takes {NoticeText.Wrap(ladder).Count} rows");
@@ -352,11 +352,11 @@ public class TuningJsonTests
         ]);
         Assert.True(files.Count > 170, $"{files.Count} files: the sweep is not reading the schema");
 
-        var shipped = ShippedData.Texts;
+        var shipped = FixtureContent.Texts;
         var failures = new List<string>();
         foreach (string file in files)
         {
-            var load = ShippedData.Load(shipped with { Tuning = file });
+            var load = FixtureContent.Load(shipped with { Tuning = file });
             if (load.Content is not { } content)
             {
                 failures.Add($"{file} -> {load.Error?.Message ?? "no content"}");
@@ -531,7 +531,7 @@ public class TuningJsonTests
         // beside it, each key under the
         // comment that says what it is; and it reads, strictly, with nothing to
         // warn about.
-        string text = ShippedData.Texts.Tuning!;
+        string text = FixtureContent.Texts.Tuning!;
         Assert.Empty(TuningJson.ReadBuiltIn(text).Warnings);
         Assert.DoesNotContain('\r', text);
 
@@ -613,7 +613,7 @@ public class TuningJsonTests
         // has — no copy of one is kept in code — so it is read strictly. A built-in
         // text without MovementBudget, or without PerStack's Block row, is refused
         // as it is read, naming the key: there is no number under it.
-        string shipped = ShippedData.Texts.Tuning!;
+        string shipped = FixtureContent.Texts.Tuning!;
         string noBudget = DataTexts.WithoutKey(shipped, nameof(Tuning.MovementBudget));
         var budget = Assert.Throws<ContentException>(() => TuningJson.ReadBuiltIn(noBudget));
         Assert.Equal((nameof(Tuning.MovementBudget), ContentValidator.RuleFileShape), (budget.EntryId, budget.Rule));
@@ -628,7 +628,7 @@ public class TuningJsonTests
         // stamped tuning.json (built-in), with no tuning to hash and none changed.
         foreach (string gap in new[] { noBudget, noBlock })
         {
-            var load = ContentFiles.Load(ShippedData.Texts, ShippedData.Texts with { Tuning = gap });
+            var load = FixtureContent.Load(FixtureContent.Texts, FixtureContent.Texts with { Tuning = gap });
             Assert.Null(load.Content);
             Assert.Null(load.Tuning);
             Assert.Empty(load.TuningOverrides);
@@ -641,7 +641,7 @@ public class TuningJsonTests
 
         // A file beside the game without them is a partial file like any other: it
         // merges over the complete built-in copy, which fills both in.
-        var beside = ShippedData.Load(ShippedData.Texts with { Tuning = noBlock });
+        var beside = FixtureContent.Load(FixtureContent.Texts with { Tuning = noBlock });
         Assert.Null(beside.Error);
         Assert.Empty(beside.Notices);
         Assert.Empty(beside.TuningOverrides);
@@ -664,7 +664,7 @@ public class TuningJsonTests
         // The shipped text itself; stripped of every comment and squeezed onto
         // one line; and with its keys in the reverse order — each built from the
         // shipped text by editing it, and each the same numbers.
-        string text = ShippedData.Texts.Tuning!;
+        string text = FixtureContent.Texts.Tuning!;
         string bare = Regex.Replace(Regex.Replace(text, @"/\*.*?\*/", "", RegexOptions.Singleline), @"\s+", " ");
         var reversed = new System.Text.Json.Nodes.JsonObject();
         foreach (var (name, value) in System.Text.Json.Nodes.JsonNode.Parse(text, documentOptions: new System.Text.Json.JsonDocumentOptions
@@ -748,7 +748,7 @@ public class TuningJsonTests
                 Assert.Equal(shipped, TuningJson.Hash(read.Tuning));
                 Assert.Equal(changed, read.Overrides);
 
-                var load = ShippedData.Load(ShippedData.Texts with { Tuning = file });
+                var load = FixtureContent.Load(FixtureContent.Texts with { Tuning = file });
                 Assert.Null(load.Error);
                 Assert.Empty(load.Notices);
                 Assert.Equal(end, k.Get(load.Content!.Tuning));
@@ -911,7 +911,7 @@ public class TuningJsonTests
 
         // The load reports the numbers the game plays: a value clamped is what it
         // became, and the fit's raise is a change like any other.
-        var load = ShippedData.Load(new ContentTexts(Tuning: """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }"""));
+        var load = FixtureContent.Load(new ContentTexts(Tuning: """{ "MovementUnitsPerMana": 0, "PartyCarrySlots": 4 }"""));
         Assert.Equal(["MovementUnitsPerMana 1", "PartyCarrySlots 8"], load.TuningOverrides);
     }
 
@@ -925,7 +925,7 @@ public class TuningJsonTests
         var read = TuningJson.Read("""{ "ApplyPercent": { "flamming": 30 } }""", BuiltIn);
         Assert.Empty(read.Warnings);
 
-        var load = ShippedData.Load(ShippedData.Texts with { Tuning = """{ "ApplyPercent": { "flamming": 30 } }""" });   // beside the shipped content files
+        var load = FixtureContent.Load(FixtureContent.Texts with { Tuning = """{ "ApplyPercent": { "flamming": 30 } }""" });   // beside the shipped content files
         Assert.Equal(["tuning.json: ApplyPercent.flamming names no enchantment - ignored - did you mean flaming?"], load.Notices);
         Assert.False(load.Content!.Tuning.ApplyPercent.ContainsKey("flamming"));
         Assert.Equal(TuningJson.Hash(BuiltIn), TuningJson.Hash(load.Content.Tuning));

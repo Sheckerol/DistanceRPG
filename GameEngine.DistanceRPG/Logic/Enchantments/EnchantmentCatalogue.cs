@@ -165,6 +165,9 @@ public sealed class EnchantmentCatalogue
     /// <summary>Whether <c>restricted.json</c>'s <c>excludes</c> keep <paramref name="a"/> and <paramref name="b"/> off one weapon — two enchantments one group names, as the opposed elements are — both ways, as a group means.</summary>
     public bool Excludes(string a, string b) => _excludes.TryGetValue(a, out var excluded) && excluded.Contains(b);
 
+    /// <summary>Whether an innate enchantment carries <paramref name="element"/>, so a wand can be made of it (<see cref="InnateFor"/>).</summary>
+    public bool HasInnateFor(DamageType element) => _elements.ContainsKey(element);
+
     /// <summary>The innate a wand of <paramref name="element"/> carries: the entry whose hit is typed with it.</summary>
     public EnchantmentDef InnateFor(DamageType element)
         => _elements.TryGetValue(element, out var def)

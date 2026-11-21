@@ -350,9 +350,9 @@ public sealed class FarmTests : IDisposable
         // dungeon added to the copy beside the game in a playtest, or to the master
         // without a test run, raises a full clear's yield with no warning — the rate
         // is not re-derived for you, which is what PHASE 6b DECISION 7 says plainly.
-        var tuning = ShippedContent.Tuning;
+        var tuning = FixtureContent.Tuning;
         int perClear = tuning.FarmYieldPerClear;
-        int dungeons = ShippedContent.Dungeons.Dungeons.Count(def => !def.RetiresOnClear);
+        int dungeons = FixtureContent.Dungeons.Dungeons.Count(def => !def.RetiresOnClear);
         int target = Loadout * Alchemist.QualityForAllAt(tuning.HealthPotionPercent);
         Assert.True(dungeons > 0, "the master has no dungeon besides the tutorial for the farm to count");
         long fullClear = (long)perClear * dungeons;

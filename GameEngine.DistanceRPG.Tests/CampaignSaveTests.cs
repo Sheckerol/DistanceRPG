@@ -362,7 +362,7 @@ public sealed class CampaignSaveTests : IDisposable
         Assert.Equal(3, tree["campaign"]!["depositsMade"]!.GetValue<int>());
         var reports = tree["campaign"]!["lastResult"]!["services"]!.AsArray();
         Assert.Equal(2, reports.Count);
-        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment", "improved", "modifier", "tier", "sourceId"],   // the roll's outcome, Phase 6a.4; a transfer's, Phase 6a.6
+        Assert.Equal(["weaponId", "service", "runsWorked", "runs", "stalled", "enchantment", "improved", "modifier", "tier", "sourceId", "raised"],   // the roll's outcome, Phase 6a.4; a transfer's, Phase 6a.6; the tiers raised, after play 2026-11-19
             reports[1]!.AsObject().Select(member => member.Key));
 
         // The restored shop works on as the one saved: the next run that counts
@@ -557,11 +557,16 @@ public sealed class CampaignSaveTests : IDisposable
         written.Mana = written.Mana;
         Assert.Equal(restored.Mana, written.Mana);
 
-        // The lock deepens past the pool: Renewal climbs to tier 3, locks 45 of 30,
-        // and sleeps — the whole pool is spendable again. The unwritten pool reads
-        // the new ceiling, as the live member's does; the written one does not.
+        // The lock deepens past the pool: Renewal climbs to tier 3 — a bar filled
+        // and a service's maintenance, twice — locks 45 of 30, and sleeps: the
+        // whole pool is spendable again. The unwritten pool reads the new ceiling,
+        // as the live member's does; the written one does not.
         foreach (var member in new[] { c, restored, written })
-            member.EquippedWeapon!.CreditEnchantment(0, 15 + 30);
+            foreach (int bar in new[] { 15, 30 })
+            {
+                member.EquippedWeapon!.CreditEnchantment(0, bar);
+                member.EquippedWeapon!.Maintain();
+            }
         Assert.Equal(3, restored.EquippedWeapon!.Enchantments[0].Tier);
         Assert.Equal((c.UsableMaxMana, c.UsableMaxMana), (c.Mana, restored.Mana));
         Assert.True(restored.Mana > written.Mana, $"the unwritten pool reads {restored.Mana}, the written one {written.Mana}");
@@ -753,10 +758,10 @@ public sealed class CampaignSaveTests : IDisposable
         // ...and so it does under a catalogue whose entries run in the opposite
         // order (a code edit, simulated): an id means its entry wherever the
         // catalogue puts it.
-        var reversed = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Reverse().ToArray());
+        var reversed = new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Reverse().ToArray());
         using (TestContent.UsePremise(enchantments: reversed))
         {
-            Assert.NotEqual(ShippedContent.Enchantments.Enchantments[0].Id, GameContent.Current.Enchantments.All[0].Id);
+            Assert.NotEqual(FixtureContent.Enchantments.Enchantments[0].Id, GameContent.Current.Enchantments.All[0].Id);
             var underReversed = Load(text);
             Assert.False(underReversed.TuningChanged);
             Assert.Equal(campaign.SeenInOrder, underReversed.Campaign.SeenInOrder);
@@ -996,10 +1001,10 @@ public sealed class CampaignSaveTests : IDisposable
         campaign.Party[2].Inventory[2] = TestWeapons.Get("wand_of_the_beam", DamageType.Shocking);
         string text = Save(campaign);
 
-        var enchantments = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Reverse().ToArray());
+        var enchantments = new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Reverse().ToArray());
         using (TestContent.UsePremise(weapons: w => w with { Weapons = w.Weapons.Reverse().ToArray() }, enchantments: enchantments))
         {
-            Assert.NotEqual(ShippedContent.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
+            Assert.NotEqual(FixtureContent.Weapons.Weapons[0].Id, GameContent.Current.Weapons.All[0].Id);
             var loaded = Load(text);
             Assert.False(loaded.TuningChanged);
             Assert.Equal(text, Save(loaded.Campaign));
@@ -1073,7 +1078,7 @@ public sealed class CampaignSaveTests : IDisposable
         var campaign = NewCampaign();
         In(campaign, "tutorial", FiveDeep).Turns!.EndTurn();   // the banner is up: the enemies' turn has begun
         Assert.Throws<InvalidOperationException>(() => SaveGame.Capture(campaign));
-        var other = TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments, ShippedContent.Weapons);
+        var other = TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments, FixtureContent.Weapons);
         Assert.Throws<ArgumentException>(() => SaveGame.Restore(SaveCodec.Read(text), other));
         Assert.Throws<SaveFormatException>(() => SaveGame.Restore(SaveCodec.Read(text) with { Version = 0 }, GameContent.Current));
     }

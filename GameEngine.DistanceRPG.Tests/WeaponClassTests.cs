@@ -56,7 +56,7 @@ public class WeaponClassTests
     /// <summary>The content the game plays with <paramref name="weapons"/> beside it and the shipped files for the rest — loaded as the game loads it, with nothing to say.</summary>
     private static GameContent Plays(string weapons)
     {
-        var load = ShippedData.Load(Shipped with { Weapons = weapons });
+        var load = FixtureContent.Load(Shipped with { Weapons = weapons });
         Assert.Null(load.Error);
         Assert.Empty(load.Notices);
         return load.Content!;
@@ -65,7 +65,7 @@ public class WeaponClassTests
     /// <summary>Why the game does not start with <paramref name="weapons"/> beside it: the load's error, never an exception out of it.</summary>
     private static ContentException Fails(string weapons)
     {
-        var load = ShippedData.Load(Shipped with { Weapons = weapons });
+        var load = FixtureContent.Load(Shipped with { Weapons = weapons });
         Assert.Null(load.Content);
         return load.Error ?? throw new Xunit.Sdk.XunitException("the load has neither content nor an error");
     }
@@ -130,7 +130,7 @@ public class WeaponClassTests
         // re-bases all four daggers and the two uniques made from them, and the
         // game loads with nothing to say.
         string[] daggers = ["flensing_knife", "assassins_fang", "disarming_kris", "weakspot_stiletto", "widowmaker", "flensing_knife_unique"];
-        var shipped = ShippedContent.Content.Weapons;
+        var shipped = FixtureContent.Content.Weapons;
         Assert.Equal(daggers, shipped.All.Where(w => w.Class == Dagger).Select(w => w.Id));
 
         var rebased = Plays(DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": ", "\"Pin\": ")).Weapons;
@@ -145,7 +145,7 @@ public class WeaponClassTests
 
         // The statline likewise: the Dagger row's damage moved reaches the four and
         // their two uniques, and no other weapon.
-        int damage = ShippedContent.Weapons.ClassOf(Dagger)!.Damage;
+        int damage = FixtureContent.Weapons.ClassOf(Dagger)!.Damage;
         var heavier = Plays(DataTexts.InClass(ShippedWeapons, Dagger, $"\"damage\": {damage}", $"\"damage\": {damage + 2}")).Weapons;
         Assert.All(daggers, id => Assert.Equal(damage + 2, heavier[id].Damage));
         Assert.All(heavier.All.Where(w => w.Class != Dagger), w => Assert.Equal(shipped[w.Id].Damage, w.Damage));
@@ -160,8 +160,8 @@ public class WeaponClassTests
         // Renewal's and the Staff of Mire's mana. So the Staff row's manaCost moved
         // moves Warding and Blight, and Rotwood, made from Blight — and not Renewal
         // or Mire, nor the unique made from Renewal.
-        var staff = ShippedContent.Weapons.ClassOf(Staff)!;
-        var shipped = ShippedContent.Content.Weapons;
+        var staff = FixtureContent.Weapons.ClassOf(Staff)!;
+        var shipped = FixtureContent.Content.Weapons;
         Assert.All(new[] { "staff_of_renewal", "staff_of_mire" }, id => Assert.NotEqual(staff.ManaCost, shipped[id].ManaCost));
 
         int moved = staff.ManaCost + 2;
@@ -187,7 +187,7 @@ public class WeaponClassTests
         // the rows, loses the Sword with no dungeons.json edit.
         string ranged = DataTexts.InClass(ShippedWeapons, Sword, "\"kind\": \"melee\"", "\"kind\": \"ranged\"");
         var content = Plays(ranged);
-        var shipped = ShippedContent.Content;
+        var shipped = FixtureContent.Content;
         var theme = shipped.Dungeons["spear_hall"].Theme;
         Assert.Equal(Brace, theme);
         Assert.Contains(Sword, shipped.Dungeons.ThemeClasses(theme));
@@ -214,8 +214,8 @@ public class WeaponClassTests
         // has B — the party's STR 4, DEX 2 — level spears on DEX 2, and climb the
         // ladder at DEX 2's pace rather than STR 4's (the ladder a member's
         // proficiency replays: Progression.Ladder over its governing stat).
-        var b = StartingParty.Data.Members.Single(member => member.Id == "B").Stats;
-        int perLevel = ShippedContent.Tuning.WeaponXpPerLevel;
+        var b = FixtureContent.Party.Members.Single(member => member.Id == "B").Stats;
+        int perLevel = FixtureContent.Tuning.WeaponXpPerLevel;
         Assert.Equal(b.STR, Progression.GoverningStat(Spear, b));
         Assert.Equal(Progression.XpToNext(perLevel, b.STR), Progression.Ladder(0, Progression.GoverningStat(Spear, b)).XpToNext);
 
@@ -254,7 +254,7 @@ public class WeaponClassTests
         // beside its Resonant re-bases every staff, the uniques made from them too,
         // and loads with nothing to say.
         string[] staves = ["staff_of_renewal", "staff_of_warding", "staff_of_blight", "staff_of_mire", "rotwood", "staff_of_renewal_unique"];
-        var shipped = ShippedContent.Content.Weapons;
+        var shipped = FixtureContent.Content.Weapons;
         Assert.Equal(staves, shipped.All.Where(w => w.Class == Staff).Select(w => w.Id));
         var blocking = Plays(DataTexts.InClass(ShippedWeapons, Staff, "\"baseline\": { \"Resonant\": 1 }", "\"baseline\": { \"Resonant\": 1, \"Block\": 1 }")).Weapons;
         Assert.All(staves, id => Assert.Equal(
@@ -365,7 +365,7 @@ public class WeaponClassTests
         // relation, as a weapon's does. A count's names the field and the whole
         // range it lies outside (the user's ruling of 2026-09-25, R3), the top the
         // forge limit of its modifier.
-        int limit = ShippedContent.Tuning.MaxForged[CritMultiplier];
+        int limit = FixtureContent.Tuning.MaxForged[CritMultiplier];
         Assert.Equal($"baseline.CritMultiplier 0 is outside 1 to {limit} - {ContentBounds.Baseline.Why}",
             Fails(DataTexts.InClass(ShippedWeapons, Dagger, "\"CritMultiplier\": 1", "\"CritMultiplier\": 0")).Detail);
         Assert.Equal("baseline Brace x1 on a Ranged weapon beside Brace x1, Longshot x1 - restricted.json kind Brace: melee",
@@ -375,21 +375,21 @@ public class WeaponClassTests
 
         // Records built in code bypass the reader, and meet the same rule in the
         // validator: a Wand row missing, or a Dagger row given twice.
-        var noWandRow = ShippedContent.Weapons with { Classes = ShippedContent.Weapons.Classes.Where(row => row.Class != Wand).ToList() };
+        var noWandRow = FixtureContent.Weapons with { Classes = FixtureContent.Weapons.Classes.Where(row => row.Class != Wand).ToList() };
         Assert.Equal((WeaponsJson.FileName, false, "Wand", ContentValidator.RuleEveryClassHasARow),
             Stamp(Assert.Throws<ContentException>(() => TestContent.Load(weapons: noWandRow))));
-        var twoDaggerRows = ShippedContent.Weapons with { Classes = [.. ShippedContent.Weapons.Classes, ShippedContent.Weapons.ClassOf(Dagger)!] };
+        var twoDaggerRows = FixtureContent.Weapons with { Classes = [.. FixtureContent.Weapons.Classes, FixtureContent.Weapons.ClassOf(Dagger)!] };
         Assert.Equal((WeaponsJson.FileName, false, "Dagger", ContentValidator.RuleEveryClassHasARow),
             Stamp(Assert.Throws<ContentException>(() => TestContent.Load(weapons: twoDaggerRows))));
 
         // And a class that fields no weapon has its baseline asked all the same:
         // every bow gone, and the Ranged row forging Brace.
-        var noBows = ShippedContent.Weapons with
+        var noBows = FixtureContent.Weapons with
         {
-            Classes = ShippedContent.Weapons.Classes
+            Classes = FixtureContent.Weapons.Classes
                 .Select(row => row.Class == Ranged ? row with { Baseline = new Dictionary<ModifierType, int> { [Brace] = 1, [Longshot] = 1 } } : row)
                 .ToList(),
-            Weapons = ShippedContent.Weapons.Weapons.Where(w => w.Class != Ranged).ToList(),
+            Weapons = FixtureContent.Weapons.Weapons.Where(w => w.Class != Ranged).ToList(),
         };
         Assert.Equal((WeaponsJson.FileName, false, "Ranged", ContentValidator.RuleForgedNotAllowed),
             Stamp(Assert.Throws<ContentException>(() => TestContent.Load(weapons: noBows))));

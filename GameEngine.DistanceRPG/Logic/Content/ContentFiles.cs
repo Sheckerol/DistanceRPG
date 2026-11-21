@@ -138,10 +138,20 @@ public static class ContentFiles
     /// <see cref="ContentLoad.Error"/>, stamped with its file, beside every notice
     /// raised before it.
     /// </summary>
-    public static ContentLoad Load(ContentTexts files, ContentTexts builtIn)
+    public static ContentLoad Load(ContentTexts files, ContentTexts builtIn) => Load(files, builtIn, StartingParty.Data);
+
+    /// <summary>
+    /// <see cref="Load(ContentTexts, ContentTexts)"/> with the starting party given
+    /// rather than the game's own (<see cref="StartingParty"/>): the roster the
+    /// tuning is fitted to and the weapons are checked against. The game always
+    /// plays its own; the suite hands in the roster of its frozen configuration, so
+    /// that the game's may change without a test of the loader noticing.
+    /// </summary>
+    public static ContentLoad Load(ContentTexts files, ContentTexts builtIn, PartyData party)
     {
         ArgumentNullException.ThrowIfNull(files);
         ArgumentNullException.ThrowIfNull(builtIn);
+        ArgumentNullException.ThrowIfNull(party);
         var notices = new List<string>();
 
         // (1) The built-in tuning, strictly: it is every number the game has, so
@@ -175,7 +185,6 @@ public static class ContentFiles
 
         // The catalogue and the party are the code's: handed to the load, never read.
         var enchantments = EnchantmentDefinitions.Data;
-        var party = StartingParty.Data;
 
         // (3) The fit.
         var tuning = TuningFit.ToContent(read.Tuning, weapons.Data, dungeons.Data, party, notices);

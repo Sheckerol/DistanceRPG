@@ -353,7 +353,7 @@ public sealed class WandTests : IDisposable
         // friendly-fire constant off. It flips on once the scorer exists" (phase-1-weapons.md L1062-1063,
         // settled.md L134-136) — a value a design doc fixes, pinned here against the master (REWORK DECISION 3):
         // an edit that turns it on fails by name, and the docs move with it.
-        Assert.False(ShippedContent.Tuning.FriendlyFireEnabled);
+        Assert.False(FixtureContent.Tuning.FriendlyFireEnabled);
 
         // And off, the shape catches the far side alone, and an ally standing in it is untouched.
         Assert.False(GameContent.Current.Tuning.FriendlyFireEnabled);
@@ -476,7 +476,7 @@ public sealed class WandTests : IDisposable
         // whole of it while the cast pays the trigger once: re-priced to three levels at 100%, six
         // bodies take 8 + 3 each for the one 4.
         using var _ = TestContent.UsePremise(
-            enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
+            enchantments: new EnchantmentsData(FixtureContent.Enchantments.Enchantments
                 .Select(e => e.Id == "flaming" ? e with { Potency = 3 } : e).ToList()),
             tuning: t => TuningValues.With(t, ("ApplyPercent.flaming", 100)));
         Assert.Equal(3, TestWeapons.Get("wand_of_the_nova", Flaming).Innate!.LevelsFor(3));
@@ -502,7 +502,7 @@ public sealed class WandTests : IDisposable
         // Flaming and Cold exclude each other exactly as Push and Drag do — the same relations file, the
         // same groups — so content listing both on one weapon is refused, naming the entry and the rule:
         // a unique wand fixing both, or a fighter's dagger carrying both (the counter is transferable).
-        var excludes = ShippedContent.Restricted.Excludes;
+        var excludes = FixtureContent.Restricted.Excludes;
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "flaming", "cold" }));
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { "shocking", "acidic" }));
         Assert.Contains(excludes, g => g.SequenceEqual(new[] { nameof(Push), nameof(Drag), nameof(Rout) }));
@@ -725,6 +725,6 @@ public sealed class WandTests : IDisposable
 
     private static ContentException LoadWith(WeaponDef extra)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            Premise.Tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
+            Premise.Tuning, FixtureContent.Restricted, FixtureContent.Enchantments,
             Premise.Weapons with { Weapons = [.. Premise.Weapons.Weapons, extra] }, dungeons: Premise.Dungeons));
 }

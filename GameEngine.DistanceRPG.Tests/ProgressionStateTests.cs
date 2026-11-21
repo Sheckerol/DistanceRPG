@@ -464,7 +464,7 @@ public sealed class ProgressionStateTests : IDisposable
         // the starting party is a ContentException naming the member and the rule, raised
         // before anything spawns -- never a KeyNotFoundException halfway through
         // building the party, with two members on the floor and two not.
-        var typo = new PartyData(ShippedContent.Party.Members
+        var typo = new PartyData(FixtureContent.Party.Members
             .Select(m => m.Id == "C" ? m with { StartingWeaponId = "great_axe_of_typos" } : m)
             .ToList());
 

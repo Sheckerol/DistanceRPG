@@ -1374,17 +1374,19 @@ public class DungeonScene : Scene
                 _hud.AddBeat(obj, obj.Position, label, LevelUpColor, -64f);
         };
 
-        // The mana an entry spent burned the circle a step deeper (§3.3). The
+        // The mana an entry spent filled its tier's bar (§3.3): the tier itself
+        // rises at the enchanter, on the weapon's next service (ruled after play,
+        // 2026-11-19), so the label says the bar is full and never a tier. The
         // same beat as a level-up and for the same reason: the applier settled
         // it, and the label only states what the entry now reads. It is the
         // wielder's beat whichever side is wielding -- an enemy healer's staff
-        // levels by casting too -- so a dummy's tier-up simply finds no object
-        // to float over.
-        _turns.EnchantmentTiered += (wielder, weapon, entry) =>
+        // fills by casting too -- so a dummy's simply finds no object to float
+        // over.
+        _turns.EnchantmentBarFilled += (wielder, weapon, entry) =>
         {
-            Log.Info($"[Progress] {weapon.Name}: {entry.Def.Name} reaches tier {entry.Tier}");
+            Log.Info($"[Progress] {weapon.Name}: {entry.Def.Name} has filled its tier {entry.Tier} bar ({entry.Xp} of {entry.TierCost()}): the enchanter's next service raises it to tier {entry.Tier + 1}");
             if (TryObjectFor(wielder, out var obj) && obj.IsActive)
-                _hud.AddFloatingText(obj.Position, $"{entry.Def.Name.ToUpperInvariant()} T{entry.Tier}!", LevelUpColor, -64f);
+                _hud.AddFloatingText(obj.Position, DungeonHud.BarFilled(entry), LevelUpColor, -64f);
         };
 
         // The hit that filled a member's weapon to its wear capacity (§6.1). The

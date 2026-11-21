@@ -11,8 +11,8 @@ namespace GameEngine.DistanceRPG.Tests;
 /// </summary>
 internal static class DataTexts
 {
-    /// <summary>The master copies, as the build carries them (<see cref="ShippedData.Texts"/>): what ships beside the executable, and what plays when nothing does.</summary>
-    public static ContentTexts Shipped => ShippedData.Texts;
+    /// <summary>The master copies, as the build carries them (<see cref="FixtureContent.Texts"/>): what ships beside the executable, and what plays when nothing does.</summary>
+    public static ContentTexts Shipped => FixtureContent.Texts;
 
     /// <summary><paramref name="text"/> with <paramref name="from"/>, which it holds exactly once, replaced by <paramref name="to"/>.</summary>
     public static string Edit(string text, string from, string to)
@@ -272,7 +272,7 @@ public class ContentFilesTests
 
     private static ContentException Fails(ContentTexts texts)
     {
-        var load = ShippedData.Load(texts);
+        var load = FixtureContent.Load(texts);
         Assert.Null(load.Content);
         return load.Error ?? throw new Xunit.Sdk.XunitException("the load has neither content nor an error");
     }
@@ -311,7 +311,7 @@ public class ContentFilesTests
 
         // Whatever else the load had to say before the failure still comes back
         // beside it: the tuning's notice, for the screen and the log.
-        var both = ShippedData.Load(Shipped with { Tuning = """{ "MovementUnitsPerMana": 0 }""", Restricted = RestrictedTypo });
+        var both = FixtureContent.Load(Shipped with { Tuning = """{ "MovementUnitsPerMana": 0 }""", Restricted = RestrictedTypo });
         Assert.Equal(["tuning.json: MovementUnitsPerMana 0 is below 1 - using 1"], both.Notices);
         Assert.Equal(["MovementUnitsPerMana 1"], both.TuningOverrides);
         Assert.Equal(RestrictedJson.FileName, both.Error!.File);
@@ -330,15 +330,15 @@ public class ContentFilesTests
             Assert.Null(texts.Weapons);
             Assert.Contains($"[Data] {Path.Combine(folder, WeaponsJson.FileName)} is missing - the built-in one plays", report);
 
-            var load = ShippedData.Load(texts);
+            var load = FixtureContent.Load(texts);
             Assert.Equal(["weapons.json is missing - the built-in weapons are playing"], load.Notices);
-            Assert.Equal(ShippedContent.Weapons.Weapons.Select(w => w.Id), load.Content!.Weapons.All.Select(w => w.Id));
+            Assert.Equal(FixtureContent.Weapons.Weapons.Select(w => w.Id), load.Content!.Weapons.All.Select(w => w.Id));
         });
 
         // The relations likewise, and one that is there but cannot be read says why
         // instead of calling itself missing.
-        Assert.Equal(["restricted.json is missing - the built-in relations are playing"], ShippedData.Load(Shipped with { Restricted = null }).Notices);
-        var locked = ShippedData.Load(Shipped with
+        Assert.Equal(["restricted.json is missing - the built-in relations are playing"], FixtureContent.Load(Shipped with { Restricted = null }).Notices);
+        var locked = FixtureContent.Load(Shipped with
         {
             Restricted = null,
             Unreadable = new Dictionary<string, string> { [RestrictedJson.FileName] = "another program has it open" },
@@ -349,10 +349,10 @@ public class ContentFilesTests
         // A present file is read whole, never merged entry by entry with the
         // built-in copy: a row it edits is the file's — here the Hatchet given a
         // damage of its own in place of its class's (REWORK DECISION 1)...
-        var edited = ShippedData.Load(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "hatchet", "\"adds\": { \"Light\": 1 },", "\"adds\": { \"Light\": 1 }, \"damage\": 20,") });
+        var edited = FixtureContent.Load(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "hatchet", "\"adds\": { \"Light\": 1 },", "\"adds\": { \"Light\": 1 }, \"damage\": 20,") });
         Assert.Empty(edited.Notices);
         Assert.Equal(20, edited.Content!.Weapons["hatchet"].Damage);
-        Assert.Equal(ShippedContent.Weapons.Weapons.Single(w => w.Id == "great_axe").Damage, edited.Content.Weapons["great_axe"].Damage);   // its class's, as the master has it
+        Assert.Equal(FixtureContent.Weapons.Weapons.Single(w => w.Id == "great_axe").Damage, edited.Content.Weapons["great_axe"].Damage);   // its class's, as the master has it
 
         // ...and one it leaves out is gone, not filled in from the built-in
         // weapons: the code names arming_sword as what a dummy holds, so the load
@@ -367,17 +367,17 @@ public class ContentFilesTests
         // The content rework, 1h: no weapons.json beside the game — the built-in
         // weapons play, the notice says so, and it is not among the files read
         // from beside the executable.
-        var missing = ShippedData.Load(Shipped with { Weapons = null });
+        var missing = FixtureContent.Load(Shipped with { Weapons = null });
         Assert.Null(missing.Error);
         Assert.Equal(["weapons.json is missing - the built-in weapons are playing"], missing.Notices);
         Assert.Equal([RestrictedJson.FileName, DungeonsJson.FileName], missing.ReadBeside);
-        Assert.Equal(ShippedContent.Weapons.Weapons.Select(w => w.Id), missing.Content!.Weapons.All.Select(w => w.Id));
+        Assert.Equal(FixtureContent.Weapons.Weapons.Select(w => w.Id), missing.Content!.Weapons.All.Select(w => w.Id));
 
         // A broken built-in weapons.json — a master copy edited and never tested —
         // with none beside the game: it plays, so the game stops on it, marked
         // built-in, with the notice that the file beside it was missing.
         var brokenBuiltIn = Shipped with { Weapons = WeaponsSyntax };
-        var broken = ContentFiles.Load(Shipped with { Weapons = null }, brokenBuiltIn);
+        var broken = FixtureContent.Load(Shipped with { Weapons = null }, brokenBuiltIn);
         Assert.Null(broken.Content);
         Assert.Equal((ContentFiles.WeaponsFileName, true, ContentFiles.WeaponsFileName, ContentValidator.RuleFileShape), Stamp(broken.Error!));
         Assert.Equal(["weapons.json is missing - the built-in weapons are playing"], broken.Notices);
@@ -385,17 +385,17 @@ public class ContentFilesTests
         // A broken one beside the game and a sound built-in one: the one beside is
         // what stops the game — a present file is read whole, never swapped for the
         // built-in copy in silence (§5.4).
-        var beside = ShippedData.Load(Shipped with { Weapons = WeaponsSyntax });
+        var beside = FixtureContent.Load(Shipped with { Weapons = WeaponsSyntax });
         Assert.Equal((ContentFiles.WeaponsFileName, false, ContentFiles.WeaponsFileName, ContentValidator.RuleFileShape), Stamp(beside.Error!));
         Assert.Empty(beside.Notices);
 
         // A sound one beside the game covers a broken built-in one, which is never
         // read: the game plays, with no error and nothing to say.
-        var covered = ContentFiles.Load(Shipped, brokenBuiltIn);
+        var covered = FixtureContent.Load(Shipped, brokenBuiltIn);
         Assert.Null(covered.Error);
         Assert.Empty(covered.Notices);
         Assert.Empty(covered.TuningOverrides);
-        Assert.Equal(ShippedContent.Weapons.Weapons.Select(w => w.Id), covered.Content!.Weapons.All.Select(w => w.Id));
+        Assert.Equal(FixtureContent.Weapons.Weapons.Select(w => w.Id), covered.Content!.Weapons.All.Select(w => w.Id));
 
         // And a built-in copy the build does not carry — no text, and why — with
         // none beside the game: the game stops on it, marked built-in, under the
@@ -405,7 +405,7 @@ public class ContentFilesTests
             Weapons = null,
             Unreadable = new Dictionary<string, string> { [WeaponsJson.FileName] = "the game was built without it" },
         };
-        var notCarried = ContentFiles.Load(Shipped with { Weapons = null }, lacking);
+        var notCarried = FixtureContent.Load(Shipped with { Weapons = null }, lacking);
         Assert.Null(notCarried.Content);
         Assert.Equal((ContentFiles.WeaponsFileName, true, ContentFiles.WeaponsFileName, ContentValidator.RuleBuiltInCopy), Stamp(notCarried.Error!));
         Assert.Equal("weapons.json (built-in): the game was built without it", notCarried.Error!.Detail);
@@ -418,7 +418,7 @@ public class ContentFilesTests
         // tuning.json — clamped, said, and the game runs — and a broken invariant in
         // a content file, which "every downstream caller assumes holds": the game
         // does not start, and the screen says which file, which entry, which rule.
-        var tuned = ShippedData.Load(Shipped with { Tuning = """{ "StartingPool": 0 }""" });
+        var tuned = FixtureContent.Load(Shipped with { Tuning = """{ "StartingPool": 0 }""" });
         Assert.Null(tuned.Error);
         Assert.Equal(1, tuned.Content!.Tuning.StartingPool);
         Assert.Equal(["tuning.json: StartingPool 0 is below 1 - using 1"], tuned.Notices);
@@ -428,7 +428,7 @@ public class ContentFilesTests
         // file, the number written and the whole range.
         var unstacked = Fails(Shipped with { Weapons = DataTexts.InRow(Shipped.Weapons!, "flensing_knife", "\"Light\": 1", "\"Light\": 0") });
         Assert.Equal((ContentFiles.WeaponsFileName, false, "flensing_knife", ContentValidator.RuleNumberInRange), Stamp(unstacked));
-        int knife = ShippedContent.Weapons.Weapons.Select(w => w.Id).ToList().IndexOf("flensing_knife");
+        int knife = FixtureContent.Weapons.Weapons.Select(w => w.Id).ToList().IndexOf("flensing_knife");
         Assert.Equal($"weapons.json: variants[{knife}].adds.Light: 0 is outside 1 to {ContentBounds.DeepestForge} - {ContentBounds.Adds.Why}", unstacked.Detail);
     }
 
@@ -442,11 +442,11 @@ public class ContentFilesTests
         // changed. It is not called missing: the file is there.
         foreach (string blank in new[] { "", " \r\n\t\n" })
         {
-            var load = ShippedData.Load(Shipped with { Tuning = blank });
+            var load = FixtureContent.Load(Shipped with { Tuning = blank });
             Assert.Null(load.Error);
             Assert.Equal(["tuning.json: the file is empty - the built-in numbers are playing"], load.Notices);
             Assert.Empty(load.TuningOverrides);
-            TuningValues.Same(ShippedContent.Tuning, load.Content!.Tuning);
+            TuningValues.Same(FixtureContent.Tuning, load.Content!.Tuning);
         }
     }
 
@@ -482,7 +482,7 @@ public class ContentFilesTests
         Assert.Contains($"({new string('t', JsonShape.MaxQuoted)}... is an invalid JSON literal. Expected the literal true)", longWord.Detail);
 
         // A number mistyped says it on one short line already, and still does.
-        var tuned = ShippedData.Load(Shipped with { Tuning = """{ "MovementBudget": 16o }""" });
+        var tuned = FixtureContent.Load(Shipped with { Tuning = """{ "MovementBudget": 16o }""" });
         Assert.Equal(["tuning.json: line 1, column 23 is not valid JSON (o is an invalid end of a number. Expected a delimiter) - the built-in numbers are playing"], tuned.Notices);
     }
 
@@ -546,12 +546,12 @@ public class ContentFilesTests
         // the game would read to, or the built-in copies'.
         ContentSource<T> Read<T>(string file, T data) where T : class => new(file, data, null, BuiltIn: false);
         ContentSource<T> BuiltIn<T>(string file, T data) where T : class => new(file, data, null, BuiltIn: true);
-        var tuning = ShippedContent.Tuning;
-        var enchantments = ShippedContent.Enchantments;
-        var restricted = BuiltIn(RestrictedJson.FileName, ShippedContent.Restricted);
-        var weapons = BuiltIn(ContentFiles.WeaponsFileName, ShippedContent.Weapons);
-        var dungeons = BuiltIn(ContentFiles.DungeonsFileName, ShippedContent.Dungeons);
-        var party = ShippedContent.Party;
+        var tuning = FixtureContent.Tuning;
+        var enchantments = FixtureContent.Enchantments;
+        var restricted = BuiltIn(RestrictedJson.FileName, FixtureContent.Restricted);
+        var weapons = BuiltIn(ContentFiles.WeaponsFileName, FixtureContent.Weapons);
+        var dungeons = BuiltIn(ContentFiles.DungeonsFileName, FixtureContent.Dungeons);
+        var party = FixtureContent.Party;
 
         // The built-in relations, broken by a code edit under them: a catalogue
         // that loses burning — handed to the staged load the way a test simulates
@@ -559,7 +559,7 @@ public class ContentFilesTests
         // restricted.json's requires and neverRolled naming a soul that is gone.
         // The load stops at restricted.json's stage, stamped with that file and
         // marked built-in.
-        var noBurning = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Where(e => e.Id != "burning").ToList());
+        var noBurning = new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Where(e => e.Id != "burning").ToList());
         var burningGone = Assert.Throws<ContentException>(() => GameContent.Load(tuning, noBurning, restricted, weapons, dungeons, party));
         Assert.Equal((RestrictedJson.FileName, true, "burning", ContentValidator.RuleUnknownId), Stamp(burningGone));
 
@@ -569,9 +569,9 @@ public class ContentFilesTests
 
         // A three-member party is stamped weapons.json, with that file's built-in
         // flag: read from a file beside the game, or the built-in copy.
-        var threeMembers = new PartyData(ShippedContent.Party.Members.Take(3).ToList());
+        var threeMembers = new PartyData(FixtureContent.Party.Members.Take(3).ToList());
         var threeBesideAFile = Assert.Throws<ContentException>(() => GameContent.Load(tuning, enchantments, restricted,
-            Read(ContentFiles.WeaponsFileName, ShippedContent.Weapons), dungeons, threeMembers));
+            Read(ContentFiles.WeaponsFileName, FixtureContent.Weapons), dungeons, threeMembers));
         Assert.Equal((ContentFiles.WeaponsFileName, false, "party", ContentValidator.RulePartySize), Stamp(threeBesideAFile));
         var threeBesideTheBuiltIn = Assert.Throws<ContentException>(() => GameContent.Load(tuning, enchantments, restricted, weapons, dungeons, threeMembers));
         Assert.Equal((ContentFiles.WeaponsFileName, true, "party", ContentValidator.RulePartySize), Stamp(threeBesideTheBuiltIn));
@@ -588,15 +588,15 @@ public class ContentFilesTests
         // The records load, the suite's door to content built from parts, hands its
         // records to the staged load as given — no built-in copy: the same failure,
         // in the same order, stamped with the stage's file and not marked built-in.
-        var recordsLoad = Assert.Throws<ContentException>(() => GameContent.Load(tuning, ShippedContent.Restricted, ShippedContent.Enchantments,
-            ShippedContent.Weapons, new PartyData([]), ShippedContent.Dungeons));
+        var recordsLoad = Assert.Throws<ContentException>(() => GameContent.Load(tuning, FixtureContent.Restricted, FixtureContent.Enchantments,
+            FixtureContent.Weapons, new PartyData([]), FixtureContent.Dungeons));
         Assert.Equal((ContentFiles.WeaponsFileName, false, "party", ContentValidator.RulePartySize), Stamp(recordsLoad));
         Assert.StartsWith("weapons.json: Invalid content entry 'party': ", recordsLoad.Message, StringComparison.Ordinal);
 
         // A validator asked on its own belongs to no stage and names no file; so
         // does the catalogue checked on its own, first, by the staged load: it is
         // the game's code, which no data file edits.
-        var brokenRow = new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == "vampiric" ? e with { Trigger = 0 } : e).ToList());
+        var brokenRow = new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Select(e => e.Id == "vampiric" ? e with { Trigger = 0 } : e).ToList());
         var alone = Assert.Throws<ContentException>(() => ContentValidator.ValidateEnchantments(brokenRow));
         Assert.Equal((null, false, "vampiric", ContentValidator.RuleZeroTrigger), Stamp(alone));
         var staged = Assert.Throws<ContentException>(() => GameContent.Load(tuning, brokenRow, restricted, weapons, dungeons, party));
@@ -611,11 +611,11 @@ public class ContentFilesTests
         // crit riders are a group by the shipped file, so a dagger cannot hold
         // CritSunder beside CritWeaken; take the group out of restricted.json and
         // the next start plays without it — settled.md's "revisit by ungrouping".
-        var shipped = ShippedData.Load(Shipped).Content!;
+        var shipped = FixtureContent.Load(Shipped).Content!;
         var crit = ModifierSet.Of((CritWeaken, 1));
         Assert.False(shipped.Modifiers.Allowed(CritSunder, WeaponKind.Melee, crit));
 
-        var ungrouped = ShippedData.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, "    [\"CritWeaken\", \"CritSunder\"],\n", "") });
+        var ungrouped = FixtureContent.Load(Shipped with { Restricted = DataTexts.Edit(Shipped.Restricted!, "    [\"CritWeaken\", \"CritSunder\"],\n", "") });
         Assert.Empty(ungrouped.Notices);
         Assert.True(ungrouped.Content!.Modifiers.Allowed(CritSunder, WeaponKind.Melee, crit));
         Assert.True(ungrouped.Content.Modifiers.Allowed(CritWeaken, WeaponKind.Melee, ModifierSet.Of((CritSunder, 1))));
@@ -624,7 +624,7 @@ public class ContentFilesTests
         // which no weapon carries together, grouped in one line.
         var pin = ModifierSet.Of((Pin, 1));
         Assert.True(shipped.Modifiers.Allowed(Softening, WeaponKind.Ranged, pin));
-        var grouped = ShippedData.Load(Shipped with
+        var grouped = FixtureContent.Load(Shipped with
         {
             Restricted = DataTexts.Edit(Shipped.Restricted!, "[\"Light\", \"Resonant\"],", "[\"Light\", \"Resonant\"],\n    [\"Pin\", \"Softening\"],"),
         });
@@ -641,14 +641,14 @@ public class ContentFilesTests
         // warns and is dropped, so the tuning the game hashes holds only numbers
         // something reads...
         const string dial = """{ "ApplyPercent": { "frost_rune": 30 } }""";
-        var stray = ShippedData.Load(Shipped with { Tuning = dial });
+        var stray = FixtureContent.Load(Shipped with { Tuning = dial });
         Assert.Equal(["tuning.json: ApplyPercent.frost_rune names no enchantment - ignored"], stray.Notices);
         Assert.False(stray.Content!.Tuning.ApplyPercent.ContainsKey("frost_rune"));
 
         // ...while a dial on an id the catalogue has, and no shipped dial names, is
         // read, and plays: regeneration's percentage turned to 50, an override
         // the log lists, and nothing to say.
-        var turned = ShippedData.Load(Shipped with { Tuning = """{ "ApplyPercent": { "regeneration": 50 } }""" });
+        var turned = FixtureContent.Load(Shipped with { Tuning = """{ "ApplyPercent": { "regeneration": 50 } }""" });
         Assert.Empty(turned.Notices);
         Assert.Equal(50, turned.Content!.Tuning.ApplyPercent["regeneration"]);
         Assert.Equal(50, turned.Content.Enchantments["regeneration"].ApplyPercent);
@@ -662,16 +662,16 @@ public class ContentFilesTests
         // tuning.json's ApplyPercent.flaming and Arcane's potency its
         // ArcanePotency: the catalogue lays each dial over its row, so turning one
         // in tuning.json is the whole edit — it plays, and there is nothing to say.
-        var turned = ShippedData.Load(Shipped with { Tuning = """{ "ApplyPercent": { "flaming": 30 } }""" });
+        var turned = FixtureContent.Load(Shipped with { Tuning = """{ "ApplyPercent": { "flaming": 30 } }""" });
         Assert.Equal(30, turned.Content!.Enchantments["flaming"].ApplyPercent);
         Assert.Empty(turned.Notices);
 
-        var arcane = ShippedData.Load(Shipped with { Tuning = """{ "ArcanePotency": 9 }""" });
+        var arcane = FixtureContent.Load(Shipped with { Tuning = """{ "ArcanePotency": 9 }""" });
         Assert.Equal(9, arcane.Content!.Enchantments["arcane"].Potency);
         Assert.Empty(arcane.Notices);
 
         // And the shipped files say nothing at all.
-        Assert.Empty(ShippedData.Load(Shipped).Notices);
+        Assert.Empty(FixtureContent.Load(Shipped).Notices);
     }
 
     [Fact]
@@ -684,9 +684,9 @@ public class ContentFilesTests
         // them, loads beside the game with nothing to say.
         Assert.Equal([TuningJson.FileName, RestrictedJson.FileName, WeaponsJson.FileName, DungeonsJson.FileName],
             ContentFiles.FileNames);
-        var texts = ShippedData.Texts;
+        var texts = FixtureContent.Texts;
         Assert.All(new[] { texts.Tuning, texts.Restricted, texts.Weapons, texts.Dungeons }, text => Assert.NotNull(text));
-        var load = ShippedData.Load(texts);
+        var load = FixtureContent.Load(texts);
         Assert.Null(load.Error);
         Assert.Empty(load.Notices);
         Assert.Empty(load.TuningOverrides);
@@ -695,25 +695,25 @@ public class ContentFilesTests
         // order: every weapon and every dungeon the game plays is its file's row,
         // field for field.
         var content = load.Content!;
-        Assert.Equal(ShippedContent.Weapons.Weapons.Select(w => w.Id), content.Weapons.All.Select(w => w.Id));
-        foreach (var (file, played) in ShippedContent.Weapons.Weapons.Zip(content.Weapons.All))
+        Assert.Equal(FixtureContent.Weapons.Weapons.Select(w => w.Id), content.Weapons.All.Select(w => w.Id));
+        foreach (var (file, played) in FixtureContent.Weapons.Weapons.Zip(content.Weapons.All))
             WeaponsJsonTests.Same(file, played);
-        Assert.Equal(ShippedContent.Dungeons.Dungeons.Select(d => d.Id), content.Dungeons.All.Select(d => d.Id));
-        foreach (var (file, played) in ShippedContent.Dungeons.Dungeons.Zip(content.Dungeons.All))
+        Assert.Equal(FixtureContent.Dungeons.Dungeons.Select(d => d.Id), content.Dungeons.All.Select(d => d.Id));
+        foreach (var (file, played) in FixtureContent.Dungeons.Dungeons.Zip(content.Dungeons.All))
             DungeonsJsonTests.Same(file, played);
 
         // Content is an edit to a file beside the game: a statline and a dungeon's
         // name are each changed in their own file, and the content that loads is
         // the edited one — 1i's playtest: the Rondel's damage 25, a
         // number of its own over its class's (REWORK DECISION 1).
-        var edited = ShippedData.Load(Shipped with
+        var edited = FixtureContent.Load(Shipped with
         {
             Weapons = DataTexts.InRow(Shipped.Weapons!, "weakspot_stiletto", "\"adds\": { \"CritSunder\": 1 },", "\"adds\": { \"CritSunder\": 1 }, \"damage\": 25,"),
             Dungeons = DataTexts.Edit(Shipped.Dungeons!, "\"name\": \"The Spear Hall\"", "\"name\": \"The Pike Hall\""),
         });
         Assert.Empty(edited.Notices);
         Assert.Equal(25, edited.Content!.Weapons["weakspot_stiletto"].Damage);
-        Assert.Equal(ShippedContent.Weapons.Weapons.Single(w => w.Id == "assassins_fang").Damage, edited.Content.Weapons["assassins_fang"].Damage);   // its class's, as the master has it
+        Assert.Equal(FixtureContent.Weapons.Weapons.Single(w => w.Id == "assassins_fang").Damage, edited.Content.Weapons["assassins_fang"].Damage);   // its class's, as the master has it
         Assert.Equal("The Pike Hall", edited.Content.Dungeons["spear_hall"].Name);
 
         // PHASE5-090: "which weapons and dungeons use it?" — "it" a modifier or an
@@ -729,7 +729,7 @@ public class ContentFilesTests
         // dungeon attuned: the Spear Hall to Cold, the cold enchantment's element.
         static string InRows(string text, params (string Id, string From, string To)[] edits)
             => edits.Aggregate(text, (done, edit) => DataTexts.InRow(done, edit.Id, edit.From, edit.To));
-        var moved = ShippedData.Load(Shipped with
+        var moved = FixtureContent.Load(Shipped with
         {
             Weapons = InRows(Shipped.Weapons!,
                 ("halberd", "\"Push\": 1", "\"Pin\": 1"),
@@ -769,14 +769,14 @@ public class ContentFilesTests
         // A file that is missing plays its built-in copy, and says so, for the
         // weapons and the dungeons as for the relations: exactly the built-in
         // weapons, row for row.
-        var missing = ShippedData.Load(Shipped with { Weapons = null, Dungeons = null });
+        var missing = FixtureContent.Load(Shipped with { Weapons = null, Dungeons = null });
         Assert.Equal(
         [
             "weapons.json is missing - the built-in weapons are playing",
             "dungeons.json is missing - the built-in dungeons are playing",
         ], missing.Notices);
-        Assert.Equal(ShippedContent.Weapons.Weapons.Select(w => w.Id), missing.Content!.Weapons.All.Select(w => w.Id));
-        foreach (var (file, played) in ShippedContent.Weapons.Weapons.Zip(missing.Content.Weapons.All))
+        Assert.Equal(FixtureContent.Weapons.Weapons.Select(w => w.Id), missing.Content!.Weapons.All.Select(w => w.Id));
+        foreach (var (file, played) in FixtureContent.Weapons.Weapons.Zip(missing.Content.Weapons.All))
             WeaponsJsonTests.Same(file, played);
     }
 }

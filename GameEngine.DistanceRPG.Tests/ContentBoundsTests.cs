@@ -39,7 +39,7 @@ public class ContentBoundsTests
     /// <summary>Why the game does not start on <paramref name="texts"/>: the load's error, never an exception out of it.</summary>
     private static ContentException Fails(ContentTexts texts)
     {
-        var load = ShippedData.Load(texts);
+        var load = FixtureContent.Load(texts);
         Assert.Null(load.Content);
         return load.Error ?? throw new Xunit.Sdk.XunitException("the load has neither content nor an error");
     }
@@ -62,7 +62,7 @@ public class ContentBoundsTests
     };
 
     /// <summary>The place of <paramref name="id"/> among the file's rows: a variant's index in <c>variants</c>, which the reader's paths name.</summary>
-    private static int IndexOf(string id) => ShippedContent.Weapons.Weapons.Select(w => w.Id).ToList().IndexOf(id);
+    private static int IndexOf(string id) => FixtureContent.Weapons.Weapons.Select(w => w.Id).ToList().IndexOf(id);
 
     [Fact]
     public void EveryNumberOfAContentRecordHasABound()
@@ -207,7 +207,7 @@ public class ContentBoundsTests
         // reads it. No bound refuses a shipped or a doc-fixed value, and every row
         // is asked of something the game ships.
         var asked = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (source, weapons, dungeons) in new[] { ("the masters", ShippedContent.Weapons, ShippedContent.Dungeons), ("the docs", Premise.Weapons, Premise.Dungeons) })
+        foreach (var (source, weapons, dungeons) in new[] { ("the masters", FixtureContent.Weapons, FixtureContent.Dungeons), ("the docs", Premise.Weapons, Premise.Dungeons) })
             foreach (var (row, where, value) in Numbers(weapons, dungeons))
             {
                 Assert.True(value >= row.Min && value <= row.Max, $"{source}: {where} is {value}, outside {row.Min} to {row.Max} ({row.Field})");
@@ -234,7 +234,7 @@ public class ContentBoundsTests
     /// <summary>The tutorial pinned to <paramref name="min"/>..<paramref name="max"/>, its master's pin read off the master.</summary>
     private static string TutorialPinned(int min, int max)
     {
-        var tutorial = ShippedContent.Dungeons.Dungeons.Single(d => d.Id == "tutorial");
+        var tutorial = FixtureContent.Dungeons.Dungeons.Single(d => d.Id == "tutorial");
         string text = DataTexts.InRow(Shipped.Dungeons!, "tutorial", $"\"bossFloorMin\": {tutorial.BossFloorMin},", $"\"bossFloorMin\": {min},");
         return DataTexts.InRow(text, "tutorial", $"\"bossFloorMax\": {tutorial.BossFloorMax},", $"\"bossFloorMax\": {max},");
     }
@@ -253,7 +253,7 @@ public class ContentBoundsTests
     /// <summary>A case for each numbered row: every number is read off the master, never written here.</summary>
     private static IEnumerable<Case> Cases()
     {
-        var weapons = ShippedContent.Weapons;
+        var weapons = FixtureContent.Weapons;
         string text = Shipped.Weapons!;
         ContentTexts WithWeapons(string edited) => Shipped with { Weapons = edited };
         ContentTexts WithDungeons(string edited) => Shipped with { Dungeons = edited };
@@ -310,7 +310,7 @@ public class ContentBoundsTests
 
         // Rows 11-13: the golem's statline and its innate Block, each floor the rule's that kept it.
         string dungeons = Shipped.Dungeons!;
-        var golem = ShippedContent.Dungeons.Dungeons.Single(d => d.Id == "tutorial").Boss;
+        var golem = FixtureContent.Dungeons.Dungeons.Single(d => d.Id == "tutorial").Boss;
         yield return new(ContentBounds.BossMaxHp, "tutorial", "boss.maxHp",
             v => WithDungeons(DataTexts.InRow(dungeons, "tutorial", $"\"maxHp\": {golem.MaxHp},", $"\"maxHp\": {v},")));
         yield return new(ContentBounds.BossMovementBudget, "tutorial", "boss.movementBudget",
@@ -339,7 +339,7 @@ public class ContentBoundsTests
         {
             foreach (int v in new[] { c.Row.Min, c.Row.Max })
             {
-                var load = ShippedData.Load(c.At(v));
+                var load = FixtureContent.Load(c.At(v));
                 Assert.True(load.Error is null, $"{c.Entry} {c.Field} {v}: {load.Error?.Message}");
             }
             foreach (var (v, rule) in new[] { (c.Row.Min - 1, c.Row.KeptBy ?? ContentValidator.RuleNumberInRange), (c.Row.Max + 1, ContentValidator.RuleNumberInRange) })
@@ -352,7 +352,7 @@ public class ContentBoundsTests
 
         // A soul written at the top of the row plays at its pin, as a soul written
         // anywhere does.
-        var soul = ShippedData.Load(Shipped with
+        var soul = FixtureContent.Load(Shipped with
         {
             Weapons = DataTexts.InRow(Shipped.Weapons!, "flensing_knife_unique", "{ \"id\": \"serrated\" }", $"{{ \"id\": \"serrated\", \"tier\": {ContentBounds.Tier.Max} }}"),
         });
@@ -364,8 +364,8 @@ public class ContentBoundsTests
         // whole range — below the first floor the boss floor range's rule, past the
         // deepest the range rule — and never as a range inverted against the
         // tuning's other end.
-        var tuning = ShippedContent.Tuning;
-        Assert.Null(ShippedData.Load(Shipped with { Dungeons = SpearHallPinned(null, ContentBounds.BossFloorMax.Max) }).Error);
+        var tuning = FixtureContent.Tuning;
+        Assert.Null(FixtureContent.Load(Shipped with { Dungeons = SpearHallPinned(null, ContentBounds.BossFloorMax.Max) }).Error);
         foreach (var (row, pinned, v, rule) in new[]
         {
             (ContentBounds.BossFloorMax, SpearHallPinned(null, ContentBounds.BossFloorMax.Max + 1), ContentBounds.BossFloorMax.Max + 1, ContentValidator.RuleNumberInRange),
@@ -415,7 +415,7 @@ public class ContentBoundsTests
         // So the tutorial pinned there under that tuning plays, the fit raising the
         // offset to it and saying so, naming the tutorial and its floor...
         string shallowFarm = $$"""{ "{{nameof(Tuning.AcquiredHeadroom)}}": {{headroomKey.Min}} }""";
-        var deepest = ShippedData.Load(Shipped with { Tuning = shallowFarm, Dungeons = TutorialPinned(ContentBounds.DeepestBossFloor, ContentBounds.DeepestBossFloor) });
+        var deepest = FixtureContent.Load(Shipped with { Tuning = shallowFarm, Dungeons = TutorialPinned(ContentBounds.DeepestBossFloor, ContentBounds.DeepestBossFloor) });
         Assert.Null(deepest.Error);
         Assert.Equal(needed, deepest.Content!.Tuning.BossStackOffset);
         Assert.Contains(deepest.Notices, notice => notice.StartsWith($"tuning.json: {nameof(Tuning.BossStackOffset)} ", StringComparison.Ordinal)
@@ -424,11 +424,11 @@ public class ContentBoundsTests
 
         // ...and one floor deeper stops the game on the range rule, and the fit says
         // nothing of the tutorial: it raised no offset for a file it could not serve.
-        var past = ShippedData.Load(Shipped with { Tuning = shallowFarm, Dungeons = TutorialPinned(ContentBounds.DeepestBossFloor + 1, ContentBounds.DeepestBossFloor + 1) });
+        var past = FixtureContent.Load(Shipped with { Tuning = shallowFarm, Dungeons = TutorialPinned(ContentBounds.DeepestBossFloor + 1, ContentBounds.DeepestBossFloor + 1) });
         Assert.Equal((DungeonsJson.FileName, false, "tutorial", ContentValidator.RuleNumberInRange), Stamp(past.Error!));
         Assert.Equal(Outside(ContentBounds.BossFloorMin, "bossFloorMin", ContentBounds.DeepestBossFloor + 1), past.Error!.Detail);
         Assert.DoesNotContain(past.Notices, notice => notice.Contains("tutorial", StringComparison.Ordinal));
-        var pastShipped = ShippedData.Load(Shipped with { Dungeons = TutorialPinned(ContentBounds.DeepestBossFloor + 1, ContentBounds.DeepestBossFloor + 1) });
+        var pastShipped = FixtureContent.Load(Shipped with { Dungeons = TutorialPinned(ContentBounds.DeepestBossFloor + 1, ContentBounds.DeepestBossFloor + 1) });
         Assert.NotNull(pastShipped.Error);
         Assert.DoesNotContain(pastShipped.Notices, notice => notice.Contains(nameof(Tuning.BossStackOffset), StringComparison.Ordinal));
     }
@@ -442,7 +442,7 @@ public class ContentBoundsTests
         // number would wrap below zero. So the refusal names the number the file
         // wrote, at its path — never a composed or a wrapped count.
         string text = Shipped.Weapons!;
-        var weapons = ShippedContent.Weapons;
+        var weapons = FixtureContent.Weapons;
         var blade = weapons.Weapons[IndexOf("riposte_blade")];
         int riposte = blade.Forged[Riposte] - weapons.ClassOf(blade.Class)!.Baseline.GetValueOrDefault(Riposte);
         var fang = weapons.Weapons[IndexOf("assassins_fang")];
@@ -483,7 +483,7 @@ public class ContentBoundsTests
         // radius, an enchantment arriving at tier 4 — a staff's innate, and a soul —
         // and a boss with more hit points than any bar opens on. Each is refused at
         // its stage, naming the entry, the field and the whole range.
-        var weapons = ShippedContent.Weapons;
+        var weapons = FixtureContent.Weapons;
         WeaponsData Editing(string id, Func<WeaponDef, WeaponDef> edit)
             => weapons with { Weapons = weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() };
         int tooDeep = ContentBounds.Tier.Max + 1;
@@ -500,7 +500,7 @@ public class ContentBoundsTests
                 WeaponsJson.FileName, "staff_of_renewal", Outside(ContentBounds.Tier, "enchantments[0].tier", tooDeep)),
             (() => TestContent.Load(weapons: Editing("flensing_knife_unique", w => w with { Enchantments = [new EnchantmentRef("serrated", tooDeep), .. w.Enchantments.Skip(1)] })),
                 WeaponsJson.FileName, "flensing_knife_unique", Outside(ContentBounds.Tier, "enchantments[0].tier", tooDeep)),
-            (() => TestContent.Load(dungeons: new DungeonsData(ShippedContent.Dungeons.Dungeons
+            (() => TestContent.Load(dungeons: new DungeonsData(FixtureContent.Dungeons.Dungeons
                     .Select(d => d.Id == "tutorial" ? d with { Boss = d.Boss with { MaxHp = ContentBounds.Bar + 1 } } : d).ToList())),
                 DungeonsJson.FileName, "tutorial", Outside(ContentBounds.BossMaxHp, "boss.maxHp", ContentBounds.Bar + 1)),
         ];
@@ -524,10 +524,10 @@ public class ContentBoundsTests
         // spread's number, named as the file writes it (raises.CritWindow). Past the deepest forge there is, no tuning can be fitted
         // to it.
         string text = Shipped.Weapons!;
-        var tuning = ShippedContent.Tuning;
+        var tuning = FixtureContent.Tuning;
         int pastAnyForge = ContentBounds.DeepestForge + 1;
 
-        var dagger = ShippedContent.Weapons.ClassOf(Dagger)!;
+        var dagger = FixtureContent.Weapons.ClassOf(Dagger)!;
         ContentException Baseline(int v)
             => Fails(Shipped with { Weapons = DataTexts.InClass(text, Dagger, $"\"CritMultiplier\": {dagger.Baseline[CritMultiplier]}", $"\"CritMultiplier\": {v}") });
         int multiplier = tuning.MaxForged[CritMultiplier];
@@ -538,7 +538,7 @@ public class ContentBoundsTests
         Assert.Equal((WeaponsJson.FileName, false, nameof(Dagger), ContentValidator.RuleMaxForged), Stamp(deep));
         Assert.Equal($"baseline.CritMultiplier {pastAnyForge} is outside 1 to {multiplier} - {ContentBounds.Baseline.Why}", deep.Detail);
 
-        var widowmaker = ShippedContent.Weapons.Weapons.Single(w => w.Id == "widowmaker");
+        var widowmaker = FixtureContent.Weapons.Weapons.Single(w => w.Id == "widowmaker");
         ContentException Raises(int v)
             => Fails(Shipped with { Weapons = DataTexts.InRow(text, "widowmaker", $"\"CritWindow\": {widowmaker.Forged[CritWindow]}", $"\"CritWindow\": {v}") });
         int window = tuning.MaxForged[CritWindow];

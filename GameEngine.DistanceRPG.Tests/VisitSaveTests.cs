@@ -419,7 +419,7 @@ public sealed class VisitSaveTests : IDisposable
         Assert.Equal(("tower_guard", WeaponClass.Sword), (boss.Weapon.Id, boss.Weapon.Class));
         string text = Save(script.Campaign);
 
-        var blockOrBrace = ShippedContent.Restricted with { Excludes = [.. ShippedContent.Restricted.Excludes, ["Brace", "Block"]] };
+        var blockOrBrace = FixtureContent.Restricted with { Excludes = [.. FixtureContent.Restricted.Excludes, ["Brace", "Block"]] };
         using (TestContent.UsePremise(restricted: blockOrBrace))
         {
             var hall = GameContent.Current.Dungeons["spear_hall"];

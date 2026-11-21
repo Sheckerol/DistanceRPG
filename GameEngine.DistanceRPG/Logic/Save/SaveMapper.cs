@@ -330,7 +330,8 @@ internal static class SaveMapper
         result.Clawbacks.Select(c => new ClawbackDto(c.MemberId, c.Pool, c.Before, c.After)).ToArray(),
         result.Services is { Count: > 0 } services   // null for an empty shop, as the queue is
             ? services.Select(r => new ServiceDto(r.WeaponId, Name(r.Service), r.RunsWorked, r.Runs, r.Stalled, r.EnchantmentId,
-                r.Improved is { } improved ? Name(improved.Kind) : null, r.Improved is { } on ? Name(on.Modifier) : null, r.Tier, r.SourceId)).ToArray()   // the roll as drawn is the log's
+                r.Improved is { } improved ? Name(improved.Kind) : null, r.Improved is { } on ? Name(on.Modifier) : null, r.Tier, r.SourceId,
+                r.Raised is { Count: > 0 } raised ? raised.Select(entry => new RaisedDto(entry.Id, entry.Tier)).ToArray() : null)).ToArray()   // the roll as drawn is the log's
             : null,
         result.FarmYield,
         result.FarmClears,
@@ -447,7 +448,8 @@ internal static class SaveMapper
     /// nothing yet included (<see cref="CarriedEnchantmentId"/>) — its source, a
     /// weapon the content has, and the tier its soul landed at, one to the deepest a
     /// tier stays whole at (<see cref="LandedTier"/>). Which of those a report may
-    /// be, and that the two come together, are check 27's.
+    /// be, and that the two come together, are check 27's. And the enchantments a
+    /// finished one's maintenance raised a tier (<see cref="Raised"/>).
     /// </summary>
     private static ServiceReport[] Services(IReadOnlyList<ServiceDto> dtos, GameContent content, string at)
     {
@@ -472,9 +474,40 @@ internal static class SaveMapper
             int? tier = row.Tier is { } landed ? LandedTier(landed, $"{where}.tier") : null;
             if (row.SourceId is { } sourceId && !content.Weapons.TryGet(sourceId, out _))
                 throw new SaveFormatException($"{where}.sourceId", $"'{sourceId}' is no weapon in the content");
-            reports[i] = new ServiceReport(row.WeaponId, service, runsWorked, runs, row.Stalled, enchantment, improved, tier, row.SourceId);
+            var raised = row.Raised is { Count: > 0 } rose ? Raised(rose, content, $"{where}.raised") : null;
+            reports[i] = new ServiceReport(row.WeaponId, service, runsWorked, runs, row.Stalled, enchantment, improved, tier, row.SourceId, Raised: raised);
         }
         return reports;
+    }
+
+    /// <summary>
+    /// The enchantments a run's report says a finished service's maintenance raised a
+    /// tier (after play, 2026-11-19), each read on its own: one the content has, of
+    /// any kind a weapon carries (<see cref="CarriedEnchantmentId"/>) but never a
+    /// unique, pinned at tier 1 and so never raised; the tier it rose to, 2 at least
+    /// — a tier above the first — and no deeper than a tier stays whole at
+    /// (<see cref="ContentBounds.DeepestTier"/>), as a weapon row's entry is held; and
+    /// no more of them than a weapon holds (<see cref="ContentBounds.MostEnchantments"/>).
+    /// The same id twice is two entries of it, which a weapon may carry. That only a
+    /// finished service raises any is check 27's.
+    /// </summary>
+    private static Enchantment[] Raised(IReadOnlyList<RaisedDto> dtos, GameContent content, string at)
+    {
+        var rows = Rows(dtos, at, "raised enchantment");
+        if (rows.Count > ContentBounds.MostEnchantments)
+            throw new SaveFormatException(at, $"{rows.Count} enchantments raised on one weapon, above {ContentBounds.MostEnchantments}: a service raises no more than a weapon holds (EnchantmentSlots at its most)");
+        var raised = new Enchantment[rows.Count];
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string where = $"{at}[{i}]";
+            var def = ContentEnchantment(CarriedEnchantmentId(rows[i].Id, content, $"{where}.id"), content, $"{where}.id");
+            if (def.Unique)
+                throw new SaveFormatException($"{where}.id", $"{rows[i].Id} is a unique enchantment, pinned at tier 1: no service raises it");
+            if (rows[i].Tier < 2)
+                throw new SaveFormatException($"{where}.tier", $"{rows[i].Tier} is no tier an enchantment rises to: a service raises one a tier, so to tier 2 or deeper");
+            raised[i] = new Enchantment(def, AtMost(rows[i].Tier, ContentBounds.DeepestTier, $"{where}.tier", DeepestTierWhy));
+        }
+        return raised;
     }
 
     /// <summary>

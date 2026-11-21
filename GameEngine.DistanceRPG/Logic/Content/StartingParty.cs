@@ -16,8 +16,16 @@ namespace GameEngine.DistanceRPG.Logic;
 /// member, the rule and the weapon.
 /// </para>
 /// <para>
-/// The §2.1 table's spreads and starting weapons, with the slot-1 staff the
-/// party has always carried and C's second, debuff staff in the bag. Every
+/// The §2.1 table's spreads and starting weapons, and a second weapon in each
+/// bag (the user's swap of 2026-11-19, after play — until then a Staff of Renewal
+/// in every bag, and a Staff of Mire in C's): A Darts, B a Hasta, D a Shortbow,
+/// each on its member's 3 or 4 — STR, STR and DEX — and C a Wand of the Blast, the
+/// one wand aimed at a spot, the nearest the four shapes come to a single target.
+/// A wand's element is its drop's to roll, and a starting weapon is no drop, so
+/// the roster names C's: Flaming, the user's choice of 2026-11-20, for now (Arcane
+/// was the other thought, to sidestep the type chart until the next dungeon, but a
+/// wand casts a typed element and Arcane is untyped). C's Staff
+/// of Renewal, in hand, is now the party's only heal. Every
 /// spread is a permutation of 1–4, so no member is better endowed than another;
 /// the pairs mirror each other, which is what makes each stat somebody's 4
 /// exactly once and leaves C the party's only CON 1 — the caster as the single
@@ -38,10 +46,10 @@ public static class StartingParty
     public static PartyData Data { get; } = new(
     [
         //             id   name       STR DEX CON INT   equipped                bag
-        Member("A", "Shield", 3, 1, 4, 2, "tower_guard", "staff_of_renewal"),
-        Member("B", "Axe", 4, 2, 3, 1, "great_axe", "staff_of_renewal"),
-        Member("C", "Caster", 2, 3, 1, 4, "staff_of_renewal", "staff_of_mire"),
-        Member("D", "Dagger", 1, 4, 2, 3, "weakspot_stiletto", "staff_of_renewal"),
+        Member("A", "Shield", 3, 1, 4, 2, "tower_guard", "darts"),
+        Member("B", "Axe", 4, 2, 3, 1, "great_axe", "skirmishers_pike"),
+        Member("C", "Caster", 2, 3, 1, 4, "staff_of_renewal", "wand_of_the_blast") with { WandElement = DamageType.Flaming },
+        Member("D", "Dagger", 1, 4, 2, 3, "weakspot_stiletto", "hunting_bow"),
     ]);
 
     private static PartyMemberDef Member(string id, string name, int str, int dex, int con, int @int,

@@ -56,9 +56,9 @@ public sealed class EnchanterTests : IDisposable
     private static Offer OfferOf(CampaignState campaign, Weapon weapon, string id) => Enchanter.Offers(campaign, weapon).Single(offer => offer.Id == id);
 
     /// <summary>The relations as shipped, with the burn let out of <c>neverRolled</c>, so the enchanter offers it and its <c>requires</c> row is asked.</summary>
-    private static RestrictedData BurningOffered() => ShippedContent.Restricted with
+    private static RestrictedData BurningOffered() => FixtureContent.Restricted with
     {
-        NeverRolled = ShippedContent.Restricted.NeverRolled.Where(id => id != "burning").ToArray(),
+        NeverRolled = FixtureContent.Restricted.NeverRolled.Where(id => id != "burning").ToArray(),
     };
 
     // ── The ruling's numbers ─────────────────────────────────────────────────
@@ -361,9 +361,9 @@ public sealed class EnchanterTests : IDisposable
 
         // A soul restricted.json lets out of neverRolled is offered once met; one it
         // takes in is not. The file's alone, as a drop's pool is.
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            NeverRolled = [.. ShippedContent.Restricted.NeverRolled.Where(id => id != "serrated"), "vampiric"],
+            NeverRolled = [.. FixtureContent.Restricted.NeverRolled.Where(id => id != "serrated"), "vampiric"],
         }))
         {
             var edited = Enchanter.Offers(campaign, guard).Select(offer => offer.Id).ToList();
@@ -375,9 +375,9 @@ public sealed class EnchanterTests : IDisposable
         // every class — a staff's too — it is offered with no note: Aegis, and the two
         // souls whose steps sit beside it (EnchantmentBehaviours.DefendsTheWielder),
         // once restricted.json lets them out and the campaign meets them.
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            NeverRolled = ShippedContent.Restricted.NeverRolled.Where(id => id is not ("sturdy" or "immovable")).ToArray(),
+            NeverRolled = FixtureContent.Restricted.NeverRolled.Where(id => id is not ("sturdy" or "immovable")).ToArray(),
         }))
         {
             campaign.See(TestWeapons.Enchanted("Stand", 40, 10, 30, "sturdy", "immovable"));
@@ -406,9 +406,9 @@ public sealed class EnchanterTests : IDisposable
         Assert.Equal(new Offer("flaming", null, null), OfferOf(campaign, fiery, "flaming"));
         Assert.Equal(new Offer("vampiric", null, null), OfferOf(campaign, fiery, "vampiric"));
 
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            Excludes = [.. ShippedContent.Restricted.Excludes, ["vampiric", "arcane"], ["vampiric", "shattering"]],
+            Excludes = [.. FixtureContent.Restricted.Excludes, ["vampiric", "arcane"], ["vampiric", "shattering"]],
         }))
         {
             var met = Opened();
@@ -443,7 +443,7 @@ public sealed class EnchanterTests : IDisposable
             // carrying Vampiric and no Flaming is refused beside Vampiric.
             using (TestContent.UsePremise(tuning: Ruled, restricted: BurningOffered() with
             {
-                Excludes = [.. ShippedContent.Restricted.Excludes, ["burning", "vampiric"]],
+                Excludes = [.. FixtureContent.Restricted.Excludes, ["burning", "vampiric"]],
             }))
                 Assert.Equal("BURNING - CANNOT SIT WITH VAMPIRIC", OfferOf(met, Carrying("tower_guard", ["vampiric"]), "burning").Refusal);
         }
@@ -494,9 +494,9 @@ public sealed class EnchanterTests : IDisposable
         // The first reason to apply is the one said, the relations before the wand:
         // under a group pairing Mire with Cold, the cold wand's Mire is refused beside
         // Cold.
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            Excludes = [.. ShippedContent.Restricted.Excludes, ["mire", "cold"]],
+            Excludes = [.. FixtureContent.Restricted.Excludes, ["mire", "cold"]],
         }))
             Assert.Equal("MIRE - CANNOT SIT WITH COLD", OfferOf(campaign, wand, "mire").Refusal);
 
@@ -553,9 +553,9 @@ public sealed class EnchanterTests : IDisposable
 
         // The relations are asked first: under a group pairing Mire with
         // Regeneration, the renewal's Mire is refused beside Regeneration.
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            Excludes = [.. ShippedContent.Restricted.Excludes, ["mire", "regeneration"]],
+            Excludes = [.. FixtureContent.Restricted.Excludes, ["mire", "regeneration"]],
         }))
             Assert.Equal("MIRE - CANNOT SIT WITH REGENERATION", OfferOf(campaign, renewal, "mire").Refusal);
 
@@ -602,9 +602,9 @@ public sealed class EnchanterTests : IDisposable
 
         // The note and the refusal are asked apart: an offer refused, and never firing
         // where it would go, says both.
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            Excludes = [.. ShippedContent.Restricted.Excludes, ["mire", "vampiric"]],
+            Excludes = [.. FixtureContent.Restricted.Excludes, ["mire", "vampiric"]],
         }))
             Assert.Equal(new Offer("mire", "MIRE - CANNOT SIT WITH VAMPIRIC", "NEVER FIRES ON A SWORD"),
                 OfferOf(campaign, Carrying("tower_guard", ["vampiric"]), "mire"));
@@ -698,9 +698,9 @@ public sealed class EnchanterTests : IDisposable
 
         // None left: a campaign that has met only what restricted.json never copies.
         // Named, each is refused as never copied.
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            NeverRolled = [.. ShippedContent.Restricted.NeverRolled, "mire", "regeneration"],
+            NeverRolled = [.. FixtureContent.Restricted.NeverRolled, "mire", "regeneration"],
         }))
         {
             var bare = CampaignState.Start(GameContent.Current);
@@ -742,8 +742,8 @@ public sealed class EnchanterTests : IDisposable
         Assert.False(catalogue.LacksPrerequisiteAhead("flaming", [], out _));
 
         // Content listing the burn with no Flaming ahead is refused at load, naming it...
-        var refused = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, BurningOffered(), ShippedContent.Enchantments,
-            ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList() }));
+        var refused = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, BurningOffered(), FixtureContent.Enchantments,
+            FixtureContent.Weapons with { Weapons = FixtureContent.Weapons.Weapons.Select(w => w.Id == "wand_of_the_nova_unique" ? w with { Enchantments = [new EnchantmentRef("burning")] } : w).ToList() }));
         Assert.Equal(("wand_of_the_nova_unique", ContentValidator.RuleEnchantmentDependency), (refused.EntryId, refused.Rule));
         Assert.Contains("'burning' needs 'flaming' ahead of it", refused.Message);
 
@@ -785,15 +785,15 @@ public sealed class EnchanterTests : IDisposable
 
         // A group added to the file: content listing the pair is refused at load,
         // naming the group...
-        var restricted = ShippedContent.Restricted with { Excludes = [.. ShippedContent.Restricted.Excludes, ["serrated", "vampiric"]] };
-        var refused = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, restricted, ShippedContent.Enchantments, ShippedContent.Weapons));
+        var restricted = FixtureContent.Restricted with { Excludes = [.. FixtureContent.Restricted.Excludes, ["serrated", "vampiric"]] };
+        var refused = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, restricted, FixtureContent.Enchantments, FixtureContent.Weapons));
         Assert.Equal(("flensing_knife_unique", ContentValidator.RuleEnchantmentsExcluded), (refused.EntryId, refused.Rule));
         Assert.Contains("'serrated' and 'vampiric' - restricted.json excludes [serrated, vampiric]", refused.Message);
 
         // ...and the enchanter refuses one beside the other, on content that loads.
-        using (TestContent.UsePremise(tuning: Ruled, restricted: ShippedContent.Restricted with
+        using (TestContent.UsePremise(tuning: Ruled, restricted: FixtureContent.Restricted with
         {
-            Excludes = [.. ShippedContent.Restricted.Excludes, ["arcane", "vampiric"]],
+            Excludes = [.. FixtureContent.Restricted.Excludes, ["arcane", "vampiric"]],
         }))
         {
             Assert.Equal((true, true), (GameContent.Current.Enchantments.Excludes("arcane", "vampiric"), GameContent.Current.Enchantments.Excludes("vampiric", "arcane")));

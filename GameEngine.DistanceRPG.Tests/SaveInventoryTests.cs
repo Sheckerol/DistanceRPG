@@ -135,6 +135,7 @@ public class SaveInventoryTests
             new("Tier", Kept.Saved, "lastResult.services[].tier: the tier a finished transfer's soul landed at (Phase 6a.6)"),
             new("SourceId", Kept.Saved, "lastResult.services[].sourceId: a transfer's source, by catalogue id (Phase 6a.6)"),
             new("Roll", Kept.NotSaved, "the log's, written at the run's end: the roll as it was drawn, which a save made during the run replays: it holds the visit's map seed and the queued deposit's ordinal, each named in the log where it was made (deposit #n, Phase 6a.5)"),
+            new("Raised", Kept.Saved, "lastResult.services[].raised: the enchantments a finished service's maintenance raised a tier, each by id and the tier it rose to (after play, 2026-11-19)"),
         ],
         [typeof(Improvement)] =
         [
@@ -290,7 +291,7 @@ public class SaveInventoryTests
             new("OverwatchTriggered", Kept.NotSaved, "an event"),
             new("RiposteTriggered", Kept.NotSaved, "an event"),
             new("XpCredited", Kept.NotSaved, "an event"),
-            new("EnchantmentTiered", Kept.NotSaved, "an event"),
+            new("EnchantmentBarFilled", Kept.NotSaved, "an event"),
             new("WeaponWornFull", Kept.NotSaved, "an event"),
             new("PotionDrunk", Kept.NotSaved, "an event: wiring, the scene subscribes it afresh for the drink's beat and log line"),
             new("GameOver", Kept.NotSaved, "an event: the visit subscribes it in OpenTurns"),

@@ -290,11 +290,18 @@ public sealed record SpoiledPotionDto(string Type, int Quality);
 /// modifier, each by name (appended by Phase 6a.4, with their defaults: absent,
 /// the report says the weapon came back as it went) — and on a transfer the soul
 /// it moves (<c>enchantment</c>), its source by catalogue id, and on a finished one
-/// the tier the soul landed at (appended by Phase 6a.6, with their defaults). The
-/// roll as it was drawn is the log's, never the save's.
+/// the tier the soul landed at (appended by Phase 6a.6, with their defaults). And
+/// on a finished service, the enchantments its maintenance raised a tier, or null
+/// for none, which is what a capture writes; null and <c>[]</c> read alike
+/// (appended after play, 2026-11-19, with its default: a report written before
+/// raised nothing, since a tier then rose in the dungeon). The roll as it was drawn
+/// is the log's, never the save's.
 /// </summary>
 public sealed record ServiceDto(string WeaponId, string Service, int RunsWorked, int Runs, bool Stalled = false, string? Enchantment = null,
-    string? Improved = null, string? Modifier = null, int? Tier = null, string? SourceId = null);
+    string? Improved = null, string? Modifier = null, int? Tier = null, string? SourceId = null, IReadOnlyList<RaisedDto>? Raised = null);
+
+/// <summary>One enchantment a finished service's maintenance raised a tier (<see cref="ServiceReport.Raised"/>): its catalogue id, and the tier it rose to — 2 at least, from no XP.</summary>
+public sealed record RaisedDto(string Id, int Tier);
 
 /// <summary>What a wipe took back from one pool (<see cref="XpClawback"/>): the member by id, the pool by name, what it held and what it holds.</summary>
 public sealed record ClawbackDto(string MemberId, string Pool, int Before, int After);

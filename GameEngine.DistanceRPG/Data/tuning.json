@@ -328,7 +328,9 @@
      no part - it grows a character's mana pool, never a weapon's ladder. The old bar, lock x tier /
      INT, tiered a staff of renewal in a wizard's hands after two casts - and a tier doubles the
      lock, which left it no pool to cast from. 5 makes a tier a long spend: 75 trigger mana to that
-     staff's second tier, in anyone's hands (after play, 2026-10). */
+     staff's second tier, in anyone's hands (after play, 2026-10). The spend fills the tier's bar and
+     stops at it: the tier itself rises when the enchanter's next service on the weapon finishes, one
+     tier a service (after play, 2026-11-19). */
   "EnchantmentTierScale": 5,
 
   /* ---- Inventory ---- */

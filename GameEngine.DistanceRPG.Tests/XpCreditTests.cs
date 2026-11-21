@@ -117,7 +117,7 @@ public sealed class XpCreditTests : IDisposable
     /// </summary>
     private static IDisposable PricedElements(params string[] ids)
         => TestContent.UsePremise(
-            enchantments: new EnchantmentsData(ShippedContent.Enchantments.Enchantments
+            enchantments: new EnchantmentsData(FixtureContent.Enchantments.Enchantments
                 .Select(e => ids.Contains(e.Id) ? e with { Potency = 3 } : e).ToList()),
             tuning: t => TuningValues.With(t, ids.Select(id => ($"{nameof(Tuning.ApplyPercent)}.{id}", 100)).ToArray()));
 

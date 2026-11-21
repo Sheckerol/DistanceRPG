@@ -53,7 +53,7 @@ public class DataFilesTests
             Assert.StartsWith(folder, path, StringComparison.Ordinal);
 
             // And the game plays what it read.
-            Assert.Equal(200, ShippedData.Load(texts).Content!.Tuning.MovementBudget);
+            Assert.Equal(200, FixtureContent.Load(texts).Content!.Tuning.MovementBudget);
         });
     }
 
@@ -67,7 +67,7 @@ public class DataFilesTests
         InTempFolder(folder =>
         {
             // The other data files sit beside it, as they ship, so any notice is the tuning's.
-            DataFiles.Write(folder, ShippedData.Texts with { Tuning = null });
+            DataFiles.Write(folder, FixtureContent.Texts with { Tuning = null });
             string path = Path.Combine(folder, TuningJson.FileName);
             File.WriteAllText(path, """{ "MovementBudget": 200 }""");
             var report = new List<string>();
@@ -86,16 +86,16 @@ public class DataFilesTests
                 line => Assert.Equal($"[Data] Read {Path.Combine(folder, WeaponsJson.FileName)}", line),
                 line => Assert.Equal($"[Data] Read {Path.Combine(folder, DungeonsJson.FileName)}", line));
 
-            var load = ShippedData.Load(texts);
+            var load = FixtureContent.Load(texts);
             Assert.Equal([$"tuning.json could not be read ({why}) - the built-in numbers are playing"], load.Notices);
             Assert.DoesNotContain(load.Notices, notice => notice.Contains("missing", StringComparison.Ordinal));
-            Assert.Equal(TuningJson.Hash(ShippedContent.Tuning), TuningJson.Hash(load.Content!.Tuning));
+            Assert.Equal(TuningJson.Hash(FixtureContent.Tuning), TuningJson.Hash(load.Content!.Tuning));
 
             // Once it is free again, it is read like any other, beside the shipped
             // files it sits with: every text read whole, and every file reported.
             report.Clear();
             var free = DataFiles.Read(folder, report.Add);
-            Assert.Equal(ShippedData.Texts with { Tuning = """{ "MovementBudget": 200 }""" }, free);
+            Assert.Equal(FixtureContent.Texts with { Tuning = """{ "MovementBudget": 200 }""" }, free);
             Assert.Equal(FilesRead.Select(name => $"[Data] Read {Path.Combine(folder, name)}"), report);
         });
     }
@@ -130,7 +130,7 @@ public class DataFilesTests
         {
             string target = Path.Combine(folder, "data");
             var report = new List<string>();
-            var written = ShippedData.Texts;
+            var written = FixtureContent.Texts;
             DataFiles.Write(target, written, report.Add);
 
             string path = Path.Combine(target, TuningJson.FileName);
@@ -153,7 +153,7 @@ public class DataFilesTests
         // and where the party lives now; and the party that plays is the code's.
         InTempFolder(folder =>
         {
-            DataFiles.Write(folder, ShippedData.Texts);
+            DataFiles.Write(folder, FixtureContent.Texts);
             string party = Path.Combine(folder, "party.json");
             File.WriteAllText(party, """{ "members": [{ "id": "A", "name": "Edited", "stats": { "STR": 4, "DEX": 3, "CON": 2, "INT": 1 } }] }""");
             var report = new List<string>();
@@ -166,12 +166,12 @@ public class DataFilesTests
                 $"[Data] {party}: party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)",
             ], report);
 
-            var load = ShippedData.Load(texts);
+            var load = FixtureContent.Load(texts);
             Assert.Null(load.Error);
             Assert.Equal(["party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)"], load.Notices);
             Assert.Equal("PARTY.JSON IS NO LONGER READ - THE STARTING PARTY IS IN THE CODE (LOGIC/CONTENT/STARTINGPARTY.CS)",
                 string.Join(" ", NoticeText.Rows(load.Notices).Select(row => row.Trim())));
-            Assert.Equal(StartingParty.Data.Members, load.Content!.Party.All);
+            Assert.Equal(FixtureContent.Party.Members, load.Content!.Party.All);
             Assert.Empty(load.TuningOverrides);
 
             // Never read, so never unreadable: a copy an editor holds open is named
@@ -188,7 +188,7 @@ public class DataFilesTests
             [
                 "enchantments.json is no longer read - the enchantment catalogue is in the code (Logic/Enchantments/EnchantmentDefinitions.cs)",
                 "party.json is no longer read - the starting party is in the code (Logic/Content/StartingParty.cs)",
-            ], ShippedData.Load(texts).Notices);
+            ], FixtureContent.Load(texts).Notices);
 
             // And with neither there, nothing is said of them at all.
             File.Delete(party);

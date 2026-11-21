@@ -94,14 +94,14 @@ public sealed class WearTests : IDisposable
 
         // WearCapacityPerBar 0 freezes the capacity: "a dial rather than an error"
         // (S:1757), worked out in closed form, so no billion bars are replayed.
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { WearCapacityPerBar = 0 }))
+        using (TestContent.Use(tuning: FixtureContent.Tuning with { WearCapacityPerBar = 0 }))
         {
             Assert.Equal(new PoolProgress(333, 30, 10, 30), Wear.Capacity(10_000));
             Assert.Equal(30, Wear.Capacity(ContentBounds.MostCount).Max);
         }
 
         // 2 a bar: a first full bar of 30 lifts it two, and the next bar is 32.
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { WearCapacityPerBar = 2 }))
+        using (TestContent.Use(tuning: FixtureContent.Tuning with { WearCapacityPerBar = 2 }))
         {
             Assert.Equal(new PoolProgress(1, 32, 0, 32), Wear.Capacity(30));
             Assert.Equal(new PoolProgress(2, 34, 0, 34), Wear.Capacity(62));
@@ -110,7 +110,7 @@ public sealed class WearTests : IDisposable
         // The worst a save can hold replays whole: the most wear any count reaches,
         // on the smallest bar the smallest growth climbs from — the replay's most
         // steps, about 46 000 — and a capacity nowhere near overflow.
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { StartingPool = 1, WearCapacityPerBar = 1 }))
+        using (TestContent.Use(tuning: FixtureContent.Tuning with { StartingPool = 1, WearCapacityPerBar = 1 }))
         {
             var most = Wear.Capacity(ContentBounds.MostCount);
             Assert.InRange(most.Max, 46_000, 47_000);
@@ -120,7 +120,7 @@ public sealed class WearTests : IDisposable
         // Wear cashed is never negative: one refusal, Wear's own, naming what it
         // was handed, whether the capacity grows (replayed) or is frozen (closed form).
         Assert.Equal("cashed", Assert.Throws<ArgumentOutOfRangeException>(() => Wear.Capacity(-1)).ParamName);
-        using (TestContent.Use(tuning: ShippedContent.Tuning with { WearCapacityPerBar = 0 }))
+        using (TestContent.Use(tuning: FixtureContent.Tuning with { WearCapacityPerBar = 0 }))
             Assert.Equal("cashed", Assert.Throws<ArgumentOutOfRangeException>(() => Wear.Capacity(-1)).ParamName);
     }
 

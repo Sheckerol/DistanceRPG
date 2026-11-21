@@ -280,7 +280,7 @@ public sealed class FarmLadderTests : IDisposable
 
     private static void Rejected(Func<Tuning, Tuning> edit, string key, string rule)
     {
-        var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(edit(ShippedContent.Tuning)));
+        var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(edit(FixtureContent.Tuning)));
         Assert.Equal((key, rule), (ex.EntryId, ex.Rule));
         Assert.Contains(ex.Rule, ex.Message);
     }

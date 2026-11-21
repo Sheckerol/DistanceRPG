@@ -7,7 +7,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// The modifier rules as the game loads them: the relations, and the numbers the
 /// rules read out of the tuning. No number expected here is a copy of the
 /// master's. Where a test leans on one, it reads it from the tuning the game
-/// reads (<see cref="ShippedContent.Tuning"/>); where the numbers are the test's
+/// reads (<see cref="FixtureContent.Tuning"/>); where the numbers are the test's
 /// subject — that the rules read them from the tuning, and how they combine them —
 /// the test moves them off the shipped ones, or states its own, over that tuning,
 /// so no test compares a shipped table with rules built from that same table,
@@ -21,11 +21,11 @@ public class ModifierRulesTests
     private static readonly ModifierType[] All = Enum.GetValues<ModifierType>();
 
     /// <summary>The tuning the game reads: the numbers the rules are expected to resolve.</summary>
-    private static Tuning Shipped => ShippedContent.Tuning;
+    private static Tuning Shipped => FixtureContent.Tuning;
 
     /// <summary>The rules over the shipped tuning with <paramref name="moves"/> made (<see cref="TuningValues.With"/>) and the shipped relations.</summary>
     private static ModifierRules Over(params (string Name, int Value)[] moves)
-        => new(TuningValues.With(Shipped, moves), ShippedContent.Restricted);
+        => new(TuningValues.With(Shipped, moves), FixtureContent.Restricted);
 
     /// <summary>A step off <paramref name="value"/> within [<paramref name="min"/>, <paramref name="max"/>]: one up, or one down at the ceiling — never the value itself.</summary>
     private static int Step(int value, int min, int max) => value + 1 <= max ? value + 1 : Math.Max(min, value - 1);
@@ -302,7 +302,7 @@ public class ModifierRulesTests
             Kind: new Dictionary<string, string> { ["flaming"] = "caster", [nameof(Overwatch)] = "ranged" },
             ForgedOnly: ["burning", nameof(Charges)],
             NeverRolled: ["burning"]);
-        var tuning = TuningValues.With(ShippedContent.Tuning, (nameof(Tuning.AcquiredHeadroom), 2), ("PerStack.Block", 4), ("MaxForged.Block", 1));
+        var tuning = TuningValues.With(FixtureContent.Tuning, (nameof(Tuning.AcquiredHeadroom), 2), ("PerStack.Block", 4), ("MaxForged.Block", 1));
 
         var rules = new ModifierRules(tuning, restricted);
 
@@ -330,8 +330,8 @@ public class ModifierRulesTests
         // A file that re-prices one modifier names that entry alone, and the read
         // merges it over the built-in table: the rules still read every other key
         // at its shipped value.
-        var partial = TuningJson.Read("""{ "PerStack": { "Block": 4 }, "Offset": { "Charges": 0 }, "MaxForged": { "Block": 1 } }""", ShippedContent.Tuning).Tuning;
-        var rules = new ModifierRules(partial, ShippedContent.Restricted);
+        var partial = TuningJson.Read("""{ "PerStack": { "Block": 4 }, "Offset": { "Charges": 0 }, "MaxForged": { "Block": 1 } }""", FixtureContent.Tuning).Tuning;
+        var rules = new ModifierRules(partial, FixtureContent.Restricted);
 
         foreach (var t in All)
         {
@@ -345,7 +345,7 @@ public class ModifierRulesTests
             Assert.True(rules.PerStack(t) > 0, $"{t}: a partial table zeroed its stacks");
 
         // An explicit zero is an override, not an absence: three stacks are worth the offset alone.
-        var zeroed = new ModifierRules(TuningJson.Read("""{ "PerStack": { "Block": 0 } }""", ShippedContent.Tuning).Tuning, ShippedContent.Restricted);
+        var zeroed = new ModifierRules(TuningJson.Read("""{ "PerStack": { "Block": 0 } }""", FixtureContent.Tuning).Tuning, FixtureContent.Restricted);
         Assert.Equal(0, zeroed.PerStack(Block));
         Assert.Equal(Shipped.Offset[Block], zeroed.Resolve(Block, 3));
 
@@ -353,7 +353,7 @@ public class ModifierRulesTests
         // has no number under the other twenty-two: refused, naming the first it
         // leaves out, rather than read as worth nothing.
         var refused = Assert.Throws<ContentException>(() =>
-            new ModifierRules(ShippedContent.Tuning with { PerStack = new Dictionary<ModifierType, int> { [Block] = 4 } }, ShippedContent.Restricted));
+            new ModifierRules(FixtureContent.Tuning with { PerStack = new Dictionary<ModifierType, int> { [Block] = 4 } }, FixtureContent.Restricted));
         Assert.Equal(("PerStack.Brace", ContentValidator.RuleTableNamesEveryMember), (refused.EntryId, refused.Rule));
     }
 
@@ -363,7 +363,7 @@ public class ModifierRulesTests
         // Allowed sees a weapon's modifiers and nothing else, so the member could only be dropped.
         var restricted = new RestrictedData([["flaming", nameof(Light)]], new Dictionary<string, string[]>(),
             new Dictionary<string, string>(), [], []);
-        var ex = Assert.Throws<ContentException>(() => new ModifierRules(ShippedContent.Tuning, restricted));
+        var ex = Assert.Throws<ContentException>(() => new ModifierRules(FixtureContent.Tuning, restricted));
         Assert.Equal(nameof(Light), ex.EntryId);
         Assert.Equal(ContentValidator.RuleModifierRelationIds, ex.Rule);
     }
@@ -373,7 +373,7 @@ public class ModifierRulesTests
     {
         var restricted = new RestrictedData([], new Dictionary<string, string[]>(),
             new Dictionary<string, string> { [nameof(Brace)] = "flying" }, [], []);
-        var ex = Assert.Throws<ContentException>(() => new ModifierRules(ShippedContent.Tuning, restricted));
+        var ex = Assert.Throws<ContentException>(() => new ModifierRules(FixtureContent.Tuning, restricted));
         Assert.Equal(nameof(Brace), ex.EntryId);
         Assert.Equal(ContentValidator.RuleKindValue, ex.Rule);
     }
@@ -386,7 +386,7 @@ public class ModifierRulesTests
         // other is pinned anywhere. What is the code's is that the game plays the
         // shipped tuning, and that its per-stack table prices every modifier.
         var tuning = GameContent.Current.Tuning;
-        Assert.Same(ShippedContent.Tuning, tuning);
+        Assert.Same(FixtureContent.Tuning, tuning);
         Assert.Equal(23, tuning.PerStack.Count);
     }
 }

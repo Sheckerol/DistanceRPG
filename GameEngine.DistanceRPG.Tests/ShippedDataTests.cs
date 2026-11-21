@@ -17,12 +17,19 @@ namespace GameEngine.DistanceRPG.Tests;
 /// and names nothing the rework removed. Read from the build's own texts
 /// (<see cref="ShippedData"/>), never from a folder.
 /// <para>
-/// The rest of the suite holds none either (the content rework's R5): a test that
-/// leans on a number of the masters reads it where the game does
-/// (<see cref="ShippedContent"/>), or stands on it as its own input
-/// (<see cref="Premise"/>), so an edit to any number of theirs fails nothing —
-/// bar the few values a design doc fixes (REWORK DECISION 3), pinned as literals in
-/// the tests below, so an edit that moves one fails by name and its doc moves with it:
+/// The rest of the suite never reads the masters at all (the user's ask of
+/// 2026-11-20): it runs under a frozen copy of them, <see cref="FixtureContent"/>
+/// (<c>TestData/content</c>), with the older worked examples' numbers laid over it
+/// (<see cref="Premise"/>), so an edit to any number, name or row of the masters —
+/// or to the starting party — fails nothing. This suite and
+/// <see cref="ShippedFilesTests"/> are what still read the game's real files, and
+/// only for whether they load and can be played.
+/// <para>
+/// That withdraws REWORK DECISION 3's pins against the master: the few values a
+/// design doc fixes are still pinned as literals in the tests below, but against
+/// the frozen copy, so they say what the examples stand on and no longer fail a
+/// designer's edit. A doc that fixes one is kept true by hand:
+/// </para>
 /// <list type="bullet">
 /// <item><c>MovementBudget</c> 160, and <c>MovementUnitsPerMana</c> 10 derived from
 /// it — phase-1-weapons.md L773-775, <c>(160 − 40) / (8 + 3)</c>:

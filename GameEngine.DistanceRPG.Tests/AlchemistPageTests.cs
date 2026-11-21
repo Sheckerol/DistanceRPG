@@ -212,7 +212,7 @@ public sealed class AlchemistPageTests : IDisposable
         Assert.True(layout.RowsTop + (layout.Rows - 1) * BetweenRunsHud.WeaponRowPitch + 7f * BetweenRunsHud.WeaponRowScale <= layout.Bottom);
         Assert.True(layout.Bottom <= h - BetweenRunsHud.RefusalFromBottom, "the page's rows run into the refusal row");
         Assert.InRange(layout.Rows, 5, 40);
-        int shipped = GameConstants.PartySize * PartyMemberState.SlotsFor(ShippedContent.Tuning);
+        int shipped = GameConstants.PartySize * PartyMemberState.SlotsFor(FixtureContent.Tuning);
         Assert.True(BetweenRunsHud.AlchemistPlace(h).Rows >= shipped, $"a 720 window holds {BetweenRunsHud.AlchemistPlace(h).Rows} rows, and a full party {shipped}");
 
         // Every bag's four empty slots filled with potions: sixteen potions under four

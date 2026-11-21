@@ -4647,3 +4647,116 @@ resting and let XP count in every mode (DECISIONS 23 and 24).
   enchantment tiers. Casts and drinks stay free of movement. The mana spent came
   from waiting turns out with enemies moving, a risk the user judges enough.
   Withdraws DECISION 21's "teach nothing" half.
+- **An enchantment's tier rises at the enchanter, one a service, ruled 2026-11-19
+  (after play).** The user's two rulings, the second on top of the first: "the
+  level of the enchantments [should] be updated when the weapon's wear is repaired
+  instead of whenever it fills the level up bar", and "cap the enchantment xp so
+  that it can't gain more than one level per maintenance". So mana spent through an
+  enchantment still fills the bar of the tier it is on (lock × tier ×
+  `EnchantmentTierScale`), but it stops at the bar, as wear stops at capacity, and
+  a full bar buys nothing in the dungeon: the tier rises when a service on the
+  weapon finishes, every full enchantment on it going up one tier, the new tier
+  from no XP. This narrows "enchantment tier is uncapped and earned by use" and
+  "the enchanter sells breadth, use buys depth" (top of this file): use still earns
+  the depth and nothing buys it, but the enchanter is now where it is cut in, so
+  depth is paced by services — a weapon wants the shop to turn its use into a
+  tier, and one bar is all it can bring. It also means no lock deepens under a
+  wielder mid-run: the spendable pool moves only as the equipped set does.
+  Read and built as follows, each a reading of the ruling rather than a ruling of
+  its own:
+  - *"Repaired" is a finished service.* The maintenance is done as the service's
+    last run is worked, before its own work, with the attach, the move and the
+    improvement roll. Nothing rises at the deposit, so a take-back still leaves a
+    weapon as its deposit found it (PHASE 6a DECISION 8), with no state to undo.
+    The weapon is in the shop either way, so the tier is seen at the same moment.
+  - *Any service, whatever it cashed.* ENCHANT, REFINE and MOVE all maintain the
+    weapon they are bought for, an unworn one too: "no wear, no roll" stays the
+    improvement roll's rule alone, since a soul that fires without the weapon
+    striking (a defender's, Overheal) fills its bar on a weapon that banks no wear.
+  - *A transfer's source is not maintained*: its wear is never cashed (PHASE 6a
+    DECISION 13). Its soul moves a tier down off the tier it lay at, and what it
+    keeps stays full for its own next service. A reorder's soul is the weapon's
+    own, so it is maintained first and moved after: a full one gains its tier and
+    loses the move's, arriving at the tier it had from no XP, which the source
+    list's `ARRIVES AT` says.
+  - *A drop's forged depth is cut in as it is made.* The farm and the boss still
+    bank a bar's worth through the one XP door, and the drop is maintained on the
+    spot: it arrives with its tiers, and waits on no service for them.
+  - *A unique is as it was*: pinned at tier 1, banking what it spends with no bar
+    and no cap, never full.
+  - *An entry over its bar* (a tuning that lowered it, a hand-written save) banks
+    nothing and loses nothing, and its service buys one tier from no XP.
+  - *The save is unchanged*: an entry is still its tier and the XP into it, and
+    every older save loads as it did, no entry in one being over its bar. No
+    tuning key moves, so no save is told its numbers changed.
+  - *What says so*: an entry in hand reads `XP 20/20 FULL`, and anywhere else
+    `XP FULL`; the beat over the wielder is `VAMPIRIC XP FULL` where it was
+    `VAMPIRIC T2!`; the deposit panel says `1 ENCHANTMENT IS FULL - ANY SERVICE
+    RAISES IT A TIER` under the weapon's state; and the log's finished-service line
+    names each tier raised. PHASE 8 DECISION 24's "enchantment tiers" in every mode
+    is, from here, enchantment XP in every mode.
+  - *The run's summary says it too* (the user's ask of the same day, "tell the
+    player that it was improved"): one green line under the enchanter's,
+    `VAMPIRIC ON THE ROTWOOD ROSE TO T3`; two on one weapon named together, `VAMPIRIC
+    AND FLAMING ON THE ROTWOOD ROSE A TIER`; more counted, `3 ENCHANTMENTS ON THE
+    ROTWOOD ROSE A TIER`, and across several weapons `3 ENCHANTMENTS ROSE A TIER AT
+    THE ENCHANTER`. "Rose", never "deepened", which is the improvement roll's word
+    for a modifier. It is one line whatever came back, because the weapon's own line
+    has no room for it at the widest names and a line a weapon would not fit the
+    run's end panel: the worst summary was 34 lines of the 35 a 720 window holds,
+    and this line takes the last, knowingly — the next line added there has to be
+    paid for. So that the hub still says it after a load, a report saves what its
+    service raised (`lastResult.services[].raised`, each an id and the tier it rose
+    to): a member appended with its default, null while empty, so no version step —
+    read as every save field is (an enchantment the content has and no unique, tier
+    2 at least and 2147 at most, no more than a weapon holds) and cross-checked
+    under check 27 (only a finished service raises any).
+- **The starting bags hold a second weapon each, ruled 2026-11-19 (after play).**
+  The user's swap: A carries Darts where it carried a Staff of Renewal, B a Hasta
+  and D a Shortbow where each carried one too, and C a Wand of the Blast where it
+  carried the Staff of Mire. Each bag weapon levels on a stat its member has at 3
+  or 4 (A and B on STR, D on DEX, C on INT). C's Staff of Renewal, in hand, is now
+  the party's only heal, and the party's own spear is back (B's), which the first
+  roster dropped. The user asked for "a single target wand" and the content has
+  none: the four shapes are Blast, Cone, Beam and Nova, and the user chose the
+  Blast, the one aimed at a spot. Two things follow from a wand in a starting bag:
+  - *A starting wand names its element.* A wand's element is rolled by the drop
+    that makes it (§3.1), and a starting weapon is no drop, so the roster names it
+    (`PartyMemberDef.WandElement`), checked at load: a member starting with a wand
+    names an element a wand can carry — Flaming, Cold, Shocking or Acidic — and a
+    member with none names none. **C's is Flaming, the user's choice of
+    2026-11-20, for now** ("it is just easy"). Their other thought was Arcane, so
+    the party could bypass the type chart until the next dungeon; a wand casts a
+    typed element and Arcane is untyped, so that would be a rule change, and it can
+    sit behind the element as a second enchantment today.
+  - *What a new campaign has met moves with the bags*: Flaming from the start, so
+    the enchanter offers it once it opens, and Mire no longer until one drops.
+  A saved campaign keeps the party it started with. The suite's worked examples
+  keep the old bags as their own premise (`Premise.Party`).
+- **The tests run under a frozen configuration, never the game's files, ruled
+  2026-11-20.** The user's ask: "make the tests not rely on the json
+  configurations at all ... a mock configuration so that if I change them for
+  gameplay reasons we don't have them break". The four data files are copied into
+  `GameEngine.DistanceRPG.Tests/TestData/content` as they shipped that day, with
+  the starting party written out beside them (`FixtureContent`), and that is what
+  every test reads: it is made current as the suite loads, in the built-in
+  content's place, and the loader's own tests load over the frozen copies
+  (`FixtureContent.Load`) rather than the game's. An edit to any number, name or
+  row of `Data/*.json`, or to `StartingParty`, now fails no test — checked by
+  changing sixteen tuning numbers, a weapon's name and id, a wand's shape, the
+  class statlines, two bosses, a dungeon's name and five of the party's weapons at
+  once, under which the suite stayed green.
+  - *This withdraws REWORK DECISION 3's pins against the master.* The values a
+    design doc fixes (the movement budget, the class rows, the tutorial's golem,
+    the enchanter's numbers) are still asserted, but against the frozen copy: a
+    doc that fixes one is kept true by hand, not by a failing test.
+  - *What still reads the real files*: `ShippedDataTests` (they are built in, LF,
+    load with nothing to say, name every tuning key) and `ShippedFilesTests` (a new
+    campaign starts on the real files and roster, and every dungeon can be
+    entered). They assert that the game can be played, never what its data says, so
+    a change that breaks the game is still caught.
+  - *The cost*: a `tuning.json` key the code gains must be added to the frozen
+    copy too, or the suite stops and says so; and the frozen copies drift from the
+    game by design, so a test no longer says anything about the shipped numbers.
+  - *One seam in the game for it*: `ContentFiles.Load` takes the roster it checks
+    the files against, the game's own by default.

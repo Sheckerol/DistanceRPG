@@ -111,6 +111,22 @@ public sealed class WeaponCatalogue
     }
 
     /// <summary>
+    /// Whether <paramref name="id"/> is made with an element supplied to it
+    /// (<see cref="Instantiate"/>): a wand whose row lists none of its own, which
+    /// is every wand but a unique fixed to one. What a caller that is no drop asks
+    /// before it makes one — the starting party, whose roster names the element.
+    /// </summary>
+    /// <exception cref="KeyNotFoundException">No such weapon, or an enchantment it names is unknown.</exception>
+    public bool TakesElement(string id)
+    {
+        var def = this[id];
+        return def.Class == WeaponClass.Wand && !def.Enchantments.Any(row => _enchantments[row.Id].Effect == EffectKind.ElementalDamage);
+    }
+
+    /// <summary>Whether a wand can be made of <paramref name="element"/>: an innate enchantment carries it (<see cref="EnchantmentCatalogue.InnateFor"/>).</summary>
+    public bool HasElement(DamageType element) => _enchantments.HasInnateFor(element);
+
+    /// <summary>
     /// A fresh <see cref="Weapon"/> of <paramref name="id"/>. A wand's innate is
     /// its element, supplied here by the caller because the roll belongs to the
     /// drop (§3.1): it becomes the first enchantment, ahead of anything the

@@ -189,6 +189,18 @@ hit, a staff's cast among it, and the wipe are PHASE 6a DECISION 1 in
 `[Wear] D's Rondel is full: wear 30 of 30`. The enchanter spends it
 and grows a weapon's capacity (below).
 
+An enchantment's tier is earned by use and cut in at the enchanter (ruled after
+play, 2026-11-19). The mana an enchantment spends fills the bar of the tier it is
+on — its lock × its tier × `EnchantmentTierScale` — and stops there: in hand it
+reads `VAMPIRIC LOCK 20 XP 9/100`, then `XP 100/100 FULL`, with `VAMPIRIC XP FULL`
+over the wielder as it fills, and a full bar banks nothing more. In the bag, the
+stable or the shop a full one reads `VAMPIRIC XP FULL`. Nothing rises in the
+dungeon, so no lock deepens under a wielder mid-run. The enchanter's next service
+on the weapon, whichever it is, raises every full enchantment on it one tier, the
+new tier from no XP: one tier a service at the most. A unique's is pinned at tier 1
+as before, banking what it spends with no bar. A drop still arrives with the tiers
+the farm gave it.
+
 **Potions** (Phase 6b): a potion in a member's bag is drunk by its number with the
 bag open (I), from the member's own bag — health or mana, the whole list — and
 costs `PotionUseCost` (40) movement, in combat and out alike (PHASE 6b DECISION 2
@@ -337,7 +349,10 @@ pool — its capacity growing on it, a point a full bar, whatever it bought — 
 it in the shop for its enchantment count plus one runs that count (PHASE 6a DECISION
 6). D on a weapon deposits it: the panel says the weapon's wear, its enchantments,
 the slots its capacity has opened and its runs in the shop — `WEAR 36 OF 36 -
-ENCHANTMENTS 1 OF 5 - SLOTS OPEN 2 - 2 RUNS IN THE SHOP` — and offers ENCHANT,
+ENCHANTMENTS 1 OF 5 - SLOTS OPEN 2 - 2 RUNS IN THE SHOP` — under it, where any of
+its enchantments has filled its bar, that any service raises it (`1 ENCHANTMENT IS
+FULL - ANY SERVICE RAISES IT A TIER`, `2 ENCHANTMENTS ARE FULL - ANY SERVICE RAISES
+EACH A TIER`) — and offers ENCHANT,
 REFINE and MOVE (moving an enchantment, below), each with the odds its return
 improves the weapon anyway (below), a refused one dimmed with the enchanter's
 reason, and an unworn weapon's refinement noted as coming back as it went; then
@@ -353,8 +368,12 @@ a staff, anything that rides a strike or a kill, since a staff never strikes (PH
 ENCHANTMENT MET YET CAN GO ON IT`, and refining is left. ENCHANT lists the offer, a
 refused one dimmed with its reason and never hidden. A run that counts works the two
 newest a run on, and a service whose last run it works comes back to the end of the
-stable, an Enchant with its enchantment attached last at tier 1 (PHASE 6a DECISION
-3); a run that does not count works nothing. A service coming back may improve the
+stable, every enchantment on it whose bar use had filled a tier deeper (above;
+whatever the service and whatever wear it cashed, but never a transfer's source,
+nor a weapon taken back), an Enchant with its enchantment attached last at tier 1
+(PHASE 6a DECISION 3); a run that does not count works nothing. The log's line for
+a finished service names each tier raised: `… finished: refined; vampiric to T3;
+improvement roll …`. A service coming back may improve the
 weapon anyway: enchanting at `GraftBaseChance` in 100 (3), flat, and refining at
 that times 1 + the wear cashed ÷ `StartingPool` — 6 in 100 on a fresh
 full bar, 7 at capacity 40, 9 at capacity 60 — and a deposit that cashed no wear
@@ -370,7 +389,11 @@ NO CHANGE`, `SCUTUM AND GLADIUS IS BACK FROM THE ENCHANTER - REFINED - DEEPENED 
 `STALLED AT THE ENCHANTER: RAPIER AND DAGGER`, or `THE ENCHANTER WORKED NOTHING - THE
 RUN DID NOT COUNT` — and past three lines of services on the screen between runs
 (two over the floor, a transfer's two lines told together),
-`AND 2 MORE AT THE ENCHANTER - TAB WEAPONS`. The log says it too:
+`AND 2 MORE AT THE ENCHANTER - TAB WEAPONS`. Under them, on a green line, the
+tiers those services raised: `VAMPIRIC ON THE ROTWOOD ROSE TO T3`, two on one weapon
+`VAMPIRIC AND FLAMING ON THE ROTWOOD ROSE A TIER`, more `3 ENCHANTMENTS ON THE ROTWOOD
+ROSE A TIER`, and across several weapons `3 ENCHANTMENTS ROSE A TIER AT THE
+ENCHANTER` — one line whatever came back. The log says it too:
 `[Enchanter] Run counted: worked Wand of the Cone 2/2, Rotwood 1/2; stalled Riposte
 Blade 0/1`, then `[Enchanter] Wand of the Cone finished: attached vampiric;
 improvement roll 1073 of 3000 against 90: no change` — the draw, out of 100 ×
@@ -394,7 +417,11 @@ rather than from the offer: the weapon needs the free slot and the deposit of
 attaching it as its next, its whole pool is cashed, it takes that attachment's runs
 and it has enchanting's odds of improving (PHASE 6a DECISION 13). Any soul may move —
 a staff's forged effect, a unique's soul — and it comes back a tier down, the new
-tier from no XP; one at tier 1, and every unique soul, moves intact with its XP. It
+tier from no XP; one at tier 1, and every unique soul, moves intact with its XP. The
+weapon it lands on is maintained as any serviced weapon is, but the weapon it comes
+off is not, its wear never cashed: a soul with a full bar moves a tier down all the
+same. A reorder's soul is the weapon's own, maintained first and moved after, so a
+full one arrives at the tier it had, from no XP — the list's `ARRIVES AT` says. It
 lands last, acquired: the forged mark stays with the weapon forged with it. Both
 weapons wait in the shop as one deposit, one of the two the enchanter works on, the
 source's wear left in its pool: the WEAPONS page lists the source `HELD     NAMELESS
@@ -602,7 +629,9 @@ back to it, and the game quits from it.
   it was drawn is the log's, never the save's). A transfer in the shop holds its
   source whole (`"source"`, `null` for a reorder) and its soul's place there
   (`"sourceIndex"`), and a run's report of one its source (`"sourceId"`) and,
-  once it came back, the tier its soul landed at (`"tier"`). A save whose shop
+  once it came back, the tier its soul landed at (`"tier"`); and a report of any
+  finished service holds the enchantments its maintenance raised a tier
+  (`"raised"`, each an `"id"` and the `"tier"` it rose to, `null` for none). A save whose shop
   contradicts itself — a weapon in it worn, a service past its last run, an
   enchantment the campaign never met or one that does nothing yet (in a deposit
   or in a run's report of one), a deposit before the tutorial is
@@ -895,9 +924,10 @@ proficiency steps, the room cap; whether they belong in `tuning.json` is open
   `GraftSharePercent`, how many of the rolls that land graft (0 to 100; 25), and
   `DeepenSignatureWeight`, how many times likelier a deepen lands on the class's
   signature (1, no bias, to 1000; 3) — PHASE 6a DECISION 5. And
-  `EnchantmentTierScale` (1 to 1000; 5, after play): leaving an enchantment's tier
-  costs its lock × tier × this in mana spent through it — no stat divides it, INT
-  growing the mana pool and never the ladder. Hashed from version 3. Turning any says
+  `EnchantmentTierScale` (1 to 1000; 5, after play): an enchantment's tier bar is
+  its lock × tier × this in mana spent through it — no stat divides it, INT
+  growing the mana pool and never the ladder — and a full bar buys its tier at the
+  enchanter's next service on the weapon, one tier a service. Hashed from version 3. Turning any says
   `THE NUMBERS HAVE CHANGED` when a campaign saved under the other number resumes —
   but never to a save from before Phase 6a, whose record of its numbers covers
   only the keys played then; while Phase 6a is being built, a save an earlier

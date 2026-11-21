@@ -138,6 +138,7 @@ public static class ContentValidator
     public const string RulePartyWeaponExists = "a party member's starting and bag weapons resolve in the weapon catalogue";
     public const string RulePartyBagFits = "a party member's starting weapon and bag fit the inventory";
     public const string RulePartyHasACaster = "a roster always includes a caster";
+    public const string RulePartyWandElement = "a party member starting with a wand names the element it carries, one a wand can carry, and a member starting with none names no element";
 
     public const string RulePoolBarIsPositive = "a pool's bar is at least one";
     public const string RuleDivisorIsPositive = "a ratio's divisor is at least one";
@@ -581,7 +582,8 @@ public static class ContentValidator
     /// <see cref="GameConstants.PartySize"/> long, no id is declared twice, every
     /// spread is a permutation of 1–4 (§2.1, and §5.7's list — "free to check and
     /// silently wrong if it drifts"), a member's weapons fit their inventory and
-    /// resolve in the catalogue, and somebody in the party is a caster.
+    /// resolve in the catalogue, a member starting with a wand names its element,
+    /// and somebody in the party is a caster.
     /// <para>
     /// The size check is the one that would otherwise fail silently: the scene
     /// spawns over the tiles it found for its own colour capacity, so a fifth
@@ -630,6 +632,17 @@ public static class ContentValidator
             foreach (var id in member.BagWeaponIds.Prepend(member.StartingWeaponId))
                 if (!weapons.TryGet(id, out _))
                     throw new ContentException(member.Id, RulePartyWeaponExists, id);
+
+            // A wand's element is rolled by the drop that makes it, and a starting
+            // weapon is no drop: the roster names it, for exactly the members who
+            // start with a wand that takes one — or the first NEW CAMPAIGN would
+            // throw making the party, long after the load passed.
+            var wand = member.BagWeaponIds.Prepend(member.StartingWeaponId).FirstOrDefault(weapons.TakesElement);
+            if (wand is not null && (member.WandElement is not { } element || element == DamageType.None || !weapons.HasElement(element)))
+                throw new ContentException(member.Id, RulePartyWandElement,
+                    member.WandElement is { } named ? $"{wand} cannot be made of {named}" : $"{wand} has no element named for it");
+            if (wand is null && member.WandElement is { } stray)
+                throw new ContentException(member.Id, RulePartyWandElement, $"{stray} named, and no weapon of the member's takes an element");
         }
 
         // Whoever opens the game holding a staff or a wand is the party's

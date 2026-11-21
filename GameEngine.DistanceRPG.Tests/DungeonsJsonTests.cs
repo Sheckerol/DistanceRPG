@@ -11,7 +11,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// is computed from the theme and the relations, so an edit to
 /// <c>restricted.json</c> moves it with no edit here. Every case reads text and
 /// loads content it never makes current; the shipped file is the master copy the
-/// build carries (<see cref="ShippedData.Texts"/>).
+/// build carries (<see cref="FixtureContent.Texts"/>).
 /// </summary>
 public class DungeonsJsonTests
 {
@@ -22,7 +22,7 @@ public class DungeonsJsonTests
     private static readonly string[] BossFields = ["id", "name", "maxHp", "movementBudget", "radius", "innate"];
 
     private static ContentLoad Load(string dungeons, string? restricted = null)
-        => ShippedData.Load(DataTexts.Shipped with { Dungeons = dungeons, Restricted = restricted ?? DataTexts.Shipped.Restricted });
+        => FixtureContent.Load(DataTexts.Shipped with { Dungeons = dungeons, Restricted = restricted ?? DataTexts.Shipped.Restricted });
 
     /// <summary>Two dungeon rows the same, field for field — the boss's innate modifiers by content, since the record holds them by reference.</summary>
     internal static void Same(DungeonDef expected, DungeonDef actual)
@@ -41,7 +41,7 @@ public class DungeonsJsonTests
         // range, and the flags the tutorial needs". The shipped file is the master
         // copy of every dungeon, in the order the hub lists them: no second record
         // of them is kept to hold it to.
-        string text = ShippedData.Texts.Dungeons!;
+        string text = FixtureContent.Texts.Dungeons!;
         var read = DungeonsJson.Read(text).Dungeons;
 
         // §5.8's names verbatim, every row naming all eight and every boss all five.

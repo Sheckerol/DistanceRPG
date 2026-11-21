@@ -419,7 +419,7 @@ public sealed class Weapon : IItem
     /// <see cref="ActorState.PaidLocks"/>, which stops at the first entry that
     /// does not fit and leaves the rest dormant.
     /// <para>
-    /// Derived rather than cached, because a tier is: <see cref="CreditEnchantment"/>
+    /// Derived rather than cached, because a tier is: <see cref="Maintain"/>
     /// replaces an entry and the deeper lock has to show through the same read.
     /// </para>
     /// </summary>
@@ -473,18 +473,17 @@ public sealed class Weapon : IItem
     }
 
     /// <summary>
-    /// The second mutator, and the only one that touches an entry: credit
-    /// <paramref name="xp"/> mana spent to the enchantment at
-    /// <paramref name="index"/>, at the INT that was spending it (§3.3). The
-    /// entry is a record and the climb is <see cref="Enchantment.WithXp"/>'s, so
-    /// this replaces the element rather than mutating one — attachment order,
-    /// the entry's identity and everything else about the weapon stay exactly
-    /// where they were.
+    /// The second mutator: credit <paramref name="xp"/> mana spent to the
+    /// enchantment at <paramref name="index"/> (§3.3). The entry is a record and
+    /// the banking is <see cref="Enchantment.WithXp"/>'s — up to the bar of the
+    /// tier it is on, never past it and never into a tier — so this replaces the
+    /// element rather than mutating one: attachment order, the entry's identity
+    /// and everything else about the weapon stay exactly where they were.
     /// <para>
     /// Every source of enchantment XP comes through here and hands over the same
     /// figure: the mana actually paid. A trigger the wielder paid for is one
     /// (§3.3), and the farm's grant is another — "a plain XP grant instead of a
-    /// special case" (§3.5) — so the farm has no path of its own into a tier.
+    /// special case" (§3.5) — so the farm has no path of its own into a bar.
     /// </para>
     /// <para>
     /// The trigger's callers are the five appliers that write a mana record: the
@@ -502,6 +501,30 @@ public sealed class Weapon : IItem
         if ((uint)index >= (uint)_enchantments.Count)
             throw new ArgumentOutOfRangeException(nameof(index), index, $"{Name} ({Id}) carries {_enchantments.Count} enchantments.");
         _enchantments[index] = _enchantments[index].WithXp(xp);
+    }
+
+    /// <summary>
+    /// The third mutator, and the only one a tier rises by (ruled after play,
+    /// 2026-11-19): every entry whose bar is full goes up one tier, its new tier
+    /// from no XP (<see cref="Enchantment.Maintained"/>), in place — attachment
+    /// order untouched. What the enchanter does to a weapon as its service
+    /// finishes, whatever the service (<see cref="Enchanter.Tick"/>), and what a
+    /// drop's forged depth is cut with as it is made (<see cref="LootTable.Land"/>);
+    /// nothing in a dungeon calls it, so a lock never deepens under a wielder
+    /// mid-run.
+    /// </summary>
+    /// <returns>The entries that rose, as they now read, in attachment order; empty when none was full.</returns>
+    internal IReadOnlyList<Enchantment> Maintain()
+    {
+        List<Enchantment>? risen = null;
+        for (int i = 0; i < _enchantments.Count; i++)
+        {
+            if (!_enchantments[i].BarFull)
+                continue;
+            _enchantments[i] = _enchantments[i].Maintained();
+            (risen ??= []).Add(_enchantments[i]);
+        }
+        return risen ?? (IReadOnlyList<Enchantment>)[];
     }
 
     public int Stacks(ModifierType t) => Modifiers.Stacks(t);

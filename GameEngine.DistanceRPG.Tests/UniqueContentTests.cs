@@ -15,7 +15,7 @@ namespace GameEngine.DistanceRPG.Tests;
 /// and carries — is §1.5's, and <see cref="Table"/> pins it (REWORK DECISION 3).
 /// The numbers a unique is read in are not: what a stack of Block absorbs, how
 /// deep a window opens, how many throws Charges buys are the master's
-/// (<see cref="ShippedContent.Tuning"/>), and each named unique's test reads them
+/// (<see cref="FixtureContent.Tuning"/>), and each named unique's test reads them
 /// there, so a key edited in <c>tuning.json</c> moves what it expects with it.
 /// Where a scenario's own geometry stands on numbers that are not its subject —
 /// the shove that carries a dummy into a line, the Block it meets — they are its
@@ -32,7 +32,7 @@ public class UniqueContentTests
     private static EnchantmentCatalogue Enchantments => GameContent.Current.Enchantments;
 
     /// <summary>The tuning the game reads: the numbers the named uniques are read in.</summary>
-    private static Tuning Shipped => ShippedContent.Tuning;
+    private static Tuning Shipped => FixtureContent.Tuning;
 
     /// <summary>
     /// The shipped tuning with every forge limit at x3, the unique raise: the
@@ -134,7 +134,7 @@ public class UniqueContentTests
         // The ceilings the combat doc quotes, each the forged depth plus the headroom: a Rondel's
         // CritSunder x1, a Stiletto-derived unique raising it to x3, and the Bulwark's Block x3.
         Assert.Equal(1 + headroom, Rules.Cap(CritSunder, TestWeapons.Get("weakspot_stiletto").Forged.Stacks(CritSunder)));
-        using (TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using (TestContent.Use(tuning: RaisesAllowed, weapons: FixtureContent.Weapons with { Weapons = [.. FixtureContent.Weapons.Weapons,
             Martial("test_sundering_stiletto", "weakspot_stiletto", [(CritWindow, 1), (CritMultiplier, 1), (CritSunder, 3)], "siphon")] }))
         {
             var unique = TestWeapons.Get("test_sundering_stiletto");
@@ -244,7 +244,7 @@ public class UniqueContentTests
         Assert.Equal(("widowmaker", ContentValidator.RuleRoleOnMartialOnly), (ex.EntryId, ex.Rule));
 
         // A legitimate derivation loads: the Halberd braced three times, the doc's own example.
-        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: FixtureContent.Weapons with { Weapons = [.. FixtureContent.Weapons.Weapons,
             Martial("test_halberd_wall", "halberd", [(Brace, 3), (Longshot, 1), (Push, 1)], "immovable")] });
         Assert.Equal(3, TestWeapons.Get("test_halberd_wall").Stacks(Brace));
         Assert.Equal(32 + 11 + 1, Catalogue.All.Count);
@@ -306,7 +306,7 @@ public class UniqueContentTests
             var soul = Enchantments[id];
             Assert.True(soul.Unique, $"{id} is not unique");
             Assert.Contains(id, Enchantments.NeverRolled);
-            Assert.Contains(id, ShippedContent.Restricted.NeverRolled);
+            Assert.Contains(id, FixtureContent.Restricted.NeverRolled);
             Assert.DoesNotContain(Enchantments.Rollable, e => e.Id == id);
             Assert.Equal(1, new Enchantment(soul, 3).Tier);
             Assert.Equal(1, (new Enchantment(soul, 1) with { Tier = 3 }).Tier);   // no path lifts the pin, a copy included
@@ -322,7 +322,7 @@ public class UniqueContentTests
         Assert.Equal(new[] { ("serrated", 1), ("vampiric", 3), ("overheal", 1) }, knife.Enchantments.Select(e => (e.Id, e.Tier)));
         Assert.Equal(3, knife.Enchantments[1].LevelsFor(1));   // tier scales a catalogue entry: 3 HP a drink
         Assert.Equal(3, TestWeapons.Get("rotwood").Innate!.Tier);
-        using (TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using (TestContent.Use(tuning: RaisesAllowed, weapons: FixtureContent.Weapons with { Weapons = [.. FixtureContent.Weapons.Weapons,
             Martial("test_deep_soul", "tower_guard", [(Block, 3), (Push, 1)], ("sturdy", 3))] }))
             Assert.Equal(1, Assert.Single(TestWeapons.Get("test_deep_soul").Enchantments).Tier);
 
@@ -332,30 +332,30 @@ public class UniqueContentTests
         // pinned by its flag — and it drops nowhere even then, since the drop pool names no soul; and an entry
         // that is no soul, put in, loads and leaves every drop. What the load refuses there is a modifier:
         // nothing reads the list for one.
-        var burningLeft = TestContent.Load(ShippedContent.Tuning,
-            ShippedContent.Restricted with { NeverRolled = Souls.Where(s => s != "burning").ToArray() },
-            ShippedContent.Enchantments, ShippedContent.Weapons);
+        var burningLeft = TestContent.Load(FixtureContent.Tuning,
+            FixtureContent.Restricted with { NeverRolled = Souls.Where(s => s != "burning").ToArray() },
+            FixtureContent.Enchantments, FixtureContent.Weapons);
         Assert.Contains(burningLeft.Enchantments.Rollable, e => e.Id == "burning");
         Assert.Equal(1, new Enchantment(burningLeft.Enchantments["burning"], 3).Tier);
         Assert.DoesNotContain("burning", LootTable.DropPool);
 
-        using (TestContent.Use(ShippedContent.Restricted with { NeverRolled = [.. Souls, "flaming"] }))
+        using (TestContent.Use(FixtureContent.Restricted with { NeverRolled = [.. Souls, "flaming"] }))
         {
             Assert.DoesNotContain(GameContent.Current.Enchantments.Rollable, e => e.Id == "flaming");
             Assert.All(Enum.GetValues<WeaponClass>(), cls => Assert.DoesNotContain("flaming", LootTable.DropOrder(cls)));
         }
         Assert.Contains("flaming", LootTable.DropOrder(WeaponClass.Dagger));   // the shipped file rolls it
 
-        var ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning,
-            ShippedContent.Restricted with { NeverRolled = [.. Souls, "Block"] },
-            ShippedContent.Enchantments, ShippedContent.Weapons));
+        var ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning,
+            FixtureContent.Restricted with { NeverRolled = [.. Souls, "Block"] },
+            FixtureContent.Enchantments, FixtureContent.Weapons));
         Assert.Equal(("Block", ContentValidator.RuleNeverRolledNamesEnchantments), (ex.EntryId, ex.Rule));
 
         // And a soul whose flag a code edit dropped is caught where the flag is read, not at neverRolled,
         // which does not ask it: the unique carrying it needs a soul.
-        ex = Assert.Throws<ContentException>(() => TestContent.Load(ShippedContent.Tuning, ShippedContent.Restricted,
-            new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == "siphon" ? e with { Unique = false } : e).ToList()),
-            ShippedContent.Weapons));
+        ex = Assert.Throws<ContentException>(() => TestContent.Load(FixtureContent.Tuning, FixtureContent.Restricted,
+            new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Select(e => e.Id == "siphon" ? e with { Unique = false } : e).ToList()),
+            FixtureContent.Weapons));
         Assert.Equal(("widowmaker", ContentValidator.RuleMartialUniqueOneSoul), (ex.EntryId, ex.Rule));
 
         // And a soul exists only on the uniques that carry it: content handing one to a variant is refused.
@@ -445,7 +445,7 @@ public class UniqueContentTests
         Assert.Contains("'poison'", ex.Message);
 
         // Legitimate: a wand fixing its element at tier 3, and a staff dropping with a second catalogue entry.
-        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: FixtureContent.Weapons with { Weapons = [.. FixtureContent.Weapons.Weapons,
             Wand("test_deep_ember", "wand_of_the_blast", "flaming") with { Enchantments = [new EnchantmentRef("flaming", 3)] },
             Staff("test_mending_ward", "staff_of_renewal", "regeneration", "ward")] });
         Assert.Equal(("flaming", 3), (TestWeapons.Get("test_deep_ember").Innate!.Id, TestWeapons.Get("test_deep_ember").Innate!.Tier));
@@ -486,7 +486,7 @@ public class UniqueContentTests
             w => Assert.True(w.Forged.ContainsKey(Light) || w.Forged.ContainsKey(Resonant), $"{w.Id} carries a dependency off the currency group"));
 
         // Both legitimate homes load beside the defaults, with the element ahead of the burn.
-        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons,
+        using var _ = TestContent.Use(tuning: RaisesAllowed, weapons: FixtureContent.Weapons with { Weapons = [.. FixtureContent.Weapons.Weapons,
             Martial("test_leech", "flensing_knife", [(CritWindow, 3), (CritMultiplier, 1), (Light, 1)], ("vampiric", 3), ("overheal", 1)),
             Wand("test_cinder", "wand_of_the_blast", "flaming", "burning")] });
         Assert.Equal(new[] { "vampiric", "overheal" }, TestWeapons.Get("test_leech").Enchantments.Select(e => e.Id));
@@ -688,7 +688,7 @@ public class UniqueContentTests
 
     private static WeaponDef Martial(string id, string? derivedFrom, (ModifierType Type, int Stacks)[] forged, params (string Id, int Tier)[] enchantments)
     {
-        var variant = ShippedContent.Weapons.Weapons.First(w => w.Id == (derivedFrom == "the_bulwark" ? "tower_guard" : derivedFrom ?? "tower_guard"));
+        var variant = FixtureContent.Weapons.Weapons.First(w => w.Id == (derivedFrom == "the_bulwark" ? "tower_guard" : derivedFrom ?? "tower_guard"));
         return new WeaponDef(id, id, variant.Class, Role: null, variant.Range, variant.Damage, variant.Cost, variant.ManaCost,
             forged.ToDictionary(f => f.Type, f => f.Stacks),
             enchantments.Select(e => new EnchantmentRef(e.Id, e.Tier)).ToList(),
@@ -697,7 +697,7 @@ public class UniqueContentTests
 
     private static WeaponDef Staff(string id, string derivedFrom, params string[] enchantmentIds)
     {
-        var variant = ShippedContent.Weapons.Weapons.First(w => w.Id == derivedFrom);
+        var variant = FixtureContent.Weapons.Weapons.First(w => w.Id == derivedFrom);
         return variant with { Id = id, Name = id, Enchantments = enchantmentIds.Select(e => new EnchantmentRef(e)).ToList(), Unique = true, DerivedFrom = derivedFrom };
     }
 
@@ -706,17 +706,17 @@ public class UniqueContentTests
 
     private static ContentException LoadWith(WeaponDef extra)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            RaisesAllowed, ShippedContent.Restricted, ShippedContent.Enchantments,
-            ShippedContent.Weapons with { Weapons = [.. ShippedContent.Weapons.Weapons, extra] }));
+            RaisesAllowed, FixtureContent.Restricted, FixtureContent.Enchantments,
+            FixtureContent.Weapons with { Weapons = [.. FixtureContent.Weapons.Weapons, extra] }));
 
     private static ContentException LoadEnchantmentEditing(string id, Func<EnchantmentDef, EnchantmentDef> edit)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            RaisesAllowed, ShippedContent.Restricted,
-            new EnchantmentsData(ShippedContent.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList()),
-            ShippedContent.Weapons));
+            RaisesAllowed, FixtureContent.Restricted,
+            new EnchantmentsData(FixtureContent.Enchantments.Enchantments.Select(e => e.Id == id ? edit(e) : e).ToList()),
+            FixtureContent.Weapons));
 
     private static ContentException LoadEditing(string id, Func<WeaponDef, WeaponDef> edit)
         => Assert.Throws<ContentException>(() => TestContent.Load(
-            RaisesAllowed, ShippedContent.Restricted, ShippedContent.Enchantments,
-            ShippedContent.Weapons with { Weapons = ShippedContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() }));
+            RaisesAllowed, FixtureContent.Restricted, FixtureContent.Enchantments,
+            FixtureContent.Weapons with { Weapons = FixtureContent.Weapons.Weapons.Select(w => w.Id == id ? edit(w) : w).ToList() }));
 }

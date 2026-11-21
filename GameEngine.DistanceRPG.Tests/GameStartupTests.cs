@@ -40,7 +40,7 @@ public class GameStartupTests
         // alone — the content GameContent.Current opens on.
         var use = typeof(GameContent).GetMethod(nameof(GameContent.Use))!;
         var shippedLoad = typeof(ShippedData).GetMethod(nameof(ShippedData.Load))!;
-        var load = typeof(ContentFiles).GetMethod(nameof(ContentFiles.Load))!;
+        var load = typeof(ContentFiles).GetMethod(nameof(ContentFiles.Load), [typeof(ContentTexts), typeof(ContentTexts)])!;
         var baseDirectory = typeof(AppContext).GetProperty(nameof(AppContext.BaseDirectory))!.GetMethod!;
         Assert.Equal(["DistanceRpgGame.LoadData"], Callers(use));
         Assert.Equal(["DistanceRpgGame.LoadData"], Callers(shippedLoad));
@@ -133,7 +133,7 @@ public class GameStartupTests
         var loadBuiltIn = typeof(ShippedData).GetMethod("LoadBuiltIn", Declared)!;
         var current = typeof(GameContent).GetProperty(nameof(GameContent.Current))!.GetMethod!;
         var fromLoad = Reachable(typeof(DistanceRpgGame).GetMethod("LoadData", Declared)!, typeof(ShippedData).GetMethod(nameof(ShippedData.Load))!);
-        Assert.Contains(fromLoad, m => Same(m, typeof(ContentFiles).GetMethod(nameof(ContentFiles.Load))!));
+        Assert.Contains(fromLoad, m => Same(m, typeof(ContentFiles).GetMethod(nameof(ContentFiles.Load), [typeof(ContentTexts), typeof(ContentTexts)])!));
         Assert.Equal([], ReadersOf(loadBuiltIn, fromLoad));
         Assert.Equal([], ReadersOf(current, fromLoad));
     }

@@ -180,14 +180,15 @@ public sealed class EnchantmentXpTests : IDisposable
     }
 
     [Fact]
-    public void AStaffsInnateClimbsThroughTryCastAndItsTierTakesItsLockAtOnce()
+    public void AStaffsInnateFillsItsBarThroughTryCast_AndItsTierWaitsForTheEnchanter()
     {
         // The whole cast path, from the entry point in: TryCast's guards, its
         // ResolvedManaCost and a fumble's doubling are the arithmetic the
         // Spent/Wanted scaling was written against, and EveryCatalogueEntryCanClimb
         // drives its cast cases with a raw Raise, so one credit is pinned here
         // through the real door instead. A Staff of Renewal, cast until its innate
-        // leaves tier 1.
+        // fills its tier-1 bar -- which is as far as use takes it (ruled after
+        // play, 2026-11-19): the tier rises at the enchanter, on a service.
         var grid = new int[20, 20];
         int roll = 10;
         var staff = TestWeapons.Get("staff_of_renewal");
@@ -196,8 +197,8 @@ public sealed class EnchantmentXpTests : IDisposable
         var ally = TestPools.Char("B", x: bx, y: by);
         var turns = new TurnSystem(grid, new[] { caster, ally }, Array.Empty<EnemyState>(), () => roll);
         var spent = ManaProbe(turns);
-        var tiered = new List<(ActorState Wielder, string Id, int Tier)>();
-        turns.EnchantmentTiered += (wielder, _, entry) => tiered.Add((wielder, entry.Id, entry.Tier));
+        var filled = new List<(ActorState Wielder, string Id, int Tier, int Xp)>();
+        turns.EnchantmentBarFilled += (wielder, _, entry) => filled.Add((wielder, entry.Id, entry.Tier, entry.Xp));
         int manaXp = caster.ManaXp;
 
         Assert.Equal(13, staff.ResolvedManaCost);
@@ -209,10 +210,10 @@ public sealed class EnchantmentXpTests : IDisposable
             Assert.True(turns.TryCast(caster, ally));
         }
         Assert.Equal((1, 14), Entry(staff, 0));           // a point short of the bar
+        Assert.False(staff.Enchantments[0].BarFull);
+        Assert.Empty(filled);
 
-        // The fifteenth crosses it. The ceiling as it stands going in is what the
-        // clamp below is read against, because the same record's mana credit
-        // grows the earned pool a point on its way past.
+        // The fifteenth fills it.
         caster.Mana = caster.UsableMaxMana;
         caster.Movement.Reset(Premise.Budget, MoveReason.Restore);
         int ceiling = caster.UsableMaxMana;
@@ -220,23 +221,22 @@ public sealed class EnchantmentXpTests : IDisposable
 
         // Fifteen records of fourteen -- thirteen of cast and the innate's one --
         // every point of which grew the pool, and the innate credited the one it
-        // paid each time: fifteen, which is the bar it has just crossed.
+        // paid each time: fifteen, which is the bar. It is full, said once, and
+        // still tier 1.
         Assert.Equal(15, spent.Count);
         Assert.All(spent, s => Assert.Equal((14, 14), (s.Wanted, s.Spent)));
         Assert.Equal(15 * 14, caster.ManaXp - manaXp);
-        Assert.Equal((2, 0), Entry(staff, 0));
-        Assert.Equal(((ActorState)caster, "regeneration", 2), Assert.Single(tiered));
+        Assert.Equal((1, 15), Entry(staff, 0));
+        Assert.True(staff.Enchantments[0].BarFull);
+        Assert.Equal(((ActorState)caster, "regeneration", 1, 15), Assert.Single(filled));
 
-        // And the tier it just bought reserves its own pool at once: the lock is
-        // the tier's, so the ceiling falls by fifteen as the bar is crossed and
-        // the mana above it is clamped away where an equip would clamp it, rather
-        // than staying spendable until the wielder next swaps a weapon. The
-        // record is queued, so the reservation is taken first and the cast comes
-        // out of what it leaves.
-        Assert.Equal(30, staff.Enchantments[0].EffectiveLock);
-        Assert.Equal(30, caster.PaidLocks);
-        Assert.Equal(caster.MaxMana - 30, caster.UsableMaxMana);
-        Assert.Equal(ceiling - 15 - 14, caster.Mana);
+        // So nothing deepens under the wielder mid-run: the lock is still the
+        // tier-1 lock, no reservation is taken, and the cast came out of the pool
+        // and nothing else did.
+        Assert.Equal(15, staff.Enchantments[0].EffectiveLock);
+        Assert.Equal(15, caster.PaidLocks);
+        Assert.Equal(caster.MaxMana - 15, caster.UsableMaxMana);
+        Assert.Equal(ceiling - 14, caster.Mana);
 
         // A fumble doubles the cast's own mana after CanCast has checked the
         // undoubled price, so the record wants twenty-six of a pool holding
@@ -250,9 +250,28 @@ public sealed class EnchantmentXpTests : IDisposable
         Assert.True(turns.TryCast(caster, ally));
 
         Assert.Equal((26, 13), (spent[^1].Wanted, spent[^1].Spent));
-        Assert.Equal((2, 0), Entry(staff, 0));
+        Assert.Equal((1, 15), Entry(staff, 0));
         Assert.Equal(0, caster.Mana);
         Assert.Equal(15 * 14 + 13, caster.ManaXp - manaXp);
+
+        // A full bar banks nothing more, however much is cast through it: the
+        // trigger is still paid, and still grows the caster's pool, but the entry
+        // stays at its bar and says nothing again -- one tier a service, at most.
+        roll = 10;
+        caster.Mana = caster.UsableMaxMana;
+        caster.Movement.Reset(Premise.Budget, MoveReason.Restore);
+        Assert.True(turns.TryCast(caster, ally));
+        Assert.Equal((14, 14), (spent[^1].Wanted, spent[^1].Spent));
+        Assert.Equal((1, 15), Entry(staff, 0));
+        Assert.Single(filled);
+
+        // The enchanter's service is what raises it: one tier, the new one from
+        // no XP, and the deeper lock with it.
+        var risen = Assert.Single(staff.Maintain());
+        Assert.Equal(("regeneration", 2, 0), (risen.Id, risen.Tier, risen.Xp));
+        Assert.Equal((2, 0), Entry(staff, 0));
+        Assert.Equal(30, staff.Enchantments[0].EffectiveLock);
+        Assert.Empty(staff.Maintain());                   // and nothing more until use fills the next bar
     }
 
     [Fact]
@@ -380,17 +399,25 @@ public sealed class EnchantmentXpTests : IDisposable
         var spent = ManaProbe(turns);
         member.Hp = 1;                                    // a drink has somewhere to land
 
-        for (int fired = 0; fired < 200 && weapon.Enchantments[0].Tier == 1; fired++)
+        int bar = weapon.Enchantments[0].TierCost();
+        for (int fired = 0; fired < 200 && !weapon.Enchantments[0].BarFull; fired++)
         {
+            Assert.Equal(spent.Sum(s => s.Spent), weapon.Enchantments[0].Xp);   // short of the bar, every point paid is banked
             member.Mana = member.UsableMaxMana;
             member.Movement.Reset(Premise.Budget, MoveReason.Restore);
             Fire(turns, member, dummy, def, weapon);
         }
 
+        // Use fills the bar and stops there (ruled after play, 2026-11-19): what
+        // was paid reaches it, the entry holds exactly it, and the tier is the
+        // enchanter's to raise, on a service.
         Assert.True(spent.Count > 0, $"'{id}' fired without paying anything.");
         Assert.All(spent, s => Assert.True(s.Spent > 0, $"'{id}' fired free."));
-        Assert.True(weapon.Enchantments[0].Tier > 1, $"'{id}' never left tier 1.");
-        Assert.Equal(spent.Sum(s => s.Spent), TotalCredited(weapon.Enchantments[0]));
+        Assert.True(weapon.Enchantments[0].BarFull, $"'{id}' never filled its bar.");
+        Assert.Equal((1, bar), Entry(weapon, 0));
+        Assert.True(spent.Sum(s => s.Spent) >= bar);
+        weapon.Maintain();
+        Assert.Equal((2, 0), Entry(weapon, 0));
     }
 
     /// <summary>
@@ -412,24 +439,6 @@ public sealed class EnchantmentXpTests : IDisposable
             return;
         }
         Assert.True(turns.TryAttack(member, dummy));
-    }
-
-    /// <summary>
-    /// The mana an entry has been credited in total: the bars it has crossed
-    /// plus the remainder into the tier it is on. Replayed off the entry rather
-    /// than counted at the call sites, so the theory compares what was spent
-    /// against what the ladder actually banked.
-    /// </summary>
-    private static int TotalCredited(Enchantment entry)
-    {
-        int total = entry.Xp;
-        var walk = new Enchantment(entry.Def, Tier: 1);
-        while (walk.Tier < entry.Tier)
-        {
-            total += walk.TierCost();
-            walk = walk with { Tier = walk.Tier + 1 };
-        }
-        return total;
     }
 
     /// <summary>
@@ -515,7 +524,14 @@ public sealed class EnchantmentXpTests : IDisposable
         Assert.Equal(20, spent.Where(s => s.Self == wizard).Sum(s => s.Spent));
         Assert.Equal(20, spent.Where(s => s.Self == fighter).Sum(s => s.Spent));
 
-        // The bars are 20 and then 40, whoever holds the knife.
+        // The bar is 20, whoever holds the knife, and both have filled it: the
+        // enchanter's next service raises each to tier 2 (after play, 2026-11-19).
+        Assert.Equal((1, 20), Entry(wizardKnife, 0));
+        Assert.Equal((1, 20), Entry(fighterKnife, 0));
+        Assert.True(wizardKnife.Enchantments[0].BarFull);
+        Assert.True(fighterKnife.Enchantments[0].BarFull);
+        wizardKnife.Maintain();
+        fighterKnife.Maintain();
         Assert.Equal((2, 0), Entry(wizardKnife, 0));
         Assert.Equal((2, 0), Entry(fighterKnife, 0));
         Assert.Equal(wizardKnife.Enchantments[0].EffectiveLock, fighterKnife.Enchantments[0].EffectiveLock);
