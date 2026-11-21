@@ -813,7 +813,10 @@ back to it, and the game quits from it.
   AS FILES, NEVER DELETED - ENTER: YES - ESC: NO` — and, on Enter, sets that
   slot's save and its backup aside in the slot's own folder as
   `saves\slot-2\campaign.abandoned-N.json` (the backup first, so the higher number
-  is the later save), never deleted; the old autosave and every other slot are
+  is the later save), never deleted, and said in one notice for the two — `CAMPAIGN.JSON
+  WAS LEFT FOR A NEW CAMPAIGN - SET ASIDE AS ...\CAMPAIGN.ABANDONED-2.JSON (ITS BACKUP AS
+  CAMPAIGN.ABANDONED-1.JSON) - TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT FOLDER AS
+  CAMPAIGN.JSON`; the old autosave and every other slot are
   untouched. **To play the old campaign again, move its file into an empty slot
   folder as `campaign.json`** — `saves\slot-3\campaign.json`, say — where LOAD GAME
   lists it: renamed back where it lies, it would take the new campaign's save's

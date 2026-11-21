@@ -435,7 +435,9 @@ internal static class CampaignBoot
     /// <summary>
     /// NEW CAMPAIGN — on the title, or <c>--new-campaign</c> at launch: the slot the
     /// new campaign begins in has its backup and then its save set aside as
-    /// <c>abandoned</c> — never deleted — each notice ending <see cref="MoveToPlay"/>,
+    /// <c>abandoned</c> — never deleted — said in one notice when both go
+    /// (<see cref="AbandonedNotice"/>) and in the file's own when only one is there,
+    /// either ending <see cref="MoveToPlay"/>,
     /// and a new campaign is handed back, which the game saves into the slot before
     /// it plays it (<c>DistanceRpgGame.BeginNewCampaign</c>; SLOT DECISION 2). Both
     /// go. A backup left behind would be resumed as though it were the new
@@ -485,6 +487,16 @@ internal static class CampaignBoot
         }
         if (!stuck)
             report?.Invoke($"[Save] {asked}: a new campaign begins in {store.Folder}");
+
+        // The save and its backup are one campaign to the player, so both set aside
+        // are said once (the user's ask of 2026-11-20: two notices read as the same
+        // thing said twice). Each file keeps its own notice in what was moved, which
+        // is what a file that will not go back is said by (PutBack).
+        if (!stuck && moved is [{ Backup: true } backedUp, { Backup: false } saved])
+        {
+            setAside.Clear();
+            setAside.Add(AbandonedNotice(what, saved.Path, backedUp.Path));
+        }
         return new BootResult(CampaignState.Start(content), Resumed: false, View: null, StraightInto: null, FirstSeed: null, [NewCampaignBegins, .. setAside])
         {
             Abandoned = moved,
@@ -1011,6 +1023,21 @@ internal static class CampaignBoot
     /// <summary>A save set aside: which file, what became of it, the full path it has now, and how to play it again — <see cref="TryAgain"/>, or NEW CAMPAIGN's <see cref="MoveToPlay"/>.</summary>
     internal static string SetAsideNotice(string file, string what, string path, string tail = TryAgain)
         => $"{file.ToUpperInvariant()} {what.ToUpperInvariant()} - SET ASIDE AS {path} - {tail}";
+
+    /// <summary>
+    /// NEW CAMPAIGN set a slot's save and its backup aside (<see cref="Abandon"/>):
+    /// one notice for the two, since they are one campaign to the player — the
+    /// save's own notice, with where its backup went beside it by name, the two
+    /// lying in one folder: <c>CAMPAIGN.JSON WAS LEFT FOR A NEW CAMPAIGN - SET ASIDE
+    /// AS …/slot-1/campaign.abandoned-18.json (ITS BACKUP AS
+    /// campaign.abandoned-17.json) - TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT
+    /// FOLDER AS CAMPAIGN.JSON</c>. The save is the one to move: it is the newer.
+    /// </summary>
+    /// <param name="what">What became of them, as each file's own notice says it: <c>was left for a new campaign</c>.</param>
+    /// <param name="path">The full path the save has now.</param>
+    /// <param name="backupPath">The path the backup has now, of which the notice says the name.</param>
+    internal static string AbandonedNotice(string what, string path, string backupPath)
+        => $"{SaveStore.FileName.ToUpperInvariant()} {what.ToUpperInvariant()} - SET ASIDE AS {path} (ITS BACKUP AS {Path.GetFileName(backupPath)}) - {MoveToPlay}";
 
     /// <summary>
     /// How every stuck notice ends (<see cref="StuckNotice"/>): its slot takes no

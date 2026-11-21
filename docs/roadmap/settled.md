@@ -4760,3 +4760,14 @@ resting and let XP count in every mode (DECISIONS 23 and 24).
     game by design, so a test no longer says anything about the shipped numbers.
   - *One seam in the game for it*: `ContentFiles.Load` takes the roster it checks
     the files against, the game's own by default.
+- **NEW CAMPAIGN says what it set aside once, ruled 2026-11-20 (after play).** A
+  slot's save and its backup each had a set-aside notice, eight lines on the
+  screen between runs that read to the user as one thing said twice. Both set
+  aside are now one notice, the save's own with where its backup went by name:
+  `CAMPAIGN.JSON WAS LEFT FOR A NEW CAMPAIGN - SET ASIDE AS .../CAMPAIGN.ABANDONED-18.JSON
+  (ITS BACKUP AS CAMPAIGN.ABANDONED-17.JSON) - TO PLAY IT AGAIN, MOVE IT INTO AN
+  EMPTY SLOT FOLDER AS CAMPAIGN.JSON`. A slot holding only one of the two says
+  that file's own notice, as before; a file that will not move, and a file that
+  will not go back when the new campaign never begins, are each still said on
+  their own. Both files are still set aside and never deleted, so a slot begun
+  over many times keeps two more `campaign.abandoned-N.json` each time.

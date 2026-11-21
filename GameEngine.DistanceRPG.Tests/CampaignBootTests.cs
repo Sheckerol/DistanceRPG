@@ -73,6 +73,21 @@ public sealed class CampaignBootTests : IDisposable
     /// whose name the new campaign's save takes, <c>TO PLAY IT AGAIN, MOVE IT INTO
     /// AN EMPTY SLOT FOLDER AS CAMPAIGN.JSON</c>.
     /// </summary>
+    /// <summary>
+    /// NEW CAMPAIGN's one notice for a save and its backup both set aside (the
+    /// user's ask of 2026-11-20: two notices read as one thing said twice): the
+    /// save's own, with where the backup went by name, ending how to play it again.
+    /// </summary>
+    private static void SaysAbandoned(string notice, string what, string path, string backupPath)
+    {
+        Assert.Equal(CampaignBoot.AbandonedNotice(what, path, backupPath), notice);
+        Assert.Equal($"CAMPAIGN.JSON {what.ToUpperInvariant()} - SET ASIDE AS {path} (ITS BACKUP AS {Path.GetFileName(backupPath)}) - "
+            + "TO PLAY IT AGAIN, MOVE IT INTO AN EMPTY SLOT FOLDER AS CAMPAIGN.JSON", notice);
+        Assert.True(Path.IsPathFullyQualified(path), path);
+        Assert.Equal(Path.GetDirectoryName(path), Path.GetDirectoryName(backupPath));   // beside it: the name alone says where
+        Assert.DoesNotContain("CAMPAIGN.BAK.JSON", notice, StringComparison.Ordinal);   // nothing said twice
+    }
+
     private static void SaysSetAside(string notice, string file, string what, string path, bool abandoned = false)
     {
         string tail = abandoned ? CampaignBoot.MoveToPlay : CampaignBoot.TryAgain;
@@ -497,8 +512,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal((false, false, false), (chosen.Store.HasSave, chosen.Store.HasBackup, chosen.Store.WasResuming));
             Assert.Collection(begun.Notices,
                 notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
-                notice => SaysSetAside(notice, "campaign.bak.json", "was left for a new campaign", backupAside, abandoned: true),
-                notice => SaysSetAside(notice, "campaign.json", "was left for a new campaign", aside, abandoned: true));
+                notice => SaysAbandoned(notice, "was left for a new campaign", aside, backupAside));
             Assert.All(begun.Notices.Skip(1), notice => Assert.DoesNotContain(CampaignBoot.TryAgain, notice, StringComparison.Ordinal));
             Assert.DoesNotContain(begun.Notices, notice => notice.Contains(Program.NewCampaignOption, StringComparison.OrdinalIgnoreCase));
             Assert.Contains(log, line => line.StartsWith($"[Save] NEW CAMPAIGN: a new campaign begins in {chosen.Store.Folder}", StringComparison.Ordinal));
@@ -615,7 +629,13 @@ public sealed class CampaignBootTests : IDisposable
             var three = Bytes(slot3.Store);
             var abandoned = CampaignBoot.Abandon(slot3, GameContent.Current, how: null);
             Assert.Equal([true, false], abandoned.Abandoned.Select(file => file.Backup));
-            Assert.Equal(abandoned.Notices.Skip(1), abandoned.Abandoned.Select(file => file.Notice));
+            // Said once for the two, while each file keeps its own notice in the list
+            // of what was moved — what a file that will not go back is said by.
+            Assert.Equal([CampaignBoot.AbandonedNotice("was left for a new campaign", abandoned.Abandoned[1].Path, abandoned.Abandoned[0].Path)], abandoned.Notices.Skip(1));
+            Assert.Equal(
+                [CampaignBoot.SetAsideNotice(SaveStore.BackupName, "was left for a new campaign", abandoned.Abandoned[0].Path, CampaignBoot.MoveToPlay),
+                    CampaignBoot.SetAsideNotice(SaveStore.FileName, "was left for a new campaign", abandoned.Abandoned[1].Path, CampaignBoot.MoveToPlay)],
+                abandoned.Abandoned.Select(file => file.Notice));
             Assert.Equal((false, false), (slot3.Store.HasSave, slot3.Store.HasBackup));
             Directory.CreateDirectory(slot3.Store.TempPath);
             string failed = Assert.IsType<string>(CampaignBoot.Save(slot3, abandoned.Campaign));
@@ -1404,8 +1424,7 @@ public sealed class CampaignBootTests : IDisposable
             Assert.Equal((false, false), (store.HasSave, store.HasBackup));   // nothing of the old campaign's is left to resume
             Assert.Collection(boot.Notices,
                 notice => Assert.Equal(CampaignBoot.NewCampaignBegins, notice),
-                notice => SaysSetAside(notice, "campaign.bak.json", "was left for a new campaign (--new-campaign)", backupAside, abandoned: true),
-                notice => SaysSetAside(notice, "campaign.json", "was left for a new campaign (--new-campaign)", aside, abandoned: true));
+                notice => SaysAbandoned(notice, "was left for a new campaign (--new-campaign)", aside, backupAside));
             Assert.False(store.WasResuming);
 
             // All three on the screen between runs, whole — the save's word is — for
