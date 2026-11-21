@@ -521,19 +521,20 @@ public sealed record Tuning
     // ---- Inventory (§4.4) ----
 
     /// <summary>
-    /// The party's whole carry, in weapon slots: 6 a member, 24 party-wide
-    /// (§4.4, settled.md), shared evenly by <see cref="GameConstants.PartySize"/>
-    /// members into <see cref="PartyMemberState.InventorySlots"/>. Loot and
-    /// weapons share it — there is no haul bag — and slot 0 of each member's
-    /// share is the weapon in hand. "Exact number is a tuning target; the
-    /// structure is the decision."
+    /// The party's whole carry, in weapon slots, shared evenly by
+    /// <see cref="GameConstants.PartySize"/> members into
+    /// <see cref="PartyMemberState.InventorySlots"/>: 31 a member, 124 party-wide,
+    /// since the user's ruling of 2026-11-21 — the hand and a bag of thirty —
+    /// where §4.4 began at 6 and 24 (settled.md). Loot and weapons share it —
+    /// there is no haul bag — and slot 0 of each member's share is the weapon in
+    /// hand. "Exact number is a tuning target; the structure is the decision."
     /// <para>
-    /// A multiple of the party's size, at most 36:
+    /// A multiple of the party's size, at most 124:
     /// <see cref="ContentValidator.ValidateTuning"/> refuses a carry that does not
     /// divide evenly, and one deeper than
-    /// <see cref="GameConstants.MaxInventorySlots"/> (nine) a member, because a
-    /// slot is equipped by the number key printed beside it and the number row
-    /// stops at 9.
+    /// <see cref="GameConstants.MaxInventorySlots"/> (31) a member, because a
+    /// slot is picked on its cell of the bag panel, which draws the hand and
+    /// three rows of ten.
     /// </para>
     /// </summary>
     public int PartyCarrySlots { get; init; }

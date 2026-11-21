@@ -335,11 +335,12 @@
 
   /* ---- Inventory ---- */
 
-  /* The party's whole carry in weapon slots, shared evenly by its four members - 6 each at 24: slot
-     1 is the hand, the rest the bag, loot and weapons alike. Rounded down to a multiple of four, at
-     most 36 (nine a member, as far as the number keys reach), and never less than the roster's
-     starting loadouts need. */
-  "PartyCarrySlots": 24,
+  /* The party's whole carry in weapon slots, shared evenly by its four members - 31 each at 124:
+     the hand, and a bag of 30 the bag panel draws as three rows of ten, loot and weapons alike.
+     Rounded down to a multiple of four, at most 124 (the panel draws no more), and never less than
+     the roster's starting loadouts need. A campaign saved under a smaller carry has its bags grown
+     to this when it loads; a smaller number here never shrinks a saved bag. */
+  "PartyCarrySlots": 124,
 
   /* ---- Consumables ---- */
   /* What a drink costs, what a potion restores and what the farm yields, played since Phase 6b's

@@ -547,7 +547,7 @@ public sealed class DungeonHud
         }
 
         if (scene.InventoryOpen)
-            DrawInventory(w, h, active, turns, scene.LeaveArmed, BagLine(scene.ActiveCharacter));
+            DrawInventory(w, h, active, turns, scene.LeaveArmed, BagLine(scene.ActiveCharacter), scene.PickBagSlot);
 
         if (scene.PauseMenuOpen)
             DrawMenu(w, h, scene);
@@ -1598,11 +1598,16 @@ public sealed class DungeonHud
     /// <summary>A rising line's scale, over the floor and in the bag's answer row alike.</summary>
     internal const float FloatingTextScale = 2f;
 
-    // Inventory panel geometry. The panel was a fixed height until §2.2, so a
-    // top fixed at the middle of the window always had room under it. It grows
-    // now, by a row per class the member is levelling or holding, and what a
-    // short window loses first are the lines under the rows: what a swap costs
-    // and which key equips.
+    // Inventory panel geometry (the user's ruling of 2026-11-21, after play: a bag
+    // of thirty, three rows of ten, picked with the mouse and read by hovering).
+    // The panel is the member's hand, with its statline under its name, over the
+    // bag as a grid of cells, ten to a row; under the grid the member's
+    // progression rows, what a swap costs, and the hint. A cell names what it
+    // holds in two short lines, and the whole of it is read in the tooltip its
+    // hover raises (DrawTooltip). A right click on a cell equips or drinks, or
+    // with X armed, leaves. The panel grows by a row per class the member is
+    // levelling or holding, and what a short window loses first are the lines
+    // under the rows: what a swap costs and what a click does.
 
     /// <summary>The panel's title, <c>INVENTORY - CHAR A</c>, at the panel's top: its scale.</summary>
     internal const float InventoryTitleScale = 3f;
@@ -1619,21 +1624,60 @@ public sealed class DungeonHud
     /// </summary>
     internal const float InventoryAnswerDrop = 26f;
 
-    /// <summary>The first slot's line, under the title and the EQUIPPED label.</summary>
+    /// <summary>The hand's line — the weapon in it, by name — under the title and the EQUIPPED label.</summary>
     internal const float InventorySlotsTop = 70f;
 
-    /// <summary>A slot: its name, and the statline under it.</summary>
+    /// <summary>The hand: its weapon's name, and the first line of the statline under it.</summary>
     private const float InventorySlotPitch = 46f;
 
     /// <summary>
-    /// A slot's statline: how far under the name it starts, how far in — past the
-    /// slot's number — its scale, and the pitch of each line it wraps to past its
-    /// first, which a slot grows by (<see cref="SlotDetailLines"/>).
+    /// A statline — the hand's, and a tooltip's: how far under the name it starts,
+    /// how far in the hand's is drawn, its scale, and the pitch of each line it
+    /// wraps to past its first, which the hand grows by (<see cref="SlotDetailLines"/>).
     /// </summary>
     private const float InventoryDetailDrop = 18f;
     private const float InventoryDetailIndent = 3 * GlyphAdvance * 2f;
     internal const float InventoryDetailScale = 1.3f;
     private const float InventoryDetailPitch = 12f;
+
+    /// <summary>How many cells a row of the bag's grid has: ten (the user's ruling of 2026-11-21).</summary>
+    internal const int BagColumns = 10;
+
+    /// <summary>
+    /// The most rows of the grid the panel is laid out for: three, a bag of thirty.
+    /// With the hand it is the deepest carry the loader admits
+    /// (<see cref="GameConstants.MaxInventorySlots"/>, held to this by test), so no
+    /// slot a member carries is without its cell.
+    /// </summary>
+    internal const int BagRowsMost = 3;
+
+    /// <summary>A cell and the gap after it, in a window with room; a narrower window's cells shrink to fit ten across (<see cref="BagCellPitch"/>), never under the least.</summary>
+    internal const float BagCellPitchMost = 96f;
+    private const float BagCellPitchLeast = 24f;
+
+    /// <summary>The gap between two cells, across and down.</summary>
+    internal const float BagCellGap = 4f;
+
+    /// <summary>A cell: two lines of its item's name. And a row of them with the gap under it.</summary>
+    internal const float BagCellHeight = 32f;
+    internal const float BagRowPitch = BagCellHeight + BagCellGap;
+
+    /// <summary>A cell's two lines: their scale, how far in from the cell's left and top the first starts, and the second under it.</summary>
+    internal const float BagCellScale = 1.2f;
+    private const float BagCellPad = 4f;
+    private const float BagCellTextDrop = 5f;
+    private const float BagCellLinePitch = 12f;
+
+    /// <summary>The label over the grid (<see cref="BagLabel"/>), and the gap under the grid's last row.</summary>
+    private const float BagLabelHeight = 16f;
+    private const float BagGridGap = 8f;
+
+    /// <summary>A cell's backing, under its text: an empty one a shade darker than a full one, so the grid reads as a grid over the dimmed floor.</summary>
+    private static readonly Vector4 BagCellEmpty = new(1f, 1f, 1f, 0.05f);
+    private static readonly Vector4 BagCellFull = new(1f, 1f, 1f, 0.13f);
+
+    /// <summary>The window's margin either side of the grid, which a narrow window's cells shrink to keep.</summary>
+    private const float InventorySideMargin = 20f;
 
     /// <summary>The PROGRESSION label over the rows.</summary>
     private const float InventoryLabelHeight = 16f;
@@ -1641,11 +1685,11 @@ public sealed class DungeonHud
     /// <summary>One pool or proficiency row.</summary>
     private const float InventoryRowPitch = 14f;
 
-    /// <summary>The swap line under the last row, and the key hint under that.</summary>
+    /// <summary>The swap line under the last row, and the hint under that.</summary>
     private const float InventorySwapGap = 16f;
     private const float InventoryHintGap = 26f;
 
-    /// <summary>What a drink costs, under the swap line while the bag holds a potion (<see cref="DrinkCostLine"/>): the key hint moves down by this.</summary>
+    /// <summary>What a drink costs, under the swap line while the bag holds a potion (<see cref="DrinkCostLine"/>): the hint moves down by this.</summary>
     private const float InventoryDrinkPitch = 18f;
 
     /// <summary>The last line's own glyphs, so a height covers what the panel draws and not just where it starts.</summary>
@@ -1660,11 +1704,85 @@ public sealed class DungeonHud
     /// <summary>Clearance kept over it for the two top readouts, which the panel never slides under: the weapon line is its first line alone while a menu is open (<see cref="WeaponLinesShown"/>).</summary>
     private const float InventoryTopMargin = 56f;
 
-    /// <summary>How far either side of the middle the panel's column runs: its slots start this far left, and the header row's right-hand hint ends this far right.</summary>
-    private const float InventoryHalfWidth = 190f;
+    /// <summary>What the hand's line says of a hand that holds nothing.</summary>
+    internal const string EmptyHand = "- NOTHING IN HAND -";
 
     /// <summary>Where the inventory panel opens, how many of its progression rows there is room for, and the line past its last glyph.</summary>
     internal readonly record struct InventoryLayout(float Top, int Rows, float Bottom);
+
+    /// <summary>A cell and the gap after it in a window <paramref name="windowWidth"/> pixels wide: <see cref="BagCellPitchMost"/> while ten fit between the margins, and less in a narrower window.</summary>
+    internal static float BagCellPitch(float windowWidth)
+        => Math.Clamp((windowWidth - 2f * InventorySideMargin) / BagColumns, BagCellPitchLeast, BagCellPitchMost);
+
+    /// <summary>The panel's left edge — the grid's, and every line's over and under it — in a window <paramref name="windowWidth"/> pixels wide: the grid is centred.</summary>
+    internal static float InventoryLeft(float windowWidth)
+        => (windowWidth - (BagColumns * BagCellPitch(windowWidth) - BagCellGap)) / 2f;
+
+    /// <summary>How wide the panel is: ten cells and the gaps between them.</summary>
+    internal static float InventoryWidth(float windowWidth) => BagColumns * BagCellPitch(windowWidth) - BagCellGap;
+
+    /// <summary>The rows of the grid a member with <paramref name="slots"/> slots has, the hand among the slots: ten bag slots a row, the last as short as it comes; none for a hand and no bag.</summary>
+    internal static int BagRows(int slots) => (Math.Max(1, slots) - 1 + BagColumns - 1) / BagColumns;
+
+    /// <summary>How many characters a line of a cell holds, at a cell pitch of <paramref name="pitch"/>: eleven in a window with room, and one at least.</summary>
+    internal static int BagCellChars(float pitch)
+        => Math.Max(1, (int)((pitch - BagCellGap - 2f * BagCellPad) / (GlyphAdvance * BagCellScale)));
+
+    /// <summary>Where bag slot <paramref name="slot"/>'s cell is drawn — slot 1 the first cell of the first row — in a grid whose first cell is at (<paramref name="left"/>, <paramref name="top"/>).</summary>
+    internal static Vector2 BagCell(int slot, float left, float top, float pitch)
+        => new(left + (slot - 1) % BagColumns * pitch, top + (slot - 1) / BagColumns * BagRowPitch);
+
+    /// <summary>
+    /// The bag slot whose cell <paramref name="at"/> is over, in a grid whose first
+    /// cell is at (<paramref name="left"/>, <paramref name="top"/>), for a member
+    /// with <paramref name="slots"/> slots; -1 over none — the gaps between cells,
+    /// and a last row's cells past the bag's last slot, are no slot's.
+    /// </summary>
+    internal static int BagSlotAt(Vector2 at, float left, float top, float pitch, int slots)
+    {
+        float dx = at.X - left, dy = at.Y - top;
+        if (dx < 0f || dy < 0f) return -1;
+        int column = (int)(dx / pitch), row = (int)(dy / BagRowPitch);
+        if (column >= BagColumns) return -1;
+        if (dx - column * pitch >= pitch - BagCellGap || dy - row * BagRowPitch >= BagCellHeight) return -1;   // in a gap
+        int slot = 1 + row * BagColumns + column;
+        return slot < slots ? slot : -1;
+    }
+
+    /// <summary>
+    /// What a cell says of the item in it: <paramref name="name"/> on two lines of
+    /// <paramref name="chars"/> characters at most, broken between words — <c>WAND
+    /// OF THE</c> over <c>BLAST</c>, <c>HEALTH</c> over <c>POTION Q2</c> — a word
+    /// longer than a line cut to it, and what two lines do not hold left out: the
+    /// whole name is the tooltip's.
+    /// </summary>
+    internal static (string First, string Second) CellLabel(string name, int chars)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        string[] lines = ["", ""];
+        if (chars <= 0) return (lines[0], lines[1]);
+        int line = 0;
+        foreach (string word in name.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string joined = lines[line].Length == 0 ? word : $"{lines[line]} {word}";
+            if (joined.Length <= chars)
+            {
+                lines[line] = joined;
+                continue;
+            }
+            if (lines[line].Length > 0 && ++line == lines.Length) break;   // the line is full: the word starts the next
+            lines[line] = word.Length <= chars ? word : word[..chars];
+            if (word.Length > chars && ++line == lines.Length) break;      // a word cut to the line fills it
+        }
+        return (lines[0], lines[1]);
+    }
+
+    /// <summary>The label over the grid: how much of the bag is filled, weapons and potions alike — <c>BAG - 12 OF 30</c>.</summary>
+    internal static string BagLabel(PartyMemberState member)
+    {
+        ArgumentNullException.ThrowIfNull(member);
+        return $"BAG - {member.Inventory.Skip(1).Count(item => item is not null)} OF {member.Inventory.Length - 1}";
+    }
 
     /// <summary>
     /// The panel's vertical fit in a window <paramref name="windowHeight"/>
@@ -1673,23 +1791,23 @@ public sealed class DungeonHud
     /// its centred place while the whole of it fits, slides up — never under
     /// the top readouts — when it does not, and only past that drops rows it
     /// has no room for, from the end of the list, rather than the lines that
-    /// name the swap cost and the equip keys. A row-less panel needs
-    /// <c>228 + 46 × slots</c> px of window (the top margin, the panel's fixed
-    /// lines, its slots and the help line's clearance) — about 370 at Phase 3's
-    /// three slots, about 500 at §4.4's six; the shipped 1280 x 720 window holds
-    /// six with every row printed. Below that even a row-less panel is taller
-    /// than the room under the readouts, and the panel is then anchored as high
-    /// as it goes and clipped: that is a window smaller than the rest of the
-    /// HUD is laid out for either. A slot whose statline wraps
-    /// (<see cref="SlotDetailLines"/>) grows the panel by
-    /// <paramref name="wrappedLines"/> — every slot's lines past its first —
-    /// as a class row does: slid up first, then rows dropped. So does the line
-    /// that says what a drink costs, under the swap line while the bag holds a
-    /// potion (<paramref name="drinkLine"/>, <see cref="DrinkCostLine"/>).
+    /// name the swap cost and what a click does. The slots are the hand's line
+    /// and the bag's grid, a row for every ten bag slots (<see cref="BagRows"/>):
+    /// the shipped 1280 x 720 window holds the hand, three rows of ten and every
+    /// progression row, opening where the panel always has. Below what a
+    /// row-less panel needs it is anchored as high as it goes and clipped: that
+    /// is a window smaller than the rest of the HUD is laid out for either. The
+    /// hand's statline, where it wraps (<see cref="SlotDetailLines"/>), grows the
+    /// panel by <paramref name="wrappedLines"/> — its lines past the first — as a
+    /// class row does: slid up first, then rows dropped. So does the line that
+    /// says what a drink costs, under the swap line while the bag holds a potion
+    /// (<paramref name="drinkLine"/>, <see cref="DrinkCostLine"/>).
     /// </summary>
     internal static InventoryLayout LayoutInventory(float windowHeight, int slots, int rowCount, int wrappedLines = 0, bool drinkLine = false)
     {
-        float fixedHeight = InventorySlotsTop + slots * InventorySlotPitch + wrappedLines * InventoryDetailPitch + InventoryLabelHeight
+        int bagRows = BagRows(slots);
+        float grid = bagRows == 0 ? 0f : BagLabelHeight + bagRows * BagRowPitch + BagGridGap;
+        float fixedHeight = InventorySlotsTop + InventorySlotPitch + wrappedLines * InventoryDetailPitch + grid + InventoryLabelHeight
             + InventorySwapGap + (drinkLine ? InventoryDrinkPitch : 0f) + InventoryHintGap + InventoryLineHeight;
         float floorLine = windowHeight - InventoryBottomMargin;
         float top = MathF.Min(windowHeight / 2f - InventoryCentredOffset,
@@ -1699,17 +1817,17 @@ public sealed class DungeonHud
         return new InventoryLayout(top, rows, top + fixedHeight + rows * InventoryRowPitch);
     }
 
-    /// <summary>How wide a slot's statline may run in a window <paramref name="windowWidth"/> pixels wide: from where it starts, right of the slot's number, to the weapon line's margin from the window's right.</summary>
+    /// <summary>How wide the hand's statline may run in a window <paramref name="windowWidth"/> pixels wide: from where it starts, in from the panel's left, to the panel's right.</summary>
     internal static float InventoryDetailWidth(float windowWidth)
-        => windowWidth - WeaponLineMargin - (windowWidth / 2f - InventoryHalfWidth + InventoryDetailIndent);
+        => InventoryWidth(windowWidth) - InventoryDetailIndent;
 
     /// <summary>
-    /// A bag slot's statline as the bag panel draws it under the weapon's name: the
-    /// weapon's runs as they read in <paramref name="member"/>'s hands
-    /// (<see cref="WeaponRuns"/>) less the name, which is the line above, wrapped to
-    /// <paramref name="width"/> (<see cref="Wrap"/>) — so the weapon in hand's
-    /// enchantments, each with its lock and bar, run to their last rather than off
-    /// the window's right.
+    /// A weapon's statline as the bag panel draws it under the weapon's name — the
+    /// hand's on the panel, a bag slot's in its tooltip: the weapon's runs as they
+    /// read in <paramref name="member"/>'s hands (<see cref="WeaponRuns"/>) less the
+    /// name, which is the line above, wrapped to <paramref name="width"/>
+    /// (<see cref="Wrap"/>) — so the weapon in hand's enchantments, each with its
+    /// lock and bar, run to their last rather than off the window's right.
     /// </summary>
     internal static IReadOnlyList<IReadOnlyList<Run>> SlotDetailLines(Weapon weapon, PartyMemberState member, int attacksThisTurn, Vector4 color, float width)
     {
@@ -1720,89 +1838,107 @@ public sealed class DungeonHud
     }
 
     /// <summary>
-    /// The inventory panel: the member's slots with their statlines, the
-    /// progression rows, what a swap costs, and the key hint. With the bag's X
-    /// armed (<paramref name="leaving"/>), the key hint asks which weapon to put
-    /// down (<see cref="LeaveHint"/>) instead of naming the equip keys. When it is
-    /// not armed, the header row names X on the right (<see cref="LeaveKeyHint"/>)
-    /// wherever X would arm it: in the party's phase, with a bag to put a weapon
-    /// down from. A potion's slot names the potion in its colour
-    /// (<see cref="SlotName"/>) and says under it what it restores now
-    /// (<see cref="PotionDetail"/>); while the bag holds one both hints say it is
-    /// poured out (<see cref="PourKeyHint"/>, PHASE 6b DECISION 1), the key hint
-    /// that its number drinks it (<see cref="EquipHint"/>), and a line under the
-    /// swap line what a drink costs (<see cref="DrinkCostLine"/>). What a key just
-    /// did, or why it did nothing — and any level it bought — is said in a row of its
+    /// The inventory panel: the member's hand with its statline, the bag as a grid
+    /// (<see cref="BagColumns"/> cells a row), the progression rows, what a swap
+    /// costs, and the hint. A cell names its item in the item's colour, on two
+    /// short lines (<see cref="CellLabel"/>); the cell under the mouse is lit, and
+    /// what it holds is read in a tooltip beside the mouse (<see cref="DrawTooltip"/>):
+    /// its whole name, its statline as it reads in this member's hands or what a
+    /// potion restores now, and what a right click does. A right click on a cell
+    /// is the cell picked (<paramref name="pick"/>, <see cref="DungeonScene.PickBagSlot"/>):
+    /// its weapon equipped, its potion drunk, or with the bag's X armed
+    /// (<paramref name="leaving"/>) the weapon put down or the potion poured out —
+    /// and then the hint asks which (<see cref="LeaveHint"/>) instead of saying
+    /// what a click does (<see cref="EquipHint"/>). No key picks a slot (the user's
+    /// ruling of 2026-11-21), and a left click on a cell is kept for the drag to
+    /// come. When X is not armed, the header row names it on the right
+    /// (<see cref="LeaveKeyHint"/>, or <see cref="PourKeyHint"/> while the bag holds
+    /// a potion) wherever X would arm it: in the party's phase, with a bag to put a
+    /// weapon down from. While the bag holds a potion a line under the swap line
+    /// says what a drink costs (<see cref="DrinkCostLine"/>). What a click just did,
+    /// or why it did nothing — and any level it bought — is said in a row of its
     /// own under the title (<paramref name="answer"/>, <see cref="BagLine"/>), never
     /// over the floor under the panel.
     /// </summary>
-    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving, IReadOnlyList<Run> answer)
+    private void DrawInventory(int w, int h, PartyMemberState active, TurnSystem turns, bool leaving, IReadOnlyList<Run> answer, Action<int> pick)
     {
         float cx = w / 2f;
 
-        // Under the slots: what every pool and every ladder is doing (§2.2).
-        // The statlines above price the items; these rows price the member.
+        // Under the bag: what every pool and every ladder is doing (§2.2).
+        // The statlines price the items; these rows price the member.
         var rows = new List<Run>();
         foreach (string row in PoolRows(active))
             rows.Add(new Run(row, White));
         foreach (string row in ProficiencyRows(active))
             rows.Add(new Run(row, Cyan));
 
-        // Each weapon's statline as it reads in this member's hands, wrapped to the
-        // room right of its slot's number: a slot grows by the lines it wraps to.
-        // A potion's says what it restores now, on one line.
+        // The hand's statline as it reads in this member's hands, wrapped to the
+        // panel: the panel grows by the lines it wraps to.
         int attacks = turns.AttacksThisTurn(active);
-        var details = active.Inventory
-            .Select((item, slot) => item switch
-            {
-                Weapon weapon => SlotDetailLines(weapon, active, attacks, WeaponLineColor(slot), InventoryDetailWidth(w)),
-                Potion potion => PotionDetailLines(potion, active),
-                _ => [],
-            })
-            .ToArray();
+        IReadOnlyList<IReadOnlyList<Run>> hand = active.EquippedWeapon is { } held
+            ? SlotDetailLines(held, active, attacks, WeaponLineColor(0), InventoryDetailWidth(w))
+            : [];
         bool potions = active.Potions.Any();
-        int wrapped = details.Sum(lines => Math.Max(0, lines.Count - 1));
+        int wrapped = Math.Max(0, hand.Count - 1);
+        int slots = active.Inventory.Length;
 
-        var layout = LayoutInventory(h, active.Inventory.Length, rows.Count, wrapped, drinkLine: potions);
+        var layout = LayoutInventory(h, slots, rows.Count, wrapped, drinkLine: potions);
         float top = layout.Top;
-        float left = cx - InventoryHalfWidth;
+        float pitch = BagCellPitch(w);
+        float left = InventoryLeft(w);
+        float right = left + InventoryWidth(w);
 
         DrawCentered(w, top, $"INVENTORY - CHAR {active.Id}", InventoryTitleScale, Cyan);
         DrawRunsCenteredAt(cx, top + InventoryAnswerDrop, FloatingTextScale, answer);   // already faded
         _text.DrawText("EQUIPPED", left, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
-        if (!leaving && turns.Phase == TurnPhase.Player && active.Inventory.Length > 1)
+        if (!leaving && turns.Phase == TurnPhase.Player && slots > 1)
         {
-            // Right-aligned on the header row, clear of EQUIPPED and of every slot line under it.
+            // Right-aligned on the header row, clear of EQUIPPED and of the hand's line under it.
             string hint = potions ? PourKeyHint : LeaveKeyHint;
             float width = hint.Length * GlyphAdvance * InventoryHeaderScale;
-            _text.DrawText(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
-            _clicks.AddKeys(hint, cx + InventoryHalfWidth - width, top + InventoryHeaderDrop, InventoryHeaderScale);
+            _text.DrawText(hint, right - width, top + InventoryHeaderDrop, InventoryHeaderScale, Grey);
+            _clicks.AddKeys(hint, right - width, top + InventoryHeaderDrop, InventoryHeaderScale);
         }
 
+        // The hand: the weapon in it by name, and its statline and modifiers under the name.
         float y = top + InventorySlotsTop;
-        for (int slot = 0; slot < active.Inventory.Length; slot++)
+        if (active.Inventory[0] is { } inHand)
         {
-            var item = active.Inventory[slot];
-            float height = InventorySlotPitch + (item == null ? 0 : Math.Max(0, details[slot].Count - 1) * InventoryDetailPitch);
-            if (slot > 0 && slot < DungeonScene.HighestSlotKey)
-            {
-                // The whole slot, its statline under its name with it, clicks as its number: equip, drink, or with X armed, leave.
-                var key = Keys.D1 + slot;
-                _clicks.Add(left - ClickZones.Pad, y - ClickZones.Pad, 2f * InventoryHalfWidth + 2f * ClickZones.Pad, height, () => _clicks.Press(key));
-            }
-            if (item == null)
-            {
-                _text.DrawText($"{slot + 1}  - EMPTY -", left, y, 2f, DarkGrey);
-                y += InventorySlotPitch;
-                continue;
-            }
-
-            // The name, then a weapon's statline and modifiers under it as they read in this member's hands.
-            var name = SlotName(slot, item);
+            var name = SlotName(0, inHand);
             _text.DrawText(name.Text, left, y, 2f, name.Color);
-            for (int line = 0; line < details[slot].Count; line++)
-                DrawRuns(left + InventoryDetailIndent, y + InventoryDetailDrop + line * InventoryDetailPitch, InventoryDetailScale, details[slot][line]);
-            y += InventorySlotPitch + Math.Max(0, details[slot].Count - 1) * InventoryDetailPitch;
+            for (int line = 0; line < hand.Count; line++)
+                DrawRuns(left + InventoryDetailIndent, y + InventoryDetailDrop + line * InventoryDetailPitch, InventoryDetailScale, hand[line]);
+        }
+        else
+        {
+            _text.DrawText(EmptyHand, left, y, 2f, DarkGrey);
+        }
+        y += InventorySlotPitch + wrapped * InventoryDetailPitch;
+
+        // The bag: a cell a slot, ten to a row. Each is backed, so the grid reads
+        // as one over the dimmed floor, and takes a right click as its slot picked.
+        int hovered = -1;
+        if (slots > 1)
+        {
+            _text.DrawText(BagLabel(active), left, y, InventoryHeaderScale, Grey);
+            float gridTop = y + BagLabelHeight;
+            int chars = BagCellChars(pitch);
+            hovered = BagSlotAt(_clicks.Mouse, left, gridTop, pitch, slots);
+            for (int slot = 1; slot < slots; slot++)
+            {
+                var cell = BagCell(slot, left, gridTop, pitch);
+                var item = active.Inventory[slot];
+                _rects.Fill(_game.ShaderManager, w, h, cell.X, cell.Y, pitch - BagCellGap, BagCellHeight, item is null ? BagCellEmpty : BagCellFull);
+                int picked = slot;
+                _clicks.AddRight(cell.X, cell.Y, pitch - BagCellGap, BagCellHeight, () => pick(picked));
+                if (item is null) continue;
+
+                var color = SlotName(slot, item).Color;
+                var (first, second) = CellLabel(item.ShownName, chars);
+                _text.DrawText(first, cell.X + BagCellPad, cell.Y + BagCellTextDrop, BagCellScale, color);
+                _text.DrawText(second, cell.X + BagCellPad, cell.Y + BagCellTextDrop + BagCellLinePitch, BagCellScale, color);
+            }
+            y = gridTop + BagRows(slots) * BagRowPitch + BagGridGap;
         }
 
         float rowY = y;
@@ -1814,7 +1950,7 @@ public sealed class DungeonHud
             rowY += InventoryRowPitch;
         }
 
-        // A swap is free out of combat and costs movement in it (§1.2): say which before the key is pressed.
+        // A swap is free out of combat and costs movement in it (§1.2): say which before the click is made.
         float swapY = rowY + InventorySwapGap;
         int cost = turns.SwapCost;
         if (cost <= 0)
@@ -1834,17 +1970,148 @@ public sealed class DungeonHud
         }
 
         if (leaving)
-            DrawKeysCentered(w, hintY, LeaveHint(active.Inventory.Length, potions), 1.5f, Yellow);
+            DrawKeysCentered(w, hintY, LeaveHint(slots, potions), 1.5f, Yellow);
         else
-            DrawKeysCentered(w, hintY, EquipHint(active.Inventory.Length, potions), 1.5f, Grey);
+            DrawKeysCentered(w, hintY, EquipHint(slots, potions), 1.5f, Grey);
+
+        // Last, over everything the panel has drawn: what the cell under the mouse holds.
+        if (hovered > 0 && active.Inventory[hovered] is { } read)
+            DrawTooltip(w, h, read, hovered, active, attacks, leaving);
+    }
+
+    // The tooltip: what the cell under the mouse holds, read whole, beside the
+    // mouse and over the panel.
+
+    /// <summary>The most a tooltip's statline runs before it wraps, in a window with the room; and the room kept clear between a tooltip and the window's edges.</summary>
+    internal const float TooltipTextWidthMost = 600f;
+    internal const float TooltipMargin = 8f;
+
+    /// <summary>A tooltip's padding inside its backing, how far from the mouse it opens, its name's scale and the pitch to the first line under it, and the gap over its last line (<see cref="HoverAction"/>).</summary>
+    private const float TooltipPad = 8f;
+    internal const float TooltipOffset = 16f;
+    private const float TooltipNameScale = 2f;
+    private const float TooltipNamePitch = 20f;
+    private const float TooltipActionGap = 4f;
+
+    /// <summary>A tooltip's backing — all but opaque, so the panel under it does not read through — and the line round it.</summary>
+    private static readonly Vector4 TooltipBack = new(0.05f, 0.05f, 0.07f, 0.96f);
+    private static readonly Vector4 TooltipEdge = new(0.6f, 0.6f, 0.65f, 0.9f);
+
+    /// <summary>How wide a tooltip's statline may run in a window <paramref name="windowWidth"/> pixels wide: <see cref="TooltipTextWidthMost"/>, or what a narrower window has between its margins.</summary>
+    internal static float TooltipTextWidth(float windowWidth)
+        => MathF.Max(GlyphAdvance * InventoryDetailScale, MathF.Min(TooltipTextWidthMost, windowWidth - 2f * (TooltipMargin + TooltipPad)));
+
+    /// <summary>
+    /// What a tooltip says under the item's name: a weapon's statline as it reads
+    /// in <paramref name="member"/>'s hands, wrapped to <paramref name="width"/>
+    /// (<see cref="SlotDetailLines"/>), or what a potion restores now
+    /// (<see cref="PotionDetailLines"/>).
+    /// </summary>
+    /// <param name="slot">The slot the item lies in, 0 being the hand.</param>
+    internal static IReadOnlyList<IReadOnlyList<Run>> HoverLines(IItem item, int slot, PartyMemberState member, int attacksThisTurn, float width)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(member);
+        return item switch
+        {
+            Weapon weapon => SlotDetailLines(weapon, member, attacksThisTurn, WeaponLineColor(slot), width),
+            Potion potion => PotionDetailLines(potion, member),
+            _ => [],
+        };
     }
 
     /// <summary>
-    /// What the bag panel prints for a slot that holds something: its number — the
-    /// key that reaches it, so the hand is 1 — and the item's name, in the item's
-    /// colour. A weapon is orange when it is a unique and otherwise in its line's
-    /// colour (<see cref="WeaponLineColor"/>); a potion is green for health and cyan
-    /// for mana (<see cref="PotionColor"/>): <c>3  HEALTH POTION Q2</c>.
+    /// A tooltip's last line: what a right click on the cell does — <c>RIGHT CLICK:
+    /// EQUIP</c>, or <c>DRINK</c> on a potion — and with the bag's X armed
+    /// (<paramref name="leaving"/>), yellow as the armed hint is, <c>RIGHT CLICK:
+    /// LEAVE IT HERE</c> or <c>POUR IT OUT</c> (PHASE 6b DECISION 1: a potion is
+    /// never left).
+    /// </summary>
+    internal static Run HoverAction(IItem item, bool leaving)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        return (item, leaving) switch
+        {
+            (Potion, true) => new Run("RIGHT CLICK: POUR IT OUT", Yellow),
+            (_, true) => new Run("RIGHT CLICK: LEAVE IT HERE", Yellow),
+            (Potion, false) => new Run("RIGHT CLICK: DRINK", Grey),
+            _ => new Run("RIGHT CLICK: EQUIP", Grey),
+        };
+    }
+
+    /// <summary>How large a tooltip's backing is, for the name, the lines under it and the last line it draws: the widest of them and all their heights, padded.</summary>
+    internal static Vector2 TooltipSize(string name, IReadOnlyList<IReadOnlyList<Run>> lines, string action)
+    {
+        ArgumentNullException.ThrowIfNull(name);
+        ArgumentNullException.ThrowIfNull(lines);
+        ArgumentNullException.ThrowIfNull(action);
+        float width = MathF.Max(name.Length * GlyphAdvance * TooltipNameScale, action.Length * GlyphAdvance * InventoryHeaderScale);
+        foreach (var line in lines)
+            width = MathF.Max(width, RunsWidth(line, InventoryDetailScale));
+        float height = TooltipNamePitch + lines.Count * InventoryDetailPitch + TooltipActionGap + GlyphHeight * InventoryHeaderScale;
+        return new Vector2(width + 2f * TooltipPad, height + 2f * TooltipPad);
+    }
+
+    /// <summary>
+    /// Where a tooltip <paramref name="size"/> large opens for a mouse at
+    /// <paramref name="mouse"/>: below and right of it, <see cref="TooltipOffset"/>
+    /// off, so the cell it reads stays in view; left of the mouse where the right
+    /// has no room, above it where below has none; and held inside the window's
+    /// margins either way, its left and top before its right and bottom in a
+    /// window too small for it.
+    /// </summary>
+    internal static Vector2 PlaceTooltip(Vector2 mouse, Vector2 size, float windowWidth, float windowHeight)
+    {
+        float x = mouse.X + TooltipOffset;
+        if (x + size.X > windowWidth - TooltipMargin)
+            x = mouse.X - TooltipOffset - size.X;
+        x = MathF.Max(TooltipMargin, MathF.Min(x, windowWidth - TooltipMargin - size.X));
+
+        float y = mouse.Y + TooltipOffset;
+        if (y + size.Y > windowHeight - TooltipMargin)
+            y = mouse.Y - TooltipOffset - size.Y;
+        y = MathF.Max(TooltipMargin, MathF.Min(y, windowHeight - TooltipMargin - size.Y));
+        return new Vector2(x, y);
+    }
+
+    /// <summary>
+    /// The tooltip of the cell under the mouse: the item's name whole, in its
+    /// colour; its statline in <paramref name="member"/>'s hands, or what a potion
+    /// restores now (<see cref="HoverLines"/>); and what a right click does
+    /// (<see cref="HoverAction"/>) — on a backing beside the mouse
+    /// (<see cref="PlaceTooltip"/>). The text drawn so far is flushed first, so the
+    /// backing goes over the panel's and the tooltip's own text over the backing.
+    /// </summary>
+    private void DrawTooltip(int w, int h, IItem item, int slot, PartyMemberState member, int attacks, bool leaving)
+    {
+        var name = SlotName(slot, item);
+        var lines = HoverLines(item, slot, member, attacks, TooltipTextWidth(w));
+        var action = HoverAction(item, leaving);
+        var size = TooltipSize(name.Text, lines, action.Text);
+        var at = PlaceTooltip(_clicks.Mouse, size, w, h);
+
+        _text.Flush(_game.ShaderManager);
+        _rects.Fill(_game.ShaderManager, w, h, at.X - 1f, at.Y - 1f, size.X + 2f, size.Y + 2f, TooltipEdge);
+        _rects.Fill(_game.ShaderManager, w, h, at.X, at.Y, size.X, size.Y, TooltipBack);
+
+        float x = at.X + TooltipPad, y = at.Y + TooltipPad;
+        _text.DrawText(name.Text, x, y, TooltipNameScale, name.Color);
+        y += TooltipNamePitch;
+        foreach (var line in lines)
+        {
+            DrawRuns(x, y, InventoryDetailScale, line);
+            y += InventoryDetailPitch;
+        }
+        _text.DrawText(action.Text, x, y + TooltipActionGap, InventoryHeaderScale, action.Color);
+    }
+
+    /// <summary>
+    /// How the bag panel names what a slot holds, on the hand's line, in a cell and
+    /// over a tooltip: the item's name, in the item's colour. A weapon is orange
+    /// when it is a unique and otherwise in its line's colour
+    /// (<see cref="WeaponLineColor"/>: the hand's yellow, a bag slot's white); a
+    /// potion is green for health and cyan for mana (<see cref="PotionColor"/>):
+    /// <c>HEALTH POTION Q2</c>.
     /// </summary>
     /// <param name="slot">The slot, 0 being the hand.</param>
     /// <param name="item">What lies there.</param>
@@ -1857,7 +2124,7 @@ public sealed class DungeonHud
             Potion potion => PotionColor(potion.Type),
             _ => White,
         };
-        return new Run($"{slot + 1}  {item.ShownName}", color);
+        return new Run(item.ShownName, color);
     }
 
     /// <summary>A potion's colour wherever the dungeon names it: green for health, cyan for mana, the colours of the two pools it fills.</summary>
@@ -1928,56 +2195,34 @@ public sealed class DungeonHud
     internal static string DrinkShortCue(int cost) => $"NOT ENOUGH MOVE TO DRINK - IT COSTS {cost}";
 
     /// <summary>
-    /// The inventory panel's key hint: the number keys that equip a bag slot —
-    /// each the number the panel prints beside that slot, so the hand is 1 and
-    /// the bag runs from 2 — then the key that closes the bag. For §4.4's six
-    /// slots, <c>PRESS 2-6 TO EQUIP - I TO CLOSE</c>. The range is read off the
-    /// member's slots and the scene's own highest binding
-    /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names every slot a key
-    /// reaches and no key that does nothing. While the bag holds a potion
-    /// (<paramref name="potion"/>) the same keys drink it:
-    /// <c>PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE</c>.
+    /// The inventory panel's hint: what a click on a cell of the bag does, then
+    /// the key that closes the bag — <c>RIGHT CLICK A SLOT TO EQUIP - I TO
+    /// CLOSE</c>. No key picks a slot (the user's ruling of 2026-11-21): the bag is
+    /// worked with the mouse. While the bag holds a potion
+    /// (<paramref name="potion"/>) the same click drinks it: <c>RIGHT CLICK A SLOT
+    /// TO EQUIP OR DRINK - I TO CLOSE</c>. A hand and no bag has nothing to swap
+    /// in, and says only how to close.
     /// </summary>
     /// <param name="slots">The member's slots, the hand among them.</param>
     /// <param name="potion">Whether the bag holds a potion.</param>
     internal static string EquipHint(int slots, bool potion = false)
-        => BagKeys(slots) is { } keys ? $"PRESS {keys} TO {(potion ? "EQUIP OR DRINK" : "EQUIP")} - I TO CLOSE" : "I TO CLOSE";   // a hand and no bag: nothing to swap in
+        => slots > 1 ? $"RIGHT CLICK A SLOT TO {(potion ? "EQUIP OR DRINK" : "EQUIP")} - I TO CLOSE" : "I TO CLOSE";
 
     /// <summary>
-    /// The number keys that reach a bag slot, as a hint prints them — <c>2-6</c>
-    /// for §4.4's six slots, <c>2</c> for a bag of one — or null for a hand and no
-    /// bag. Each key is the number the panel prints beside its slot, so the hand
-    /// is 1 and never among them. The range stops at the scene's highest binding
-    /// (<see cref="DungeonScene.HighestSlotKey"/>), so it names no key that does
-    /// nothing. Equipping and putting down read the same keys
-    /// (<see cref="EquipHint"/>, <see cref="LeaveHint"/>).
-    /// </summary>
-    private static string? BagKeys(int slots)
-    {
-        int last = Math.Min(slots, DungeonScene.HighestSlotKey);
-        return last switch
-        {
-            < 2 => null,
-            2 => "2",
-            _ => $"2-{last}",
-        };
-    }
-
-    /// <summary>
-    /// The bag's key hint while its X is armed (§4.4): which weapon to put down,
-    /// by the same number keys that equip, and how to back out. For six slots it
-    /// is <c>LEAVE WHICH? 2-6 - X CANCELS</c>. It replaces <see cref="EquipHint"/>
-    /// on the panel for as long as X is armed. It names no key for the hand,
-    /// because the weapon in hand is never put down this way. While the bag holds
-    /// a potion (<paramref name="potion"/>) it says the same keys pour one out —
-    /// <c>LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS</c> — since a potion is never
-    /// left (PHASE 6b DECISION 1).
+    /// The bag's hint while its X is armed (§4.4): which weapon to put down, by
+    /// the same click that equips, and how to back out — <c>LEAVE WHICH? RIGHT
+    /// CLICK IT - X CANCELS</c>. It replaces <see cref="EquipHint"/> on the panel
+    /// for as long as X is armed. The weapon in hand is never put down this way:
+    /// the hand is no cell. While the bag holds a potion
+    /// (<paramref name="potion"/>) it says the same click pours one out —
+    /// <c>LEAVE OR POUR OUT WHICH? RIGHT CLICK IT - X CANCELS</c> — since a potion
+    /// is never left (PHASE 6b DECISION 1).
     /// </summary>
     /// <param name="slots">The member's slots, the hand among them.</param>
     /// <param name="potion">Whether the bag holds a potion.</param>
     internal static string LeaveHint(int slots, bool potion = false)
-        => BagKeys(slots) is { } keys
-            ? $"{(potion ? "LEAVE OR POUR OUT WHICH?" : "LEAVE WHICH?")} {keys} - X CANCELS"
+        => slots > 1
+            ? $"{(potion ? "LEAVE OR POUR OUT WHICH?" : "LEAVE WHICH?")} RIGHT CLICK IT - X CANCELS"
             : "NOTHING TO LEAVE - X CANCELS";
 
     /// <summary>
@@ -2001,13 +2246,8 @@ public sealed class DungeonHud
         return $"POURED OUT THE {potion.ShownName}";
     }
 
-    /// <summary>
-    /// What an armed bag number says when its slot holds nothing: <c>SLOT 3 IS
-    /// EMPTY</c>, by the number the panel prints for <paramref name="slot"/> (the
-    /// key that was pressed). X stays armed for another pick.
-    /// </summary>
-    /// <param name="slot">The slot, 0 being the hand.</param>
-    internal static string EmptySlotCue(int slot) => $"SLOT {slot + 1} IS EMPTY";
+    /// <summary>What an armed click says on a cell that holds nothing. X stays armed for another pick.</summary>
+    internal const string EmptySlotCue = "THAT SLOT IS EMPTY";
 
     /// <summary>
     /// What <c>G</c> says when the bag has no room (§4.4): a carry limit, not a

@@ -508,9 +508,9 @@ public class DungeonScene : Scene
     public bool CharacterOpen => ActiveMenu == GameMenu.Character;
 
     /// <summary>
-    /// True while the bag's X has armed "leave" (§4.4): the next bag number puts
+    /// True while the bag's X has armed "leave" (§4.4): the next cell picked puts
     /// that slot's weapon down where the active member stands, rather than
-    /// equipping it, and the bag's key hint says so (<see cref="DungeonHud.LeaveHint"/>).
+    /// equipping it, and the bag's hint says so (<see cref="DungeonHud.LeaveHint"/>).
     /// Only ever true with the bag open. X again, closing the bag, or the turn's
     /// end disarms it, and so does a weapon put down.
     /// </summary>
@@ -1561,9 +1561,9 @@ public class DungeonScene : Scene
         //
         // Every key press, once more, through one handler with no key list
         // (AnyKey): it clears what the pause menu answered, and the number keys, 1
-        // to HighestSlotKey, go on to one routed handler (NumberKey): they equip bag
-        // slots while the bag is open, pick a pause-menu option while it is, and
-        // select party members otherwise. The number keys have no subscription of
+        // to HighestSlotKey, go on to one routed handler (NumberKey): they pick a
+        // pause-menu option while it is open, and select party members otherwise
+        // (never a bag slot: the bag is worked with the mouse, PickBagSlot). The number keys have no subscription of
         // their own: beside this one, it could run first, and the answer 2 gives
         // would be cleared by the very key that gave it. Every other key below
         // already does nothing behind a menu (AnyMenuOpen).
@@ -1580,8 +1580,8 @@ public class DungeonScene : Scene
         input.SubscribeToKeyPressed(_ => StairKey(), Keys.E);
         input.SubscribeToKeyPressed(_ => ToggleInventory(), Keys.I, Keys.B);
         input.SubscribeToKeyPressed(_ => ToggleCharacter(), Keys.C);
-        // X, in the bag, arms "leave": the next bag number puts that weapon down
-        // where the active member stands, rather than equipping it (§4.4).
+        // X, in the bag, arms "leave": the next right click on a cell puts that
+        // weapon down where the active member stands, rather than equipping it (§4.4).
         input.SubscribeToKeyPressed(_ => LeaveKey(), Keys.X);
         // G takes what the active member is standing on (§3.5): a drop, or a
         // weapon the party put down.
@@ -1617,6 +1617,11 @@ public class DungeonScene : Scene
 
         input.SubscribeToMouseMoved(e => _mousePos = e.Position);
         input.SubscribeToMouseButtonPressed(_ => HandleClick(), MouseButton.Left);
+        // The right click is the bag's (the user's ruling of 2026-11-21): on a cell
+        // of the open bag it equips, drinks or, with X armed, leaves (PickBagSlot),
+        // through the zones the HUD laid down as it drew the cells. Nowhere else
+        // does it do anything yet.
+        input.SubscribeToMouseButtonPressed(_ => { if (!Transiting) _hud.Clicks.RightClick(_mousePos); }, MouseButton.Right);
 
         input.SubscribeToMouseScroll(e =>
         {
@@ -1628,17 +1633,11 @@ public class DungeonScene : Scene
     // ── Party control ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// The highest number key the scene binds: the top of the number row. With
-    /// the bag open a key equips the bag slot printed with its number — the
-    /// panel numbers slots from 1, the weapon in hand being 1 — so keys 2 up
-    /// reach every bag slot a member carries: 2-6 for the six of §4.4's carry,
-    /// and 2-9 at the deepest carry the loader admits. That ceiling is
-    /// <see cref="GameConstants.MaxInventorySlots"/>, refused past at load
-    /// (<see cref="ContentValidator.RuleEverySlotHasAKey"/>) and held at or
-    /// under this number by test, so no slot a member carries is beyond its
-    /// key. The inventory panel's key hint reads its range off the same number
-    /// (<see cref="DungeonHud.EquipHint"/>), so the hint and the bindings
-    /// cannot drift apart.
+    /// The highest number key the scene binds: the top of the number row. The
+    /// number keys pick a pause-menu option and select a party member
+    /// (<see cref="NumberKey"/>). They picked a bag slot too, until the bag grew
+    /// past what they reach (the user's ruling of 2026-11-21): a slot is picked
+    /// on its cell of the bag panel now (<see cref="PickBagSlot"/>).
     /// </summary>
     internal const int HighestSlotKey = 9;
 
@@ -1677,11 +1676,8 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// A number key, routed by the menu that is open (§4.4: the swap keys
-    /// generalise to every slot): with the bag open, 2 and up swap the bag slot
-    /// printed with that number into the hand — 1 is the hand itself — or drink
-    /// the potion there (<see cref="DrinkSlot"/>), or, with the bag's X armed,
-    /// put that slot's weapon down or pour its potion out (<see cref="LeaveSlot"/>);
+    /// A number key, routed by the menu that is open: with the bag open it does
+    /// nothing — a slot is picked with the mouse (<see cref="PickBagSlot"/>);
     /// on the pause menu (<see cref="PauseMenu.Press"/>), 1 closes it, 2 asks the
     /// host to save the campaign into its own slot on the party's own turn — the
     /// menu kept up for the answer — and otherwise says why not, and 3 quits to
@@ -1726,23 +1722,36 @@ public class DungeonScene : Scene
                     break;
             }
         }
-        else if (InventoryOpen)
-        {
-            int slot = digit - 1;   // the printed number is the slot plus one
-            if (slot > 0 && slot < ActiveCharacter.State.Inventory.Length)
-            {
-                if (LeaveArmed)
-                    LeaveSlot(slot);
-                else if (ActiveCharacter.State.PotionIn(slot) is not null)
-                    DrinkSlot(slot);   // a potion is drunk, never held: the hand keeps a weapon (PHASE 6b DECISION 1)
-                else
-                    EquipSlot(slot);
-            }
-        }
         else if (!AnyMenuOpen || CharacterOpen)
         {
             SetActiveCharacter(digit - 1);   // a number past the party selects nobody; on the sheet, it shows that member
         }
+    }
+
+    /// <summary>
+    /// A cell of the open bag picked — a right click on it, through the zone the
+    /// HUD laid down as it drew the cell (the user's ruling of 2026-11-21: the bag
+    /// is worked with the mouse, where the number keys once picked a slot): the
+    /// active member swaps that slot's weapon into the hand
+    /// (<see cref="EquipSlot"/>), or drinks the potion there
+    /// (<see cref="DrinkSlot"/>), or, with the bag's X armed, puts the weapon down
+    /// or pours the potion out (<see cref="LeaveSlot"/>). Nothing for the hand,
+    /// for a slot the member does not carry, with the bag shut, during a stair's
+    /// fade, or once play is left. Internal, so a scene built with no window can
+    /// be walked through its bag.
+    /// </summary>
+    /// <param name="slot">The bag slot, 1 up: 0 is the hand.</param>
+    internal void PickBagSlot(int slot)
+    {
+        if (Transiting || _leaving || !InventoryOpen) return;
+        var state = ActiveCharacter.State;
+        if (slot <= 0 || slot >= state.Inventory.Length) return;
+        if (LeaveArmed)
+            LeaveSlot(slot);
+        else if (state.PotionIn(slot) is not null)
+            DrinkSlot(slot);   // a potion is drunk, never held: the hand keeps a weapon (PHASE 6b DECISION 1)
+        else
+            EquipSlot(slot);
     }
 
     private void SetActiveCharacter(int idx, bool force = false)
@@ -1827,7 +1836,7 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// A bag number on a potion's slot (§3.4): the active member drinks it, through
+    /// A pick of a potion's slot (§3.4): the active member drinks it, through
     /// the turn system, which prices it — <see cref="TurnSystem.PotionUseCost"/>
     /// movement, in combat and out (PHASE 6b DECISION 2), paid whole or refused —
     /// and restores what it offers through the heal or mana applier. What was drunk
@@ -1853,8 +1862,8 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// The log's line for a drink refused short of its cost, the bag slot by the
-    /// number its key bears: <c>[Potion] A cannot drink from slot 2: 39 movement
+    /// The log's line for a drink refused short of its cost, the bag slot counted
+    /// from the hand's 1: <c>[Potion] A cannot drink from slot 2: 39 movement
     /// left, a drink costs 40</c>. The movement left is rounded down to the whole,
     /// since a whole cost is paid from the whole movement exactly when the gate
     /// pays it from the fraction (<see cref="TurnSystem.CanDrink"/>): so 39.6 reads
@@ -1864,9 +1873,9 @@ public class DungeonScene : Scene
         => $"[Potion] {id} cannot drink from slot {slot + 1}: {MathF.Floor(distLeft):0} movement left, a drink costs {cost}";
 
     /// <summary>
-    /// X, in the bag (§4.4): arm "leave", so the next bag number puts that slot's
-    /// weapon down where the active member stands rather than equipping it, and
-    /// the bag's key hint becomes <c>LEAVE WHICH? 2-6 - X CANCELS</c>. X again
+    /// X, in the bag (§4.4): arm "leave", so the next right click on a cell puts
+    /// that slot's weapon down where the active member stands rather than equipping
+    /// it, and the bag's hint becomes <c>LEAVE WHICH? RIGHT CLICK IT - X CANCELS</c>. X again
     /// disarms it. It arms only in the party's own phase, which is when a member
     /// acts at all; outside the bag, or during a stair's fade, it does nothing
     /// and says nothing.
@@ -1884,15 +1893,15 @@ public class DungeonScene : Scene
     }
 
     /// <summary>
-    /// With the bag's X armed, a bag number (§4.4): the active member puts that
+    /// With the bag's X armed, a cell picked (§4.4): the active member puts that
     /// slot's weapon down on the floor it stands on. The floor keeps it for the
     /// rest of the visit (<see cref="Floor.Leave"/>). Its marker goes down on the
     /// member's tile, where <c>G</c> takes it back like anything else lying there.
     /// It costs nothing: it is not a swap, and the weapon in hand stays in hand.
     /// A weapon put down disarms X. An empty slot says so, as a full bag says
     /// <c>BAG FULL</c>, and leaves X armed for another pick. What was left says so
-    /// over the member in place of any answer still rising there, such as that
-    /// <c>SLOT 3 IS EMPTY</c> or the <c>BAG FULL</c> that sent the player to the bag
+    /// over the member in place of any answer still rising there, such as
+    /// <c>THAT SLOT IS EMPTY</c> or the <c>BAG FULL</c> that sent the player to the bag
     /// (<see cref="DungeonHud.AddAnswer"/>), so the two never stack — said in the
     /// open bag's own row, under its title (<see cref="DungeonHud.BagLine"/>).
     /// <para>
@@ -1909,7 +1918,7 @@ public class DungeonScene : Scene
         if (_turns.Phase != TurnPhase.Player || !member.Alive) return;
         if (member.Inventory[slot] is null)
         {
-            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.EmptySlotCue(slot), false));
+            SayRefusal(ActiveCharacter, new ClickCue(DungeonHud.EmptySlotCue, false));
             return;
         }
         if (member.PotionIn(slot) is not null)
@@ -2348,8 +2357,9 @@ public class DungeonScene : Scene
         if (Transiting) return;
 
         // The menus and the keys lines as last drawn come first (after play,
-        // 2026-10): a key's words click as the key, a bag slot as its number
-        // (ClickZones), so a click there does only what its key would. On the
+        // 2026-10): a key's words click as the key (ClickZones), so a click
+        // there does only what its key would. A cell of the bag takes the right
+        // click, never this one, which is kept for the drag to come. On the
         // character sheet, a row of the party list shows that member, as its
         // number does.
         if (_hud.Clicks.Click(_mousePos)) return;

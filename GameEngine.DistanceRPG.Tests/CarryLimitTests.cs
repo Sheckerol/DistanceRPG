@@ -169,44 +169,53 @@ public sealed class CarryLimitTests : IDisposable
         Assert.Equal(ContentValidator.RuleCarryFillsTheParty, loaded.Rule);
         Assert.Same(before, GameContent.Current);
 
-        // Every multiple of the party from a hand each to nine slots each divides evenly and loads.
-        foreach (int carry in new[] { 4, 24, 28, 36 })
+        // Every multiple of the party from a hand each to thirty-one slots each divides evenly and loads.
+        foreach (int carry in new[] { 4, 24, 28, 36, 40, 124 })
             ContentValidator.ValidateTuning(FixtureContent.Tuning with { PartyCarrySlots = carry });
     }
 
     [Fact]
-    public void ACarryDeeperThanTheNumberKeysIsRefused()
+    public void ACarryDeeperThanTheBagPanelIsRefused()
     {
-        // With the bag open a slot is equipped by the number key printed beside it
-        // -- the hand is 1, the bag runs from 2 -- and the number row stops at 9
-        // (PHASE4-143). Forty slots would give each member ten, and a pickup would
-        // land in a tenth slot no key can swap into the hand, so the loader refuses
-        // any carry deeper than nine a member: 36 party-wide loads, 40 does not.
-        Assert.Equal(9, GameConstants.MaxInventorySlots);
+        // With the bag open a slot is picked on its cell of the panel, which draws
+        // the hand and a bag of thirty as three rows of ten (the user's ruling of
+        // 2026-11-21, after play: the nine slots the number keys reached ran out
+        // before the way out). One slot more a member would be a slot with no cell,
+        // and a pickup landing there could never be swapped into the hand, so the
+        // loader refuses any carry deeper than thirty-one a member: 124 party-wide
+        // loads, 128 does not.
+        Assert.Equal(31, GameConstants.MaxInventorySlots);
         int deepest = GameConstants.PartySize * GameConstants.MaxInventorySlots;
-        Assert.Equal(36, deepest);
+        Assert.Equal(124, deepest);
         ContentValidator.ValidateTuning(FixtureContent.Tuning with { PartyCarrySlots = deepest });
         foreach (int carry in new[] { deepest + GameConstants.PartySize, 400 })
         {
             var ex = Assert.Throws<ContentException>(() => ContentValidator.ValidateTuning(FixtureContent.Tuning with { PartyCarrySlots = carry }));
-            Assert.Equal((nameof(Tuning.PartyCarrySlots), ContentValidator.RuleEverySlotHasAKey), (ex.EntryId, ex.Rule));
+            Assert.Equal((nameof(Tuning.PartyCarrySlots), ContentValidator.RuleEverySlotHasACell), (ex.EntryId, ex.Rule));
         }
 
         // Refused at load, before a member is built on it, leaving the running content alone.
         var before = GameContent.Current;
         var loaded = Assert.Throws<ContentException>(() => TestContent.Use(tuning: FixtureContent.Tuning with { PartyCarrySlots = deepest + GameConstants.PartySize }));
-        Assert.Equal(ContentValidator.RuleEverySlotHasAKey, loaded.Rule);
+        Assert.Equal(ContentValidator.RuleEverySlotHasACell, loaded.Rule);
         Assert.Same(before, GameContent.Current);
 
-        // The other end of the same rule: the scene binds a number key for every
-        // slot the loader admits. At the deepest carry a member holds nine, the
-        // bag reads 2-9, and each of its eight slots has its key.
-        Assert.InRange(GameConstants.MaxInventorySlots, 1, DungeonScene.HighestSlotKey);
+        // The other end of the same rule: the panel draws a cell for every slot
+        // the loader admits. At the deepest carry a member holds the hand and
+        // thirty, the grid is three full rows of ten, and each bag slot is under
+        // its own cell and no other.
+        Assert.Equal(GameConstants.MaxInventorySlots, 1 + DungeonHud.BagColumns * DungeonHud.BagRowsMost);
         using (TestContent.Use(tuning: FixtureContent.Tuning with { PartyCarrySlots = deepest }))
         {
             var member = TestPools.Char("A");
             Assert.Equal(GameConstants.MaxInventorySlots, member.Inventory.Length);
-            Assert.Equal("PRESS 2-9 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(member.Inventory.Length));
+            Assert.Equal(DungeonHud.BagRowsMost, DungeonHud.BagRows(member.Inventory.Length));
+            float pitch = DungeonHud.BagCellPitch(1280f);
+            var found = Enumerable.Range(1, member.Inventory.Length - 1)
+                .Select(slot => DungeonHud.BagSlotAt(DungeonHud.BagCell(slot, 100f, 200f, pitch) + new OpenTK.Mathematics.Vector2(1f, 1f), 100f, 200f, pitch, member.Inventory.Length))
+                .ToArray();
+            Assert.Equal(Enumerable.Range(1, 30), found);
+            Assert.Equal("BAG - 0 OF 30", DungeonHud.BagLabel(member));
         }
     }
 }

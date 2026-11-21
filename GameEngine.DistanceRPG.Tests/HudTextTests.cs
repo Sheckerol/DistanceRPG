@@ -1,3 +1,4 @@
+using Vector2 = OpenTK.Mathematics.Vector2;
 using GameEngine.DistanceRPG.Logic;
 using static GameEngine.DistanceRPG.Logic.ModifierType;
 using static GameEngine.DistanceRPG.Logic.StatusEffectType;
@@ -808,15 +809,19 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
-    public void InventoryLayout_SixSlotsFitA720Window()
+    public void InventoryLayout_TheHandAndThreeRowsOfTenFitA720Window()
     {
-        // 4.4's six slots a member (PHASE4-141) in the shipped 1280 x 720 window:
-        // the panel slides up to make room for the three extra slots, and still
-        // prints every progression row the layout keeps, with the swap line and
-        // the key hint clear of the help line at h - 24.
-        int slots = PartyMemberState.InventorySlots;
-        Assert.Equal(6, slots);
-        Assert.Equal(slots, TestPools.Char("A").Inventory.Length);
+        // The user's ruling of 2026-11-21: a bag of thirty, drawn as three rows of
+        // ten under the hand. In the shipped 1280 x 720 window the panel opens
+        // where it always has and prints every progression row, with the swap
+        // line and the hint clear of the help line at h - 24. The grid costs a
+        // row's height for every ten bag slots, the last row as short as it comes.
+        const int slots = GameConstants.MaxInventorySlots;
+        Assert.Equal(31, slots);
+        Assert.Equal(slots, 1 + DungeonHud.BagColumns * DungeonHud.BagRowsMost);
+        Assert.Equal([0, 1, 1, 1, 2, 3, 3], new[] { 1, 2, 6, 11, 12, 22, 31 }.Select(DungeonHud.BagRows));
+        Assert.Equal(DungeonHud.BagRowPitch, DungeonHud.LayoutInventory(1600f, 21, 0).Bottom - DungeonHud.LayoutInventory(1600f, 11, 0).Bottom);
+        Assert.Equal(6, PartyMemberState.InventorySlots);   // the fixture's carry: a hand and one row of five
         const int most = 2 + 8;   // the two pools and every weapon class at once
 
         // A bag of potions too (Phase 6b.2): each potion's slot says what it restores
@@ -832,10 +837,10 @@ public sealed class HudTextTests : IDisposable
             }
         Assert.Single(DungeonHud.PotionDetailLines(TestPotions.Health(ContentBounds.MostCount), TestPools.Char("A")));
 
-        var full = DungeonHud.LayoutInventory(720f, slots, most);
-        Assert.True(full.Top < 720f / 2f - 150f);   // slid up from where the three-slot panel opened
+        var full = DungeonHud.LayoutInventory(720f, slots, most, drinkLine: true);
+        Assert.Equal(720f / 2f - 150f, full.Top);   // where the panel has always opened: the grid is shorter than six slots a line each were
 
-        // And past 720 the invariant the three-slot panel keeps holds for six too:
+        // And past 720 the invariant the three-slot panel keeps holds for thirty-one too:
         // what is drawn clears the help line, or every row it could drop has gone.
         foreach (bool drink in new[] { false, true })
             for (int h = 240; h <= 1600; h += 2)
@@ -863,10 +868,10 @@ public sealed class HudTextTests : IDisposable
         hud.AddFloatingText(default, "+18", DungeonHud.Green, 8f);                         // the heal, over the floor: the answer says it
         hud.AddBeat(a, default, "MAX HP 31!", DungeonHud.Cyan, -64f);                       // the level the heal bought, raised first
         hud.AddAnswer(a, default, "DRANK HEALTH POTION Q3 - +18 HP", DungeonHud.Green, -52f);
-        hud.AddAnswer(b, default, "SLOT 3 IS EMPTY", DungeonHud.Grey, -40f);
+        hud.AddAnswer(b, default, DungeonHud.EmptySlotCue, DungeonHud.Grey, -40f);
         Assert.Equal(["DRANK HEALTH POTION Q3 - +18 HP", "MAX HP 31!"], hud.BagLine(a).Select(run => run.Text));
         Assert.Equal([DungeonHud.Green, DungeonHud.Cyan], hud.BagLine(a).Select(run => run.Color));
-        Assert.Equal(["SLOT 3 IS EMPTY"], hud.BagLine(b).Select(run => run.Text));
+        Assert.Equal(["THAT SLOT IS EMPTY"], hud.BagLine(b).Select(run => run.Text));
         Assert.Empty(hud.BagLine(new object()));
         Assert.Empty(hud.RisingLines(bagOpen: true));
         Assert.Equal(4, hud.RisingLines(bagOpen: false).Count);   // the bag closed, every line rises as it always has
@@ -911,7 +916,7 @@ public sealed class HudTextTests : IDisposable
             DungeonHud.DrinkShortCue(10_000),
             DungeonHud.LeftBeat(TestWeapons.Get(longest.Id, longest.Class == WeaponClass.Wand ? DamageType.Cold : null)),
             DungeonHud.BagFullCue(GameConstants.MaxInventorySlots, potion: true),
-            DungeonHud.EmptySlotCue(GameConstants.MaxInventorySlots - 1),
+            DungeonHud.EmptySlotCue,
         ];
         const float glyph = 7f, advance = 6f;
         foreach (string answer in answers)
@@ -920,7 +925,7 @@ public sealed class HudTextTests : IDisposable
             Assert.True(width <= 1240f, $"'{answer}' with '{level}' runs off the window");
             Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", answer);
         }
-        int slots = PartyMemberState.InventorySlots;
+        foreach (int slots in new[] { PartyMemberState.InventorySlots, GameConstants.MaxInventorySlots })
         for (int h = 240; h <= 1600; h += 40)
             foreach (bool drink in new[] { false, true })
                 for (int rows = 0; rows <= 10; rows++)
@@ -974,8 +979,9 @@ public sealed class HudTextTests : IDisposable
         // asleep in a member's hands, the member's tag before the name, and
         // four-digit wear at its full capacity. In the shipped 1280 x 720 window
         // every line fits, the top line ends above the party selector down the
-        // left, nothing is dropped, and a bag of six such weapons still ends above
-        // the help line with every slot drawn.
+        // left, nothing is dropped; in the bag the hand's statline wraps inside the
+        // panel, which still ends above the help line at the deepest carry, and
+        // every bag slot's is read whole in a tooltip that stays inside the window.
         using var numbers = TestContent.UsePremise(tuning: t => TestShop.Ruled(t) with { WearCapacityPerBar = 1000 });
         var content = GameContent.Current;
         var souls = content.Enchantments.All.Where(def => !def.Unique).OrderByDescending(def => def.Name.Length).Take(5).ToArray();
@@ -1024,22 +1030,40 @@ public sealed class HudTextTests : IDisposable
             Assert.Equal("...", cut[^1].Text);
             Assert.True(Width(cut, DungeonHud.WeaponLineScale) <= top);
 
-            // The bag: six of it, the hand's with its locks and bars, every line
-            // inside the window's right, every run drawn, and the panel — grown by the
-            // lines the slots wrap to — clear of the top readouts and the help line.
+            // The bag. The hand's statline, with its locks and bars: every line inside
+            // the panel, every run drawn, and the panel — at the deepest carry, with a
+            // potion's drink line, grown by the lines the hand wraps to — clear of the
+            // top readouts and the help line.
             for (int slot = 1; slot < member.Inventory.Length; slot++)
                 member.Inventory[slot] = Widest(def);
-            var slots = member.Inventory.Select((carried, slot) => DungeonHud.SlotDetailLines((Weapon)carried!, member, 0, DungeonHud.WeaponLineColor(slot), bag)).ToArray();
-            for (int slot = 0; slot < slots.Length; slot++)
-            {
-                Assert.All(slots[slot], line => Assert.True(Width(line, DungeonHud.InventoryDetailScale) <= bag, $"{def.Id}: bag slot {slot + 1} runs off the window"));
-                Assert.Equal(DungeonHud.WeaponRuns("", member.WeaponIn(slot)!, member, 0, DungeonHud.WeaponLineColor(slot)).Skip(1).Select(run => run.Text),
-                    slots[slot].SelectMany(line => line).Select(run => run.Text));
-            }
-            Assert.Contains(slots[0].SelectMany(line => line), run => run.Text.Contains(" LOCK ", StringComparison.Ordinal));
-            var layout = DungeonHud.LayoutInventory(720f, slots.Length, 2 + 8, slots.Sum(lines => lines.Count - 1));
+            var hand = DungeonHud.SlotDetailLines(weapon, member, 0, DungeonHud.WeaponLineColor(0), bag);
+            Assert.All(hand, line => Assert.True(Width(line, DungeonHud.InventoryDetailScale) <= bag, $"{def.Id}: the hand runs off the panel"));
+            Assert.Equal(DungeonHud.WeaponRuns("", weapon, member, 0, DungeonHud.WeaponLineColor(0)).Skip(1).Select(run => run.Text),
+                hand.SelectMany(line => line).Select(run => run.Text));
+            Assert.Contains(hand.SelectMany(line => line), run => run.Text.Contains(" LOCK ", StringComparison.Ordinal));
+            var layout = DungeonHud.LayoutInventory(720f, GameConstants.MaxInventorySlots, 2 + 8, hand.Count - 1, drinkLine: true);
             Assert.True(layout.Top >= 56f, $"{def.Id}: the bag is over the top readouts");
             Assert.True(layout.Bottom <= 720f - 24f, $"{def.Id}: the bag runs past the help line");
+
+            // A bag slot's, read in its tooltip: every line inside the tooltip's width,
+            // every run drawn, and the tooltip whole inside the window wherever the
+            // mouse is, with the longer of its last lines.
+            float tip = DungeonHud.TooltipTextWidth(1280f);
+            for (int slot = 1; slot < member.Inventory.Length; slot++)
+            {
+                var carried = member.Inventory[slot]!;
+                var read = DungeonHud.HoverLines(carried, slot, member, 0, tip);
+                Assert.All(read, line => Assert.True(Width(line, DungeonHud.InventoryDetailScale) <= tip, $"{def.Id}: bag slot {slot}'s tooltip runs past its width"));
+                Assert.Equal(DungeonHud.WeaponRuns("", member.WeaponIn(slot)!, member, 0, DungeonHud.WeaponLineColor(slot)).Skip(1).Select(run => run.Text),
+                    read.SelectMany(line => line).Select(run => run.Text));
+                var size = DungeonHud.TooltipSize(DungeonHud.SlotName(slot, carried).Text, read, DungeonHud.HoverAction(carried, leaving: true).Text);
+                foreach (var mouse in new[] { new Vector2(0f, 0f), new Vector2(1279f, 0f), new Vector2(0f, 719f), new Vector2(1279f, 719f), new Vector2(640f, 360f) })
+                {
+                    var at = DungeonHud.PlaceTooltip(mouse, size, 1280f, 720f);
+                    Assert.True(at.X >= DungeonHud.TooltipMargin && at.X + size.X <= 1280f - DungeonHud.TooltipMargin, $"{def.Id}: the tooltip at {mouse} runs off the window's sides");
+                    Assert.True(at.Y >= DungeonHud.TooltipMargin && at.Y + size.Y <= 720f - DungeonHud.TooltipMargin, $"{def.Id}: the tooltip at {mouse} runs off the window's top or bottom");
+                }
+            }
         }
         Assert.InRange(mostLines, 3, DungeonHud.WeaponLineMost);
         Assert.Equal(5, DungeonHud.WeaponLineMost);
@@ -1051,60 +1075,55 @@ public sealed class HudTextTests : IDisposable
     }
 
     [Fact]
-    public void TheEquipHintNamesEveryBagSlot()
+    public void TheEquipHintSaysARightClickEquips()
     {
-        // The panel numbers slots from 1 -- the hand is 1 -- and a number key equips
-        // the bag slot printed with it, so six slots are equipped with 2-6 (PHASE4-143).
-        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(PartyMemberState.InventorySlots));
-        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(TestPools.Char("A").Inventory.Length));
-
-        // It is read off the slots, so a carry tuned differently reads differently:
-        // Phase 3's three, a bag of one, and no bag at all.
-        Assert.Equal("PRESS 2-3 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(3));
-        Assert.Equal("PRESS 2 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(2));
+        // The user's ruling of 2026-11-21: the bag is worked with the mouse — a
+        // right click on a slot's cell equips it — and no key picks a slot, so the
+        // hint names no number, whatever the carry. A hand and no bag has nothing
+        // to swap in.
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(PartyMemberState.InventorySlots));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(TestPools.Char("A").Inventory.Length));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(GameConstants.MaxInventorySlots));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(2));
         Assert.Equal("I TO CLOSE", DungeonHud.EquipHint(1));
+        Assert.DoesNotMatch(@"\d", DungeonHud.EquipHint(GameConstants.MaxInventorySlots, potion: true));
 
-        // It never names a key the scene does not bind: past the last number key,
-        // it names the keys there are.
-        Assert.Equal(9, DungeonScene.HighestSlotKey);
-        Assert.Equal("PRESS 2-8 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(8));
-        Assert.Equal("PRESS 2-9 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(12));
+        // The wiring: a slot is equipped, drunk from or left through the one door a
+        // cell's right click opens, and a number key reaches none of the three.
+        foreach (string act in new[] { "EquipSlot", "DrinkSlot", "LeaveSlot" })
+            Assert.Equal(["DungeonScene.PickBagSlot"], TestIl.CallersOf(typeof(DungeonScene), act));
+        Assert.DoesNotContain("DungeonScene.NumberKey", TestIl.CallersOf(typeof(DungeonScene), nameof(DungeonScene.PickBagSlot)));
     }
 
     [Fact]
     public void TheLeaveHintNamesItsKeys()
     {
-        // In the bag, X arms "leave" (4.4), and while it is armed the key hint
-        // asks which weapon to put down: by the bag's own numbers, the same keys
-        // that equip, read off the same slots, with X again to back out. Never 1:
-        // the weapon in hand is not put down this way.
+        // In the bag, X arms "leave" (4.4), and while it is armed the hint asks
+        // which weapon to put down: by the same right click that equips, with X
+        // again to back out. The weapon in hand is not put down this way: the hand
+        // is no cell of the grid.
         int slots = PartyMemberState.InventorySlots;
-        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots));
-        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(TestPools.Char("A").Inventory.Length));
+        Assert.Equal("LEAVE WHICH? RIGHT CLICK IT - X CANCELS", DungeonHud.LeaveHint(slots));
+        Assert.Equal("LEAVE WHICH? RIGHT CLICK IT - X CANCELS", DungeonHud.LeaveHint(TestPools.Char("A").Inventory.Length));
 
         var words = DungeonHud.LeaveHint(slots).Split([' ', '?'], StringSplitOptions.RemoveEmptyEntries);
         Assert.Contains("X", words);
         Assert.Contains("CANCELS", words);
-        Assert.DoesNotContain("1", DungeonHud.LeaveHint(slots));
 
-        // The same keys the equip hint names, whatever depth the carry is tuned to:
-        // Phase 3's three, a bag of one, the deepest the number row reaches, and
-        // no key past it. A hand and no bag has nothing to put down.
-        foreach (int n in new[] { 2, 3, 6, 8, 12 })
+        // The same whatever depth the carry is tuned to, and no number in it. A
+        // hand and no bag has nothing to put down.
+        foreach (int n in new[] { 2, 3, 6, 8, GameConstants.MaxInventorySlots })
         {
-            string keys = DungeonHud.EquipHint(n).Split(' ')[1];   // PRESS 2-6 TO EQUIP: the keys
-            Assert.Equal($"LEAVE WHICH? {keys} - X CANCELS", DungeonHud.LeaveHint(n));
+            Assert.Equal("LEAVE WHICH? RIGHT CLICK IT - X CANCELS", DungeonHud.LeaveHint(n));
+            Assert.DoesNotMatch(@"\d", DungeonHud.LeaveHint(n));
         }
-        Assert.Equal("LEAVE WHICH? 2 - X CANCELS", DungeonHud.LeaveHint(2));
-        Assert.Equal("LEAVE WHICH? 2-9 - X CANCELS", DungeonHud.LeaveHint(12));
         Assert.Equal("NOTHING TO LEAVE - X CANCELS", DungeonHud.LeaveHint(1));
 
         // Unarmed, the panel names the key, so X can be found at all. An armed
-        // number on an empty slot says so by the number pressed, and a weapon put
-        // down says what was left, answered by TOOK when it is taken back.
+        // click on an empty cell says so, and a weapon put down says what was
+        // left, answered by TOOK when it is taken back.
         Assert.Equal("X TO LEAVE ONE HERE", DungeonHud.LeaveKeyHint);
-        Assert.Equal("SLOT 3 IS EMPTY", DungeonHud.EmptySlotCue(2));
-        Assert.Equal("SLOT 6 IS EMPTY", DungeonHud.EmptySlotCue(5));
+        Assert.Equal("THAT SLOT IS EMPTY", DungeonHud.EmptySlotCue);
         Assert.Equal("LEFT HATCHET HERE", DungeonHud.LeftBeat(TestWeapons.Get("hatchet")));
 
         // And a full bag's refusal is still a carry limit, not a fault, and now
@@ -1118,16 +1137,16 @@ public sealed class HudTextTests : IDisposable
     [Fact]
     public void APotionsSlotNamesIt()
     {
-        // Phase 6b.1: the bag panel names a potion's slot by its number and the
-        // potion, in the colour of the pool it fills — green for health, cyan for
-        // mana — and a weapon's as it always has: its line's colour, a unique's
-        // orange. The widest a save may load runs inside the window from the slot's
-        // place, in the HUD's font.
-        Assert.Equal(new DungeonHud.Run("3  HEALTH POTION Q2", DungeonHud.Green), DungeonHud.SlotName(2, TestPotions.Health(2)));
-        Assert.Equal(new DungeonHud.Run("4  MANA POTION Q1", DungeonHud.Cyan), DungeonHud.SlotName(3, TestPotions.Mana(1)));
+        // Phase 6b.1: the bag panel names a potion's slot by the potion, in the
+        // colour of the pool it fills — green for health, cyan for mana — and a
+        // weapon's as it always has: its line's colour, a unique's orange. No slot
+        // is numbered since no key picks one (the user's ruling of 2026-11-21).
+        // The widest a save may load runs inside the panel, in the HUD's font.
+        Assert.Equal(new DungeonHud.Run("HEALTH POTION Q2", DungeonHud.Green), DungeonHud.SlotName(2, TestPotions.Health(2)));
+        Assert.Equal(new DungeonHud.Run("MANA POTION Q1", DungeonHud.Cyan), DungeonHud.SlotName(3, TestPotions.Mana(1)));
         Assert.Equal((DungeonHud.Green, DungeonHud.Cyan), (DungeonHud.PotionColor(PotionType.Health), DungeonHud.PotionColor(PotionType.Mana)));
-        Assert.Equal(new DungeonHud.Run("1  HATCHET", DungeonHud.WeaponLineColor(0)), DungeonHud.SlotName(0, TestWeapons.Get("hatchet")));
-        Assert.Equal(new DungeonHud.Run("2  HATCHET", DungeonHud.WeaponLineColor(1)), DungeonHud.SlotName(1, TestWeapons.Get("hatchet")));
+        Assert.Equal(new DungeonHud.Run("HATCHET", DungeonHud.WeaponLineColor(0)), DungeonHud.SlotName(0, TestWeapons.Get("hatchet")));
+        Assert.Equal(new DungeonHud.Run("HATCHET", DungeonHud.WeaponLineColor(1)), DungeonHud.SlotName(1, TestWeapons.Get("hatchet")));
         var unique = GameContent.Current.Weapons.All.First(def => def.Unique);
         Assert.Equal(DungeonHud.Orange, DungeonHud.SlotName(1, TestWeapons.Get(unique.Id, unique.Class == WeaponClass.Wand ? DamageType.Cold : null)).Color);
 
@@ -1139,14 +1158,14 @@ public sealed class HudTextTests : IDisposable
     [Fact]
     public void TheLeaveHintSaysPourWhenTheBagHoldsAPotion()
     {
-        // While the bag holds a potion, X's keys put a weapon down or pour a potion
-        // out (PHASE 6b DECISION 1): both hints say so, by the same keys. A bag of
+        // While the bag holds a potion, X's click puts a weapon down or pours a potion
+        // out (PHASE 6b DECISION 1): both hints say so, by the same click. A bag of
         // weapons says what it always said. The pour says what it did over the
         // member, and nothing of it lies on the floor to take back.
         int slots = PartyMemberState.InventorySlots;
-        Assert.Equal("LEAVE OR POUR OUT WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots, potion: true));
-        Assert.Equal("LEAVE WHICH? 2-6 - X CANCELS", DungeonHud.LeaveHint(slots, potion: false));
-        Assert.Equal("LEAVE OR POUR OUT WHICH? 2-9 - X CANCELS", DungeonHud.LeaveHint(12, potion: true));
+        Assert.Equal("LEAVE OR POUR OUT WHICH? RIGHT CLICK IT - X CANCELS", DungeonHud.LeaveHint(slots, potion: true));
+        Assert.Equal("LEAVE WHICH? RIGHT CLICK IT - X CANCELS", DungeonHud.LeaveHint(slots, potion: false));
+        Assert.Equal("LEAVE OR POUR OUT WHICH? RIGHT CLICK IT - X CANCELS", DungeonHud.LeaveHint(12, potion: true));
         Assert.Equal("NOTHING TO LEAVE - X CANCELS", DungeonHud.LeaveHint(1, potion: true));
         Assert.Equal("X TO LEAVE OR POUR ONE OUT", DungeonHud.PourKeyHint);
         Assert.Equal("X TO LEAVE ONE HERE", DungeonHud.LeaveKeyHint);
@@ -1167,13 +1186,14 @@ public sealed class HudTextTests : IDisposable
 
         // Each in the HUD's font; the armed hint and the cue across the window at their
         // 1.5 and 2, and the header row's hint at its 1.2 beside EQUIPPED inside the
-        // panel's 380.
+        // panel, at its 1280 window's width and at the 380 it once was.
         string fullCue = DungeonHud.BagFullCue(GameConstants.MaxInventorySlots, potion: true);
         foreach (string text in new[] { DungeonHud.LeaveHint(12, potion: true), DungeonHud.PourKeyHint, DungeonHud.PouredBeat(TestPotions.Health(ContentBounds.MostCount)), fullCue })
             Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", text);
         Assert.True(DungeonHud.LeaveHint(12, potion: true).Length * 6f * 1.5f <= 1240f);
         Assert.True(fullCue.Length * 6f * 2f <= 1240f, $"'{fullCue}' runs off the window");
         Assert.True(("EQUIPPED".Length + 1 + DungeonHud.PourKeyHint.Length) * 6f * 1.2f <= 380f);
+        Assert.True(DungeonHud.InventoryWidth(1280f) >= 380f);
     }
 
     /// <summary>The drink's numbers as this file states them, over the premise: §3.4's 20 a unit for both pools, and 40 a drink.</summary>
@@ -1254,15 +1274,15 @@ public sealed class HudTextTests : IDisposable
     [Fact]
     public void TheEquipHintSaysDrinkWhenTheBagHoldsAPotion()
     {
-        // Phase 6b.2: a bag number on a potion's slot drinks it, so while the bag
-        // holds one the hint says the same keys equip or drink. A bag of weapons
+        // Phase 6b.2: a pick of a potion's slot drinks it, so while the bag holds
+        // one the hint says the same click equips or drinks. A bag of weapons
         // says what it always said; a hand and no bag has neither to offer.
         int slots = PartyMemberState.InventorySlots;
-        Assert.Equal("PRESS 2-6 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(slots, potion: true));
-        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots, potion: false));
-        Assert.Equal("PRESS 2-6 TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots));
-        Assert.Equal("PRESS 2 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(2, potion: true));
-        Assert.Equal("PRESS 2-9 TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(12, potion: true));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(slots, potion: true));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots, potion: false));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP - I TO CLOSE", DungeonHud.EquipHint(slots));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(2, potion: true));
+        Assert.Equal("RIGHT CLICK A SLOT TO EQUIP OR DRINK - I TO CLOSE", DungeonHud.EquipHint(12, potion: true));
         Assert.Equal("I TO CLOSE", DungeonHud.EquipHint(1, potion: true));
         Assert.Matches(@"^[A-Z0-9 .,:_!?()/<>\[\]+=#*-]+$", DungeonHud.EquipHint(12, potion: true));
         Assert.True(DungeonHud.EquipHint(12, potion: true).Length * 6f * 1.5f <= 1240f);

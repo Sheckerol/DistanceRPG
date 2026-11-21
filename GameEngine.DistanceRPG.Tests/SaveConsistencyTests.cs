@@ -1401,13 +1401,18 @@ public sealed class SaveConsistencyTests : IDisposable
         }
 
         // A member whose bag is its hand alone — a save written under a PartyCarrySlots
-        // of one slot a member — has no slot a potion can lie in, and is told so.
-        RefusedAt(Edited(text, tree =>
-            {
-                var hand = MemberNode(tree, 0)["inventory"]![0]!.DeepClone();
-                MemberNode(tree, 0)["inventory"] = new JsonArray(hand);
-            }),
-            "campaign.party[0].potions[0].slot", "2 is no bag slot of member A: it carries a hand and no bag");
+        // of one slot a member, and loaded under one: a deeper carry would grow the
+        // bag (the user's ruling of 2026-11-21) — has no slot a potion can lie in, and
+        // is told so.
+        string handOnly = Edited(text, tree =>
+        {
+            var hand = MemberNode(tree, 0)["inventory"]![0]!.DeepClone();
+            MemberNode(tree, 0)["inventory"] = new JsonArray(hand);
+        });
+        var hands = new PartyData(Premise.Party.Members.Select(m => m with { BagWeaponIds = [] }).ToList());
+        using (TestContent.UsePremise(tuning: t => t with { PartyCarrySlots = GameConstants.PartySize }, party: hands))
+            RefusedAt(handOnly, "campaign.party[0].potions[0].slot", "2 is no bag slot of member A: it carries a hand and no bag");
+        Restores(handOnly, "a hand-only bag, grown to the carry: slot 2 is a bag slot again");
 
         // At its ceiling a quality passes its own read. A whole save carrying one is
         // none play will write — from Phase 6b's farm on, what the bags carry is

@@ -4771,3 +4771,38 @@ resting and let XP count in every mode (DECISIONS 23 and 24).
   will not go back when the new campaign never begins, are each still said on
   their own. Both files are still set aside and never deleted, so a slot begun
   over many times keeps two more `campaign.abandoned-N.json` each time.
+- **A bag of thirty, worked with the mouse, ruled 2026-11-21 (after play).** The
+  user limped through a dungeon and ran out of slots "without even getting out":
+  "We probably need thirty at least", then "30 per individual or three rows of
+  10", and "We shouldn't be relying on pressing keys to swap ... a click and drag
+  system would be best. For now having right click equip is fine, but a gui with
+  mouse over text and things like that is the eventual plan."
+  - *The carry*: a member carries the hand and a bag of thirty — 31 slots, 124
+    party-wide (`PartyCarrySlots`), where §4.4 began at 6 and 24. The structure
+    stands: loot and weapons share the slots and there is no haul bag. The
+    ceiling was nine a member because a slot was picked by its number key; it is
+    31 now (`GameConstants.MaxInventorySlots`) because the bag panel draws the
+    hand and three rows of ten, refused past at load
+    (`ContentValidator.RuleEverySlotHasACell`).
+  - *A campaign under way gets the room*: a save holds each bag's length, and a
+    load gives the member that many slots or the tuning's carry, whichever is
+    more (`SaveMapper`), everything where it lay. A shallower carry never
+    shrinks a saved bag. No save version step: nothing in the document changed.
+  - *The panel*: `INVENTORY - CHAR A`, the weapon in hand with its statline, then
+    `BAG - 12 OF 30` over a grid of cells, ten a row, each naming what it holds
+    on two short lines in the item's colour. The cell under the mouse is lit and
+    read whole in a tooltip beside the mouse: the name, the statline as it reads
+    in this member's hands (or what a potion restores now), and what a right
+    click does. **A right click on a cell** equips its weapon or drinks its
+    potion; with X armed it leaves the weapon or pours the potion out. No key
+    picks a slot any more — the number keys still pick a pause-menu option and
+    select a member — and a left click on a cell does nothing yet: it is kept
+    for the drag to come.
+  - *Not done, and the user's eventual plan*: click and drag between cells, the
+    hand and the floor; the same grid between runs (the WEAPONS page is still a
+    list, which names every bag row it holds); icons. The slots are no longer
+    numbered in the dungeon, so `SLOT 3 IS EMPTY` is `THAT SLOT IS EMPTY`.
+  - *What this leaves open*: §4.4's tension — "every drop you pick up climbing
+    out costs you a weapon you could have been swinging" — is gone in practice at
+    120 bag slots a party, and the farm's worked number for a "full loadout" of
+    potions (§6.6) was stated against a bag of six. Neither is retuned here.

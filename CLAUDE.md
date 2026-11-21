@@ -44,7 +44,9 @@ GameEngine.DistanceRPG/         # Game executable
                                 # campaign's own slot, at a safe point), 3 QUIT TO TITLE (IRunHost.cs'
                                 # ISaveHost is what the scenes ask of the game for it)
   DungeonScene.cs               # Scene: geometry, input, fog wiring, events
-  DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel)
+  DungeonHud.cs                 # Screen-space HUD (bitmap text, floating combat text, inventory panel:
+                                # the hand over the bag as a grid of cells, ten a row, read by hovering
+                                # — a tooltip — and picked by right click, never a key)
   BetweenRunsScene.cs           # The screen between runs, three pages Tab goes round: DUNGEONS (the
                                 # last run's summary, the list), WEAPONS and ALCHEMIST; every change
                                 # there asks the game for a save (IBetweenRunsHost.RequestSave).

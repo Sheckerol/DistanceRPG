@@ -153,7 +153,7 @@ public static class ContentValidator
     public const string RuleFloorNumberStartsAtOne = "a floor number starts at 1";
     public const string RuleShareIsAPercentage = "a share is a percentage, 0 to 100";
     public const string RuleCarryFillsTheParty = "the party's carry divides evenly among its members, at least one slot each";
-    public const string RuleEverySlotHasAKey = "a member carries no more slots than the number keys can equip";
+    public const string RuleEverySlotHasACell = "a member carries no more slots than the bag panel draws";
     public const string RuleGatherTakesATile = "the stairs gather the party from at least a tile away";
 
     public const string RuleThemeIsClassSignature = "a dungeon's theme is a class signature";
@@ -382,9 +382,9 @@ public static class ContentValidator
     /// floor is a floor number, which starts at 1; the death clawback is a share
     /// of a gain; the carry divides evenly among the members with a slot each, or
     /// somebody has no hand to hold a weapon in and the party's 24 is not what
-    /// the members carry, and shares out no deeper than the number keys equip
-    /// (<see cref="GameConstants.MaxInventorySlots"/>, nine a member), or loot
-    /// lands in a slot no key can reach; and the stairs gather from at least a
+    /// the members carry, and shares out no deeper than the bag panel draws
+    /// (<see cref="GameConstants.MaxInventorySlots"/>, the hand and thirty a
+    /// member), or loot lands in a slot the panel has no cell for; and the stairs gather from at least a
     /// tile away. So is §3.4's: a drink's cost (<see cref="Tuning.PotionUseCost"/>)
     /// is a count, movement spent or none, never movement handed back; and §6.6's:
     /// the farm's yield a clear (<see cref="Tuning.FarmYieldPerClear"/>) is a count
@@ -464,7 +464,7 @@ public static class ContentValidator
             throw new ContentException(nameof(Tuning.PartyCarrySlots), RuleCarryFillsTheParty,
                 $"{tuning.PartyCarrySlots} slots among {GameConstants.PartySize} members");
         if (PartyMemberState.SlotsFor(tuning) > GameConstants.MaxInventorySlots)
-            throw new ContentException(nameof(Tuning.PartyCarrySlots), RuleEverySlotHasAKey,
+            throw new ContentException(nameof(Tuning.PartyCarrySlots), RuleEverySlotHasACell,
                 $"{tuning.PartyCarrySlots} slots among {GameConstants.PartySize} members is {PartyMemberState.SlotsFor(tuning)} each, past {GameConstants.MaxInventorySlots}");
         if (tuning.StairGatherTiles < 1)
             throw new ContentException(nameof(Tuning.StairGatherTiles), RuleGatherTakesATile, $"{tuning.StairGatherTiles}");

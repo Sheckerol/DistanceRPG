@@ -622,7 +622,11 @@ internal static class SaveMapper
             throw new SaveFormatException($"{at}.inventory",
                 $"{bag.Count} slots: a member carries at least the one in hand and at most {GameConstants.MaxInventorySlots}");
 
-        var member = PartyMemberState.Restore(row.Id, row.ColorIndex, stats, bag.Count);
+        // The bag the save holds, grown to the carry the tuning in hand gives a
+        // member where that is deeper (the user's ruling of 2026-11-21: the carry
+        // went from six a member to thirty-one, and a campaign under way plays on
+        // with the room). Never shrunk: what lies past a shallower carry stays.
+        var member = PartyMemberState.Restore(row.Id, row.ColorIndex, stats, Math.Max(bag.Count, PartyMemberState.SlotsFor(content.Tuning)));
 
         foreach (var (name, xp) in Required(row.WeaponXp, $"{at}.weaponXp"))
             member.WeaponXp[EnumOf<WeaponClass>(name, $"{at}.weaponXp.{name}", "weapon class")] = Count(xp, $"{at}.weaponXp.{name}");

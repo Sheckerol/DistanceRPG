@@ -608,13 +608,15 @@ public sealed class CampaignSaveTests : IDisposable
     }
 
     [Fact]
-    public void AMemberKeepsTheSlotsItWasBuiltWith()
+    public void ASavedBagGrowsToTheCarry_AndNeverShrinks()
     {
-        // A bag is the size it was built with (PartyMemberState.InventorySlots is
-        // read when a member is built), and a save carries the length: a changed
-        // PartyCarrySlots gives new members the new count and never resizes a bag
-        // that exists — a six-slot bag stays six under a tuning of 36, and a
-        // nine-slot one stays nine under 24.
+        // A save carries each bag's length, and a load gives the member that many
+        // slots or the carry the tuning in hand gives, whichever is more (the
+        // user's ruling of 2026-11-21: the carry went from six a member to
+        // thirty-one, and a campaign under way plays on with the room) — a
+        // six-slot bag is nine under a tuning of 36, everything where it lay and
+        // the new slots empty; a nine-slot one stays nine under 24, since what its
+        // last slots hold would have nowhere to go.
         string six = Save(NewCampaign());
         string nine;
         using (TestContent.UsePremise(tuning: t => t with { PartyCarrySlots = 36 }))
@@ -622,7 +624,14 @@ public sealed class CampaignSaveTests : IDisposable
             Assert.Equal(9, PartyMemberState.InventorySlots);
             var loaded = Load(six);
             Assert.True(loaded.TuningChanged);
-            Assert.All(loaded.Campaign.Party, member => Assert.Equal(6, member.Inventory.Length));
+            Assert.All(loaded.Campaign.Party, member => Assert.Equal(9, member.Inventory.Length));
+            var began = NewCampaign().Party;
+            for (int m = 0; m < began.Count; m++)
+            {
+                var grown = loaded.Campaign.Party[m];
+                Assert.Equal(began[m].Inventory.Select(item => (item as Weapon)?.Id), grown.Inventory.Select(item => (item as Weapon)?.Id));
+                Assert.All(grown.Inventory.Skip(6), Assert.Null);
+            }
 
             var built = NewCampaign();
             Assert.All(built.Party, member => Assert.Equal(9, member.Inventory.Length));
@@ -634,7 +643,7 @@ public sealed class CampaignSaveTests : IDisposable
         Assert.Equal(nine.Replace(TuningJson.Hash(Premise.Tuning with { PartyCarrySlots = 36 }), TuningJson.Hash(GameContent.Current.Tuning), StringComparison.Ordinal),
             Save(Load(nine).Campaign));
 
-        // A bag no member can carry — no hand, or more slots than there are keys — is refused.
+        // A bag no member can carry — no hand, or more slots than the bag panel draws — is refused.
         Assert.Equal("campaign.party[1].inventory", RefusedAfter(six, tree => Party(tree, 1)["inventory"] = new JsonArray()).Where);
         Assert.Equal("campaign.party[1].inventory", RefusedAfter(six, tree =>
             Party(tree, 1)["inventory"] = new JsonArray(Enumerable.Range(0, GameConstants.MaxInventorySlots + 1).Select(_ => (JsonNode?)null).ToArray())).Where);

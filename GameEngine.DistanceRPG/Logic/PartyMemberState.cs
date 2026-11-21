@@ -66,10 +66,12 @@ public sealed class PartyMemberState : ActorState
 
     /// <summary>
     /// A member as a save describes it (§5.1): its id, its colour, the spread it
-    /// was built with and the bag it was built with — <paramref name="slots"/>
-    /// of them, whatever the current tuning's carry would give a member built
-    /// now, since a member keeps the count it was built with and a changed
-    /// <c>tuning.json</c> never resizes a bag. Everything else — the XP, the body,
+    /// was built with and a bag of <paramref name="slots"/> slots — the count the
+    /// save holds, or the current tuning's carry where that is deeper
+    /// (<c>SaveMapper</c> asks for the larger): a deeper carry in
+    /// <c>tuning.json</c> grows a saved bag, so a campaign begun under six slots
+    /// plays on under thirty-one, and a shallower one never shrinks it, since
+    /// what the slots past it hold would have nowhere to go. Everything else — the XP, the body,
     /// what the bag holds, the turn's movement — the load writes back after, as
     /// plain state. The one construction a load makes, beside
     /// <see cref="From"/>'s for a new campaign; internal, so a restore is never a
@@ -231,15 +233,16 @@ public sealed class PartyMemberState : ActorState
 
     /// <summary>
     /// Weapon slots a member carries: the party's carry
-    /// (<see cref="Tuning.PartyCarrySlots"/>, §4.4's 24) shared evenly among its
-    /// <see cref="GameConstants.PartySize"/> members — six each, replacing the
-    /// three that were a testing remnant. Slot 0 is the weapon in hand; the rest
-    /// are the bag, and loot and weapons share them — there is no haul bag, so
-    /// every drop carried out is a weapon that could have been swung.
+    /// (<see cref="Tuning.PartyCarrySlots"/>) shared evenly among its
+    /// <see cref="GameConstants.PartySize"/> members — thirty-one each under the
+    /// shipped tuning, the hand and a bag of thirty (the user's ruling of
+    /// 2026-11-21), where §4.4 began at six. Slot 0 is the weapon in hand; the
+    /// rest are the bag, and loot and weapons share them — there is no haul bag.
     /// <para>
-    /// Read from the current content when a member is built, so a member keeps
-    /// the count it was built with. A roster entry's starting weapon and bag are
-    /// checked against the same number at load, so a bag too deep to spawn
+    /// Read from the current content when a member is built. A member keeps the
+    /// count it was built with until a save is loaded under a deeper carry, which
+    /// grows it (<see cref="Restore"/>). A roster entry's starting weapon and bag
+    /// are checked against the same number at load, so a bag too deep to spawn
     /// aborts startup.
     /// </para>
     /// </summary>
@@ -250,7 +253,7 @@ public sealed class PartyMemberState : ActorState
     /// the party's size. <see cref="ContentValidator.ValidateTuning"/> refuses a
     /// carry that does not divide evenly, a slot or more each, so nothing is lost
     /// to the division, and one that shares out past
-    /// <see cref="GameConstants.MaxInventorySlots"/>, so every slot has a key.
+    /// <see cref="GameConstants.MaxInventorySlots"/>, so every slot has a cell of the bag panel.
     /// Content being loaded passes its own tuning, since the content
     /// <see cref="InventorySlots"/> reads is not current yet.
     /// </summary>
@@ -261,10 +264,11 @@ public sealed class PartyMemberState : ActorState
     }
 
     /// <summary>
-    /// The member's <see cref="InventorySlots"/> slots, six under the shipped
-    /// tuning; slot 0 is the equipped weapon. The array is the member's for good:
-    /// only construction sizes it — a restore (<see cref="Restore"/>) to the count
-    /// the saved member was built with — and every write after is to a slot.
+    /// The member's <see cref="InventorySlots"/> slots, thirty-one under the
+    /// shipped tuning; slot 0 is the equipped weapon. The array is the member's
+    /// for good: only construction sizes it — a restore (<see cref="Restore"/>) to
+    /// the count the save holds, or the current carry where that is deeper — and
+    /// every write after is to a slot.
     /// <para>
     /// <strong>A slot holds a weapon or a potion</strong> (<see cref="IItem"/>,
     /// §3.4), one thing or nothing. The hand holds a weapon by rule (PHASE 6a

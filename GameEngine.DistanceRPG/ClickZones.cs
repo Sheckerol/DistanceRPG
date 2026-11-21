@@ -21,6 +21,12 @@ namespace GameEngine.DistanceRPG;
 /// The zone under the mouse is lit as it is laid down, under the text, so what a
 /// click would take reads before it is made. The last zone laid down over a point
 /// is the one clicked: what is drawn over the rest.
+/// <para>
+/// A cell of the dungeon's bag takes the <strong>right</strong> click (the user's
+/// ruling of 2026-11-21: right click equips, the left kept for the drag to come):
+/// zones of their own (<see cref="AddRight"/>, <see cref="RightClick"/>), lit the
+/// same way, which a left click never reaches.
+/// </para>
 /// </summary>
 internal sealed class ClickZones : IDisposable
 {
@@ -41,6 +47,7 @@ internal sealed class ClickZones : IDisposable
 
     private readonly Func<InputEventManager> _input;
     private readonly List<Zone> _zones = [];
+    private readonly List<Zone> _rightZones = [];
     private readonly HudRects _rects = new();
     private ShaderManager? _shaders;
     private int _width;
@@ -55,6 +62,9 @@ internal sealed class ClickZones : IDisposable
     /// <summary>The zones laid down in the last frame, in the order they were.</summary>
     public IReadOnlyList<Zone> Zones => _zones;
 
+    /// <summary>The right click's zones laid down in the last frame, in the order they were.</summary>
+    public IReadOnlyList<Zone> RightZones => _rightZones;
+
     /// <summary>
     /// A frame begins: the last frame's zones go, and the zone under the mouse is
     /// lit through <paramref name="shaders"/> in a window <paramref name="width"/> by
@@ -63,6 +73,7 @@ internal sealed class ClickZones : IDisposable
     public void BeginFrame(ShaderManager shaders, int width, int height)
     {
         _zones.Clear();
+        _rightZones.Clear();
         _rects.Initialize();
         _shaders = shaders;
         _width = width;
@@ -71,10 +82,17 @@ internal sealed class ClickZones : IDisposable
 
     /// <summary>A zone: <paramref name="onClick"/> when a click lands in it. Lit while the mouse is over it, in a frame begun (<see cref="BeginFrame"/>).</summary>
     public void Add(float x, float y, float width, float height, Action onClick)
+        => Lay(_zones, x, y, width, height, onClick);
+
+    /// <summary>A zone of the right click's: <paramref name="onClick"/> when a right click lands in it (<see cref="RightClick"/>). Lit while the mouse is over it, as a left click's is.</summary>
+    public void AddRight(float x, float y, float width, float height, Action onClick)
+        => Lay(_rightZones, x, y, width, height, onClick);
+
+    private void Lay(List<Zone> zones, float x, float y, float width, float height, Action onClick)
     {
         ArgumentNullException.ThrowIfNull(onClick);
         var zone = new Zone(x, y, width, height, onClick);
-        _zones.Add(zone);
+        zones.Add(zone);
         if (_shaders is not null && zone.Contains(Mouse))
             _rects.Fill(_shaders, _width, _height, x, y, width, height, Lit);
     }
@@ -94,13 +112,18 @@ internal sealed class ClickZones : IDisposable
     }
 
     /// <summary>A click at <paramref name="at"/>: the last zone laid down over it acts, and true; false over none.</summary>
-    public bool Click(Vector2 at)
+    public bool Click(Vector2 at) => Take(_zones, at);
+
+    /// <summary>A right click at <paramref name="at"/>: the last of its zones laid down over it acts (<see cref="AddRight"/>), and true; false over none.</summary>
+    public bool RightClick(Vector2 at) => Take(_rightZones, at);
+
+    private static bool Take(List<Zone> zones, Vector2 at)
     {
-        for (int i = _zones.Count - 1; i >= 0; i--)
+        for (int i = zones.Count - 1; i >= 0; i--)
         {
-            if (!_zones[i].Contains(at))
+            if (!zones[i].Contains(at))
                 continue;
-            _zones[i].OnClick();
+            zones[i].OnClick();
             return true;
         }
         return false;

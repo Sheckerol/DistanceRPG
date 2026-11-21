@@ -82,16 +82,16 @@ public static class GameConstants
     public const int PartySize = 4;
 
     /// <summary>
-    /// The most slots a member may carry (§4.4): the weapon in hand and eight
-    /// bag slots. A slot is worked by the number key printed beside it — the
-    /// hand is 1, the bag runs from 2 — and the number row stops at 9, so a
-    /// carry shared out any deeper would land loot in slots no key can equip.
-    /// The ceiling on <see cref="Tuning.PartyCarrySlots"/> is this many a
-    /// member, 36 party-wide: refused past at load
-    /// (<see cref="ContentValidator.RuleEverySlotHasAKey"/>) and held against
-    /// the presentation's highest slot key by test, the way
-    /// <see cref="PartySize"/> is held against its spawn capacity. Raising it
-    /// needs another way to pick a slot first.
+    /// The most slots a member may carry (§4.4): the weapon in hand and a bag
+    /// of thirty, which the bag panel draws as three rows of ten (the user's
+    /// ruling of 2026-11-21, after play: the nine the number keys reached ran
+    /// out before the way out). A slot is picked with the mouse, on its cell of
+    /// the panel, so a carry shared out any deeper would land loot in slots the
+    /// panel has no cell for. The ceiling on <see cref="Tuning.PartyCarrySlots"/>
+    /// is this many a member, 124 party-wide: refused past at load
+    /// (<see cref="ContentValidator.RuleEverySlotHasACell"/>) and held against
+    /// the panel's own grid by test, the way <see cref="PartySize"/> is held
+    /// against its spawn capacity. Raising it needs more rows drawn first.
     /// </summary>
-    public const int MaxInventorySlots = 9;
+    public const int MaxInventorySlots = 31;
 }

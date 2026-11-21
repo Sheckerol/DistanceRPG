@@ -557,16 +557,16 @@ public class DungeonContentTests
         Rejected(t => t with { DeathXpLossPercent = -1 }, nameof(Tuning.DeathXpLossPercent), ContentValidator.RuleShareIsAPercentage);
 
         // The carry divides among the members, a slot each at least, and no member
-        // carries more slots than the number keys can equip.
+        // carries more slots than the bag panel draws.
         Rejected(t => t with { PartyCarrySlots = 25 }, nameof(Tuning.PartyCarrySlots), ContentValidator.RuleCarryFillsTheParty);
         Rejected(t => t with { PartyCarrySlots = 0 }, nameof(Tuning.PartyCarrySlots), ContentValidator.RuleCarryFillsTheParty);
-        Rejected(t => t with { PartyCarrySlots = 40 }, nameof(Tuning.PartyCarrySlots), ContentValidator.RuleEverySlotHasAKey);
+        Rejected(t => t with { PartyCarrySlots = 128 }, nameof(Tuning.PartyCarrySlots), ContentValidator.RuleEverySlotHasACell);
 
         // The stairs gather the party from a tile away at least.
         Rejected(t => t with { StairGatherTiles = 0 }, nameof(Tuning.StairGatherTiles), ContentValidator.RuleGatherTakesATile);
 
         // The ends of every range are choices, not errors: a one-floor range, no
-        // offset, no lock, no clawback or all of it, one slot a member or nine, one tile.
+        // offset, no lock, no clawback or all of it, one slot a member or thirty-one, one tile.
         ContentValidator.ValidateTuning(FixtureContent.Tuning with
         {
             BossFloorMin = 1, BossFloorMax = 1, BossStackOffset = 0, CooldownRunsPerFloor = 0,

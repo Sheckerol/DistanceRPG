@@ -159,7 +159,7 @@ internal sealed class AlchemistPage
         return $"{HubWeapons.MemberLine(member.Id)} - {room}";
     }
 
-    /// <summary>A potion's row under its member, its slot numbered as the dungeon's bag numbers it — the hand 1: <c>  BAG 4  HEALTH POTION Q3</c>.</summary>
+    /// <summary>A potion's row under its member, its slot numbered from the hand's 1 — bag slot 3 is the third cell of the dungeon's bag grid, and 4 here: <c>  BAG 4  HEALTH POTION Q3</c>.</summary>
     internal static string PotionText(int slot, Potion potion)
     {
         ArgumentNullException.ThrowIfNull(potion);

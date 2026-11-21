@@ -147,8 +147,8 @@ public class TuningFitTests
     public void ContentNoValueCanServeIsLeftToFailAsContent()
     {
         // Content no in-range value can serve is content's own error (1g): a member
-        // carrying ten weapons (forty slots, past the thirty-six the number keys
-        // reach), a dungeon pinned to floor 500, a weapon forged x4. The tuning is
+        // carrying thirty-two weapons (128 slots, past the 124 the bag panel
+        // draws), a dungeon pinned to floor 500, a weapon forged x4. The tuning is
         // left as it was, says nothing, and the content fails as content, naming
         // the entry and the rule — for the floor, the range every number of a
         // content file lies in (the user's ruling of 2026-09-25, R3), asked before
@@ -156,7 +156,7 @@ public class TuningFitTests
         var warnings = new List<string>();
 
         var ten = new PartyData(FixtureContent.Party.Members.Select((m, i) => i == 0
-            ? m with { BagWeaponIds = Enumerable.Repeat("staff_of_renewal", 9).ToList() }
+            ? m with { BagWeaponIds = Enumerable.Repeat("staff_of_renewal", GameConstants.MaxInventorySlots).ToList() }
             : m).ToList());
         var carry = Fit(BuiltIn, warnings, party: ten);
         Assert.Equal(BuiltIn.PartyCarrySlots, carry.PartyCarrySlots);   // left as it was
