@@ -5,3 +5,6 @@
 # checked out.
 GameEngine.DistanceRPG/Data/*.json text eol=lf
 GameEngine.DistanceRPG.Tests/TestData/saves/* text eol=lf
+# The suite frozen configuration (the ruling of 2026-11-20): the copies the tests
+# read in the masters place, edited as text by the loader tests, so LF everywhere too.
+GameEngine.DistanceRPG.Tests/TestData/content/* text eol=lf
